@@ -119,12 +119,15 @@ class ContextPrecisionWithReference(BaseMetric):
         """Calculate average precision from binary verdicts. Matches legacy logic exactly."""
         verdict_list = verdicts
         denominator = sum(verdict_list) + 1e-10
-        numerator = sum(
-            [
-                (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
-                for i in range(len(verdict_list))
-            ]
-        )
+
+        # Optimized O(n) calculation using iterative cumulative sum
+        cumsum = 0
+        numerator = 0.0
+        for i, verdict in enumerate(verdict_list):
+            cumsum += verdict
+            if verdict:
+                numerator += cumsum / (i + 1)
+
         score = numerator / denominator
 
         if np.isnan(score):
@@ -239,12 +242,15 @@ class ContextPrecisionWithoutReference(BaseMetric):
         """Calculate average precision from binary verdicts. Matches legacy logic exactly."""
         verdict_list = verdicts
         denominator = sum(verdict_list) + 1e-10
-        numerator = sum(
-            [
-                (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
-                for i in range(len(verdict_list))
-            ]
-        )
+
+        # Optimized O(n) calculation using iterative cumulative sum
+        cumsum = 0
+        numerator = 0.0
+        for i, verdict in enumerate(verdict_list):
+            cumsum += verdict
+            if verdict:
+                numerator += cumsum / (i + 1)
+
         score = numerator / denominator
 
         if np.isnan(score):
