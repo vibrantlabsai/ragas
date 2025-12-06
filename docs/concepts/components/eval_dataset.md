@@ -83,7 +83,7 @@ Ensure that the dataset contains the necessary fields for evaluation, such as us
 
 ```python
 from datasets import load_dataset
-dataset = load_dataset("explodinggradients/amnesty_qa","english_v3")
+dataset = load_dataset("vibrantlabsai/amnesty_qa","english_v3")
 ```
 
 Load the dataset into a Ragas EvaluationDataset object.

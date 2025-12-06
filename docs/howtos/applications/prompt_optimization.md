@@ -19,7 +19,7 @@ This balanced dataset allows us to assess both the assistant's helpfulness when 
 
 First, download the dataset:
 ```
-!curl -O https://huggingface.co/datasets/explodinggradients/diabetes_assistant_dataset/resolve/main/diabetes_assistant_dataset.csv
+!curl -O https://huggingface.co/datasets/vibrantlabsai/diabetes_assistant_dataset/resolve/main/diabetes_assistant_dataset.csv
 ```
 We'll test two nearly identical prompts that differ by only a single line - one with standard instructions and another with an added financial incentive statement. This minimal variation will help us investigate our hypothesis: do LLMs demonstrate improved instruction-following when presented with financial incentives?
 

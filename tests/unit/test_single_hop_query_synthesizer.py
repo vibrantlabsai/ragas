@@ -117,6 +117,48 @@ async def test_generate_scenarios_with_tuple_entities(fake_llm):
 
 
 @pytest.mark.asyncio
+async def test_generate_sample_includes_metadata(fake_llm):
+    node = Node(type=NodeType.CHUNK)
+    node.add_property("page_content", "Context about microservices and patterns.")
+    persona = Persona(name="Engineer", role_description="Builds systems")
+
+    synthesizer = SingleHopSpecificQuerySynthesizer(llm=fake_llm)
+
+    # Stub the prompt to avoid LLM dependency and return deterministic values
+    class StubPrompt(PydanticPrompt):
+        async def generate(self, data, llm, callbacks=None):  # type: ignore[override]
+            class R:
+                query = "What is microservices?"
+                answer = "Microservices are loosely coupled services."
+
+            return R()
+
+    synthesizer.generate_query_reference_prompt = StubPrompt()
+
+    # Build a minimal scenario
+    from ragas.testset.synthesizers.base import QueryLength, QueryStyle
+    from ragas.testset.synthesizers.single_hop.base import SingleHopScenario
+
+    scenario = SingleHopScenario(
+        nodes=[node],
+        persona=persona,
+        style=QueryStyle.PERFECT_GRAMMAR,
+        length=QueryLength.MEDIUM,
+        term="microservices",
+    )
+
+    sample = await synthesizer._generate_sample(scenario, callbacks=None)  # type: ignore[arg-type]
+
+    assert sample.user_input == "What is microservices?"
+    assert sample.reference == "Microservices are loosely coupled services."
+    assert sample.reference_contexts == ["Context about microservices and patterns."]
+    # New metadata fields
+    assert sample.persona_name == "Engineer"
+    assert sample.query_style == "PERFECT_GRAMMAR"
+    assert sample.query_length == "MEDIUM"
+
+
+@pytest.mark.asyncio
 async def test_generate_scenarios_with_string_entities(fake_llm):
     """Test that _generate_scenarios still works with string-formatted entities."""
     # Create a node with string-formatted entities (the normal case)

@@ -44,8 +44,8 @@ def test_quickstart_list_templates():
     assert result.exit_code == 0
     assert "Available Ragas Quickstart Templates" in result.stdout
     assert "rag_eval" in result.stdout
-    assert "agent_evals" in result.stdout
-    assert "benchmark_llm" in result.stdout
+    # Note: Other templates (agent_evals, benchmark_llm, etc.) are currently hidden
+    # as they are not yet fully implemented. Only rag_eval is available.
 
 
 def test_quickstart_invalid_template():

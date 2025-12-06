@@ -17,22 +17,39 @@ $$
 ### Example
 
 ```python
-from ragas import SingleTurnSample
-from ragas.metrics import ContextEntityRecall
+from openai import AsyncOpenAI
+from ragas.llms import llm_factory
+from ragas.metrics.collections import ContextEntityRecall
 
-sample = SingleTurnSample(
+# Setup LLM
+client = AsyncOpenAI()
+llm = llm_factory("gpt-4o-mini", client=client)
+
+# Create metric
+scorer = ContextEntityRecall(llm=llm)
+
+# Evaluate
+result = await scorer.ascore(
     reference="The Eiffel Tower is located in Paris.",
-    retrieved_contexts=["The Eiffel Tower is located in Paris."],
+    retrieved_contexts=["The Eiffel Tower is located in Paris."]
 )
+print(f"Context Entity Recall Score: {result.value}")
+```
 
-scorer = ContextEntityRecall(llm=evaluator_llm)
+Output:
+```
+Context Entity Recall Score: 0.999999995
+```
 
-await scorer.single_turn_ascore(sample)
-```
-Output
-```
-0.999999995
-```
+!!! note "Synchronous Usage"
+    If you prefer synchronous code, you can use the `.score()` method instead of `.ascore()`:
+    
+    ```python
+    result = scorer.score(
+        reference="The Eiffel Tower is located in Paris.",
+        retrieved_contexts=["The Eiffel Tower is located in Paris."]
+    )
+    ```
 
 ### How It’s Calculated
 
@@ -65,3 +82,29 @@ Let us consider the reference and the retrieved contexts given above.
 
     We can see that the first context had a high entity recall, because it has a better entity coverage given the reference. If these two retrieved contexts were fetched by two retrieval mechanisms on same set of documents, we could say that the first mechanism was better than the other in use-cases where entities are of importance.
 
+## Legacy Metrics API
+
+The following examples use the legacy metrics API pattern. For new projects, we recommend using the collections-based API shown above.
+
+!!! warning "Deprecation Timeline"
+    This API will be deprecated in version 0.4 and removed in version 1.0. Please migrate to the collections-based API shown above.
+
+### Example with SingleTurnSample
+
+```python
+from ragas import SingleTurnSample
+from ragas.metrics import ContextEntityRecall
+
+sample = SingleTurnSample(
+    reference="The Eiffel Tower is located in Paris.",
+    retrieved_contexts=["The Eiffel Tower is located in Paris."],
+)
+
+scorer = ContextEntityRecall(llm=evaluator_llm)
+
+await scorer.single_turn_ascore(sample)
+```
+Output:
+```
+0.999999995
+```

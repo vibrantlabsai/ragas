@@ -21,7 +21,7 @@ Let’s get started!
 Run the command below to download the dummy Ragas Airline dataset and load the documents using LangChain.
 
 ```sh
-! git clone https://huggingface.co/datasets/explodinggradients/ragas-airline-dataset
+! git clone https://huggingface.co/datasets/vibrantlabsai/ragas-airline-dataset
 ```
 
 ```python

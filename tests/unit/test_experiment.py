@@ -187,6 +187,13 @@ class TestVersionExperiment:
         with pytest.raises(ValueError, match="No git repository found"):
             find_git_root(temp_dir)
 
+    def test_version_experiment_missing_gitpython(self, temp_dir):
+        """Test that version_experiment provides helpful error when GitPython is not installed."""
+        with patch("ragas.utils.find_git_root", return_value=temp_dir):
+            with patch.dict("sys.modules", {"git": None}):
+                with pytest.raises(ImportError, match="uv pip install ragas\\[git\\]"):
+                    version_experiment("test_experiment")
+
 
 class TestExperimentDecorator:
     """Test the experiment decorator."""

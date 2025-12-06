@@ -13,7 +13,7 @@ pip install zeno-client
 
 Next, create an account at [hub.zenoml.com](https://hub.zenoml.com) and generate an API key on your [account page](https://hub.zenoml.com/account).
 
-We can now pick up the evaluation where we left off at the [Getting Started](./../../getstarted/index.md) guide:
+We can now pick up the evaluation where we left off at the [Getting Started](../../getstarted/evaluation.md) guide:
 
 
 ```python
@@ -21,6 +21,8 @@ import os
 
 import pandas as pd
 from datasets import load_dataset
+from zeno_client import ZenoClient, ZenoMetric
+
 from ragas import evaluate
 from ragas.metrics import (
     answer_relevancy,
@@ -28,7 +30,6 @@ from ragas.metrics import (
     context_recall,
     faithfulness,
 )
-from zeno_client import ZenoClient, ZenoMetric
 ```
 
 
@@ -40,7 +41,7 @@ os.environ["ZENO_API_KEY"] = "your-zeno-api-key"
 
 
 ```python
-fiqa_eval = load_dataset("explodinggradients/fiqa", "ragas_eval")
+fiqa_eval = load_dataset("vibrantlabsai/fiqa", "ragas_eval")
 result = evaluate(
     fiqa_eval["baseline"],
     metrics=[

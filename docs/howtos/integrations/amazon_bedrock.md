@@ -28,7 +28,7 @@ The steps covered in this notebook include:
     This command will clone the repository containing helper files needed for this tutorial. 
 
     ```
-    ! git clone https://huggingface.co/datasets/explodinggradients/booking_agent_utils
+    ! git clone https://huggingface.co/datasets/vibrantlabsai/booking_agent_utils
     ```
 
 

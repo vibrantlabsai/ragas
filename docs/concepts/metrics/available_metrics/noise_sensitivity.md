@@ -10,14 +10,22 @@ $$
 $$
 
 
-
-## Example
+### Example
 
 ```python
-from ragas.dataset_schema import SingleTurnSample
-from ragas.metrics import NoiseSensitivity
+from openai import AsyncOpenAI
+from ragas.llms import llm_factory
+from ragas.metrics.collections import NoiseSensitivity
 
-sample = SingleTurnSample(
+# Setup LLM
+client = AsyncOpenAI()
+llm = llm_factory("gpt-4o-mini", client=client)
+
+# Create metric
+scorer = NoiseSensitivity(llm=llm)
+
+# Evaluate
+result = await scorer.ascore(
     user_input="What is the Life Insurance Corporation of India (LIC) known for?",
     response="The Life Insurance Corporation of India (LIC) is the largest insurance company in India, known for its vast portfolio of investments. LIC contributes to the financial stability of the country.",
     reference="The Life Insurance Corporation of India (LIC) is the largest insurance company in India, established in 1956 through the nationalization of the insurance industry. It is known for managing a large portfolio of investments.",
@@ -28,21 +36,50 @@ sample = SingleTurnSample(
         "The Indian economy is one of the fastest-growing major economies in the world, thanks to sectors like finance, technology, manufacturing etc."
     ]
 )
-
-scorer = NoiseSensitivity(llm=evaluator_llm)
-await scorer.single_turn_ascore(sample)
-```
-Output
-```
-0.3333333333333333
+print(f"Noise Sensitivity Score: {result.value}")
 ```
 
-To calculate noise sensitivity of irrelevant context, you can set the `mode` parameter to `irrelevant`.
+Output:
+
+```
+Noise Sensitivity Score: 0.3333333333333333
+```
+
+To calculate noise sensitivity of irrelevant context, you can set the `mode` parameter to `irrelevant`:
 
 ```python
-scorer = NoiseSensitivity(mode="irrelevant")
-await scorer.single_turn_ascore(sample)
+scorer = NoiseSensitivity(llm=llm, mode="irrelevant")
+result = await scorer.ascore(
+    user_input="What is the Life Insurance Corporation of India (LIC) known for?",
+    response="The Life Insurance Corporation of India (LIC) is the largest insurance company in India, known for its vast portfolio of investments. LIC contributes to the financial stability of the country.",
+    reference="The Life Insurance Corporation of India (LIC) is the largest insurance company in India, established in 1956 through the nationalization of the insurance industry. It is known for managing a large portfolio of investments.",
+    retrieved_contexts=[
+        "The Life Insurance Corporation of India (LIC) was established in 1956 following the nationalization of the insurance industry in India.",
+        "LIC is the largest insurance company in India, with a vast network of policyholders and huge investments.",
+        "As the largest institutional investor in India, LIC manages substantial funds, contributing to the financial stability of the country.",
+        "The Indian economy is one of the fastest-growing major economies in the world, thanks to sectors like finance, technology, manufacturing etc."
+    ]
+)
+print(f"Noise Sensitivity (Irrelevant) Score: {result.value}")
 ```
+
+Output:
+
+```
+Noise Sensitivity (Irrelevant) Score: 0.0
+```
+
+!!! note "Synchronous Usage"
+    If you prefer synchronous code, you can use the `.score()` method instead of `.ascore()`:
+    
+    ```python
+    result = scorer.score(
+        user_input="What is the Life Insurance Corporation of India (LIC) known for?",
+        response="The Life Insurance Corporation of India (LIC) is the largest insurance company in India...",
+        reference="The Life Insurance Corporation of India (LIC) is the largest insurance company...",
+        retrieved_contexts=[...]
+    )
+    ```
 
 ## How It’s Calculated
 
@@ -103,5 +140,47 @@ Let's examine how noise sensitivity in relevant context was calculated:
 
 This results in a noise sensitivity score of 0.333, indicating that one out of three claims in the answer was incorrect.
 
+
+## Legacy Metrics API
+
+The following examples use the legacy metrics API pattern. For new projects, we recommend using the collections-based API shown above.
+
+!!! warning "Deprecation Timeline"
+    This API will be deprecated in version 0.4 and removed in version 1.0. Please migrate to the collections-based API shown above.
+
+### Example with SingleTurnSample
+
+```python
+from ragas.dataset_schema import SingleTurnSample
+from ragas.metrics import NoiseSensitivity
+
+sample = SingleTurnSample(
+    user_input="What is the Life Insurance Corporation of India (LIC) known for?",
+    response="The Life Insurance Corporation of India (LIC) is the largest insurance company in India, known for its vast portfolio of investments. LIC contributes to the financial stability of the country.",
+    reference="The Life Insurance Corporation of India (LIC) is the largest insurance company in India, established in 1956 through the nationalization of the insurance industry. It is known for managing a large portfolio of investments.",
+    retrieved_contexts=[
+        "The Life Insurance Corporation of India (LIC) was established in 1956 following the nationalization of the insurance industry in India.",
+        "LIC is the largest insurance company in India, with a vast network of policyholders and huge investments.",
+        "As the largest institutional investor in India, LIC manages substantial funds, contributing to the financial stability of the country.",
+        "The Indian economy is one of the fastest-growing major economies in the world, thanks to sectors like finance, technology, manufacturing etc."
+    ]
+)
+
+scorer = NoiseSensitivity(llm=evaluator_llm)
+await scorer.single_turn_ascore(sample)
+```
+
+Output:
+
+```
+0.3333333333333333
+```
+
+To calculate noise sensitivity of irrelevant context, you can set the `mode` parameter to `irrelevant`:
+
+```python
+scorer = NoiseSensitivity(mode="irrelevant")
+await scorer.single_turn_ascore(sample)
+```
 
 Credits: Noise sensitivity was introduced in [RAGChecker](https://github.com/amazon-science/RAGChecker/tree/main/ragchecker)

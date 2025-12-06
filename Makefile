@@ -161,7 +161,7 @@ build-docs: ## Build all documentation
 	@echo "Converting ipynb notebooks to md files..."
 	$(Q)MKDOCS_CI=true uv run python $(GIT_ROOT)/docs/ipynb_to_md.py
 	@echo "Building ragas documentation..."
-	$(Q)uv run --group docs mkdocs build
+	$(Q)MKDOCS_CI=false uv run --group docs mkdocs build
 
 serve-docs: ## Build and serve documentation locally
-	$(Q)uv run --group docs mkdocs serve --dirtyreload
+	$(Q)MKDOCS_CI=false uv run --group docs mkdocs serve --dirtyreload

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import typing as t
 
-from datasets import Dataset, Sequence
+from datasets import Dataset
 
 from ragas.dataset_schema import EvaluationDataset, MultiTurnSample, SingleTurnSample
 from ragas.metrics.base import Metric, MetricType, MultiTurnMetric, SingleTurnMetric
@@ -18,26 +18,6 @@ def remap_column_names(dataset: Dataset, column_map: dict[str, str]) -> Dataset:
 
     inverse_column_map = {v: k for k, v in column_map.items()}
     return dataset.rename_columns(inverse_column_map)
-
-
-def handle_deprecated_ground_truths(ds: Dataset) -> Dataset:
-    if "ground_truths" in ds.features and "ground_truth" not in ds.features:
-        column_names = "ground_truths"
-        if (
-            isinstance(ds.features[column_names], Sequence)
-            and ds.features[column_names].feature.dtype == "string"
-        ):
-            logger.warning(
-                "passing column names as 'ground_truths' is deprecated and will be removed in the next version, please use 'ground_truth' instead. Note that `ground_truth` should be of type string and not Sequence[string] like `ground_truths`"
-            )
-            gt = [gt[0] for gt in ds["ground_truths"]]
-            ds = ds.add_column(
-                "ground_truth",
-                gt,
-                new_fingerprint=ds._fingerprint
-                + "a",  # adding random to fingerprint to avoid caching
-            )
-    return ds
 
 
 def get_supported_metric_type(ds: EvaluationDataset):

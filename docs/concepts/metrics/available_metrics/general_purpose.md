@@ -49,12 +49,88 @@ Critics are essentially basic LLM calls using the defined criteria. For example,
 
 ## Simple Criteria Scoring
 
-Course grained evaluation method is an evaluation metric that can be used to score (integer) responses based on predefined single free form scoring criteria. The output of course grained evaluation is an integer score between the range specified in the criteria.
+Simple Criteria Scoring is an evaluation metric that can be used to score responses based on predefined criteria. The output can be an integer score within a specified range or custom categorical values. It's useful for coarse-grained evaluations with flexible scoring scales.
+
+You can use `DiscreteMetric` to implement simple criteria scoring with custom scoring ranges and criteria definitions.
+
+### Integer Range Scoring Example
 
 ```python
+from openai import AsyncOpenAI
+from ragas.llms import llm_factory
+from ragas.metrics import DiscreteMetric
 from ragas.dataset_schema import SingleTurnSample
-from ragas.metrics import SimpleCriteriaScore
 
+# Setup
+client = AsyncOpenAI()
+llm = llm_factory("gpt-4o-mini", client=client)
+
+# Create clarity scorer (0-10 scale)
+clarity_metric = DiscreteMetric(
+    name="clarity",
+    allowed_values=list(range(0, 11)),  # 0 to 10
+    prompt="""Rate the clarity of the response on a scale of 0-10.
+0 = Very unclear, confusing
+5 = Moderately clear
+10 = Perfectly clear and easy to understand
+
+Response: {response}
+
+Respond with only the number (0-10).""",
+    llm=llm
+)
+
+sample = SingleTurnSample(
+    user_input="Explain machine learning",
+    response="Machine learning is a subset of artificial intelligence that enables systems to learn from data."
+)
+
+result = await clarity_metric.ascore(response=sample.response)
+print(f"Clarity Score: {result.value}")  # Output: e.g., 8
+```
+
+### Custom Range Scoring Example
+
+```python
+# Create quality scorer with custom range (1-5)
+quality_metric = DiscreteMetric(
+    name="quality",
+    allowed_values=list(range(1, 6)),  # 1 to 5
+    prompt="""Rate the quality of the response:
+1 = Poor quality
+2 = Below average
+3 = Average
+4 = Good
+5 = Excellent
+
+Response: {response}
+
+Respond with only the number (1-5).""",
+    llm=llm
+)
+
+result = await quality_metric.ascore(response=sample.response)
+print(f"Quality Score: {result.value}")
+```
+
+### Similarity-Based Scoring
+
+```python
+# Create similarity scorer
+similarity_metric = DiscreteMetric(
+    name="similarity",
+    allowed_values=list(range(0, 6)),  # 0 to 5
+    prompt="""Rate the similarity between response and reference on a scale of 0-5:
+0 = Completely different
+3 = Somewhat similar
+5 = Identical meaning
+
+Reference: {reference}
+Response: {response}
+
+Respond with only the number (0-5).""",
+    llm=llm
+)
 
 sample = SingleTurnSample(
     user_input="Where is the Eiffel Tower located?",
@@ -62,18 +138,13 @@ sample = SingleTurnSample(
     reference="The Eiffel Tower is located in Egypt"
 )
 
-scorer =  SimpleCriteriaScore(
-    name="course_grained_score",
-    definition="Score 0 to 5 by similarity",
-    llm=evaluator_llm
+result = await similarity_metric.ascore(
+    response=sample.response,
+    reference=sample.reference
 )
+print(f"Similarity Score: {result.value}")
+```
 
-await scorer.single_turn_ascore(sample)
-```
-Output
-```
-0
-```
 
 ## Rubrics based criteria scoring
 

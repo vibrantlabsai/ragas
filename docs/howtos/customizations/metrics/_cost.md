@@ -43,7 +43,7 @@ get_token_usage_for_openai(llm_result)
 
 
 
-You can define your own or import parsers if they are defined. If you would like to suggest parser for LLM providers or contribute your own ones please check out this [issue](https://github.com/explodinggradients/ragas/issues/1151) 🙂.
+You can define your own or import parsers if they are defined. If you would like to suggest parser for LLM providers or contribute your own ones please check out this [issue](https://github.com/vibrantlabsai/ragas/issues/1151) 🙂.
 
 You can use it for evaluations as so. Using example from [get started](get-started-evaluation) here.
 
@@ -53,7 +53,7 @@ from datasets import load_dataset
 from ragas import EvaluationDataset
 from ragas.metrics._aspect_critic import AspectCriticWithReference
 
-dataset = load_dataset("explodinggradients/amnesty_qa", "english_v3")
+dataset = load_dataset("vibrantlabsai/amnesty_qa", "english_v3")
 
 
 eval_dataset = EvaluationDataset.from_hf_dataset(dataset["eval"])

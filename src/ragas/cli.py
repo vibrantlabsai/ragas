@@ -483,32 +483,34 @@ def quickstart(
     from pathlib import Path
 
     # Define available templates with descriptions
+    # Currently only rag_eval is available and fully tested
     templates = {
         "rag_eval": {
             "name": "RAG Evaluation",
             "description": "Evaluate a RAG (Retrieval Augmented Generation) system with custom metrics",
             "source_path": "ragas_examples/rag_eval",
         },
-        "agent_evals": {
-            "name": "Agent Evaluation",
-            "description": "Evaluate AI agents with structured metrics and workflows",
-            "source_path": "ragas_examples/agent_evals",
-        },
-        "benchmark_llm": {
-            "name": "LLM Benchmarking",
-            "description": "Benchmark and compare different LLM models with datasets",
-            "source_path": "ragas_examples/benchmark_llm",
-        },
-        "prompt_evals": {
-            "name": "Prompt Evaluation",
-            "description": "Evaluate and compare different prompt variations",
-            "source_path": "ragas_examples/prompt_evals",
-        },
-        "workflow_eval": {
-            "name": "Workflow Evaluation",
-            "description": "Evaluate complex LLM workflows and pipelines",
-            "source_path": "ragas_examples/workflow_eval",
-        },
+        # Coming soon - not yet fully implemented:
+        # "agent_evals": {
+        #     "name": "Agent Evaluation",
+        #     "description": "Evaluate AI agents with structured metrics and workflows",
+        #     "source_path": "ragas_examples/agent_evals",
+        # },
+        # "benchmark_llm": {
+        #     "name": "LLM Benchmarking",
+        #     "description": "Benchmark and compare different LLM models with datasets",
+        #     "source_path": "ragas_examples/benchmark_llm",
+        # },
+        # "prompt_evals": {
+        #     "name": "Prompt Evaluation",
+        #     "description": "Evaluate and compare different prompt variations",
+        #     "source_path": "ragas_examples/prompt_evals",
+        # },
+        # "workflow_eval": {
+        #     "name": "Workflow Evaluation",
+        #     "description": "Evaluate complex LLM workflows and pipelines",
+        #     "source_path": "ragas_examples/workflow_eval",
+        # },
     }
 
     # If no template specified, list available templates
@@ -533,7 +535,7 @@ def quickstart(
         console.print("  ragas quickstart [template_name]")
         console.print("\n[bold]Example:[/bold]")
         console.print("  ragas quickstart rag_eval")
-        console.print("  ragas quickstart agent_evals --output-dir ./my-project\n")
+        console.print("  ragas quickstart rag_eval --output-dir ./my-project\n")
         return
 
     # Validate template name
@@ -579,7 +581,7 @@ def quickstart(
         import urllib.request
         import zipfile
 
-        github_repo = "explodinggradients/ragas"
+        github_repo = "vibrantlabsai/ragas"
         branch = "main"
 
         # Create temporary directory for download
@@ -591,34 +593,28 @@ def quickstart(
                 f"https://github.com/{github_repo}/archive/refs/heads/{branch}.zip"
             )
 
-            with Live(
-                Spinner(
-                    "dots", text="Downloading template from GitHub...", style="cyan"
-                ),
-                console=console,
-            ):
-                zip_path = temp_dir / "repo.zip"
-                urllib.request.urlretrieve(archive_url, zip_path)
+            zip_path = temp_dir / "repo.zip"
+            urllib.request.urlretrieve(archive_url, zip_path)
 
-                with zipfile.ZipFile(zip_path, "r") as zip_ref:
-                    zip_ref.extractall(temp_dir)
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall(temp_dir)
 
-                extracted_folders = [
-                    f
-                    for f in temp_dir.iterdir()
-                    if f.is_dir() and f.name.startswith("ragas-")
-                ]
-                if not extracted_folders:
-                    error("Failed to extract template from GitHub archive")
-                    raise typer.Exit(1)
+            extracted_folders = [
+                f
+                for f in temp_dir.iterdir()
+                if f.is_dir() and f.name.startswith("ragas-")
+            ]
+            if not extracted_folders:
+                error("Failed to extract template from GitHub archive")
+                raise typer.Exit(1)
 
-                repo_dir = extracted_folders[0]
-                source_path = repo_dir / "examples" / "ragas_examples" / template_path
+            repo_dir = extracted_folders[0]
+            source_path = repo_dir / "examples" / "ragas_examples" / template_path
 
-                if not source_path.exists():
-                    error(f"Template not found in repository: {template_path}")
-                    console.print(f"Looking for: {source_path}")
-                    raise typer.Exit(1)
+            if not source_path.exists():
+                error(f"Template not found in repository: {template_path}")
+                console.print(f"Looking for: {source_path}")
+                raise typer.Exit(1)
 
         except Exception as e:
             error(f"Failed to download template from GitHub: {e}")
@@ -648,7 +644,14 @@ def quickstart(
         console=console,
     ) as live:
         live.update(Spinner("dots", text="Copying template files...", style="green"))
-        shutil.copytree(source_path, output_path)
+
+        # Copy template but exclude .venv and __pycache__
+        def ignore_patterns(directory, files):
+            return {
+                f for f in files if f in {".venv", "__pycache__", "*.pyc", "uv.lock"}
+            }
+
+        shutil.copytree(source_path, output_path, ignore=ignore_patterns)
         time.sleep(0.3)
 
         live.update(
@@ -668,55 +671,107 @@ def quickstart(
 
 {template_info["description"]}
 
-## Setup
+## Quick Start
 
-1. Set your OpenAI API key (or other LLM provider):
-   ```bash
-   export OPENAI_API_KEY="your-api-key"
-   ```
+### 1. Set Your API Key
 
-2. Install dependencies:
-   ```bash
-   pip install ragas openai
-   ```
+Choose your LLM provider:
 
-## Running the Example
-
-Run the evaluation:
 ```bash
-python app.py
+# OpenAI (default)
+export OPENAI_API_KEY="your-openai-key"
+
+# Or use Anthropic Claude
+export ANTHROPIC_API_KEY="your-anthropic-key"
+
+# Or use Google Gemini
+export GOOGLE_API_KEY="your-google-key"
 ```
 
-Or run via the CLI:
+### 2. Install Dependencies
+
+Using `uv` (recommended):
+
 ```bash
-ragas evals evals/evals.py --dataset test_data --metrics [metric_names]
+uv sync
+```
+
+Or using `pip`:
+
+```bash
+pip install -e .
+```
+
+### 3. Run the Evaluation
+
+Using `uv`:
+
+```bash
+uv run python evals.py
+```
+
+Or using `pip`:
+
+```bash
+python evals.py
+```
+
+### 4. Export Results to CSV
+
+Using `uv`:
+
+```bash
+uv run python export_csv.py
+```
+
+Or using `pip`:
+
+```bash
+python export_csv.py
 ```
 
 ## Project Structure
 
 ```
 {template}/
-├── app.py              # Your application code (RAG system, agent, etc.)
-├── evals/              # Evaluation-related code and data
-│   ├── evals.py       # Evaluation metrics and experiment definitions
-│   ├── datasets/      # Test datasets
-│   ├── experiments/   # Experiment results
-│   └── logs/          # Evaluation logs and traces
-└── README.md
+├── README.md           # This file
+├── pyproject.toml      # Project configuration
+├── rag.py              # Your RAG application code
+├── evals.py            # Evaluation workflow
+├── export_csv.py       # CSV export utility
+├── __init__.py         # Makes this a Python package
+└── evals/              # Evaluation-related data
+    ├── datasets/       # Test datasets
+    ├── experiments/    # Experiment results (CSVs saved here)
+    └── logs/           # Evaluation logs and traces
 ```
 
-This structure separates your application code from evaluation code, making it easy to:
-- Develop and test your application independently
-- Run evaluations without mixing concerns
-- Track evaluation results separately from application logic
+## Customization
 
-## Next Steps
+### Modify the LLM Provider
 
-1. Implement your application logic in `app.py`
-2. Review and modify the metrics in `evals/evals.py`
-3. Customize the dataset in `evals/datasets/`
-4. Run experiments and analyze results
-5. Iterate on your prompts and system design
+In `evals.py`, update the LLM configuration:
+
+```python
+from ragas.llms import llm_factory
+
+# Use Anthropic Claude
+llm = llm_factory("claude-3-5-sonnet-20241022", provider="anthropic")
+
+# Use Google Gemini
+llm = llm_factory("gemini-1.5-pro", provider="google")
+
+# Use local Ollama
+llm = llm_factory("mistral", provider="ollama", base_url="http://localhost:11434")
+```
+
+### Customize Test Cases
+
+Edit the `load_dataset()` function in `evals.py` to add or modify test cases.
+
+### Change Evaluation Metrics
+
+Update the `my_metric` definition in `evals.py` to use different grading criteria.
 
 ## Documentation
 
@@ -728,7 +783,7 @@ Visit https://docs.ragas.io for more information.
             f.write(readme_content)
         time.sleep(0.2)
 
-        live.update(Spinner("dots", text="Finalizing project...", style="green"))
+        # live.update(Spinner("dots", text="Finalizing project...", style="green"))
         time.sleep(0.3)
 
     # Cleanup temporary directory if we downloaded from GitHub
@@ -741,15 +796,12 @@ Visit https://docs.ragas.io for more information.
     # Success message with next steps
     success(f"\n✓ Created {template_info['name']} project at: {output_path}")
     console.print("\n[bold cyan]Next Steps:[/bold cyan]")
-    console.print(f"  1. cd {output_path}")
-    console.print("  2. export OPENAI_API_KEY='your-api-key'")
-    console.print("  3. pip install ragas openai")
-    console.print("  4. python app.py")
-    console.print("\n[bold]Project Structure:[/bold]")
-    console.print("  app.py       - Your application code")
-    console.print("  evals/       - All evaluation-related code and data")
-    console.print("\n[bold]Quick Start:[/bold]")
-    console.print(f"  cd {output_path} && python app.py\n")
+    console.print(f"  cd {output_path}")
+    console.print("  uv sync")
+    console.print("  export OPENAI_API_KEY='your-api-key'")
+    console.print("  uv run python evals.py")
+    console.print("\n📚 For detailed instructions, see:")
+    console.print("  https://docs.ragas.io/en/latest/getstarted/quickstart/\n")
 
 
 @app.command()

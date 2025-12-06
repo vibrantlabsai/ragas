@@ -589,6 +589,57 @@ class LlamaIndexEmbeddingsWrapper(BaseRagasEmbeddings):
         return f"{self.__class__.__name__}(embeddings={self.embeddings.__class__.__name__}(...))"
 
 
+def _infer_embedding_provider_from_llm(llm: t.Any) -> str:
+    """
+    Infer the embedding provider from an LLM instance.
+
+    This function attempts to extract the provider information from an LLM object
+    to allow intelligent default selection of matching embedding providers.
+
+    Parameters
+    ----------
+    llm : Any
+        The LLM instance to extract provider information from.
+
+    Returns
+    -------
+    str
+        The inferred provider name, defaults to "openai" if unable to determine.
+    """
+    if llm is None:
+        return "openai"
+
+    # Check for InstructorLLM with provider attribute
+    if hasattr(llm, "provider"):
+        provider = getattr(llm, "provider", "").lower()
+        if provider:
+            return provider
+
+    # Check for other LLM types
+    llm_class_name = llm.__class__.__name__.lower()
+
+    # Map common LLM class patterns to providers
+    provider_mapping = {
+        "anthropic": "anthropic",
+        "claude": "anthropic",
+        "gemini": "google",
+        "google": "google",
+        "vertex": "google",
+        "groq": "groq",
+        "mistral": "mistral",
+        "cohere": "cohere",
+        "openai": "openai",
+        "azure": "azure",
+    }
+
+    for pattern, provider_name in provider_mapping.items():
+        if pattern in llm_class_name:
+            return provider_name
+
+    # Default to OpenAI if unable to determine
+    return "openai"
+
+
 def embedding_factory(
     provider: str = "openai",
     model: t.Optional[str] = None,

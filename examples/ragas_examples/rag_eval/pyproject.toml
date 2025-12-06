@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag-eval"
+version = "0.1.0"
+description = "RAG evaluation example using Ragas"
+requires-python = ">=3.9"
+dependencies = [
+    "ragas[all]>=0.3.0",
+    "openai>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[tool.setuptools]
+py-modules = []
+
+[tool.uv]
+managed = true
+# Note: When developing locally, use:
+# uv sync --override ragas@path/to/ragas

@@ -50,7 +50,7 @@ docs = [Document(content=doc) for doc in dataset]
 
 
 ```python
-from haystack.components.embedders import OpenAITextEmbedder, OpenAIDocumentEmbedder
+from haystack.components.embedders import OpenAIDocumentEmbedder, OpenAITextEmbedder
 
 document_embedder = OpenAIDocumentEmbedder(model="text-embedding-3-small")
 text_embedder = OpenAITextEmbedder(model="text-embedding-3-small")
@@ -133,8 +133,8 @@ Make sure to include all relevant data for each metric to ensure accurate evalua
 
 ```python
 from haystack_integrations.components.evaluators.ragas import RagasEvaluator
-
 from langchain_openai import ChatOpenAI
+
 from ragas.llms import LangchainLLMWrapper
 from ragas.metrics import AnswerRelevancy, ContextPrecision, Faithfulness
 
@@ -252,7 +252,7 @@ In the example below, we will define two custom Ragas metrics:
 
 
 ```python
-from ragas.metrics import RubricsScore, AspectCritic
+from ragas.metrics import AspectCritic, RubricsScore
 
 SportsRelevanceMetric = AspectCritic(
     name="sports_relevance_metric",

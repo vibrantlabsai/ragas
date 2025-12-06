@@ -20,26 +20,43 @@ class NumericMetric(SimpleLLMMetric, NumericValidator):
 
     This class is used for metrics that output numeric scores within a
     defined range, such as 0.0 to 1.0 for similarity scores or 1-10 ratings.
+    Uses the instructor library for structured LLM outputs.
 
     Attributes
     ----------
     allowed_values : Union[Tuple[float, float], range]
         The valid range for metric outputs. Can be a tuple of (min, max) floats
         or a range object. Default is (0.0, 1.0).
+    llm : Optional[BaseRagasLLM]
+        The language model instance for evaluation. Can be created using llm_factory().
+    prompt : Optional[Union[str, Prompt]]
+        The prompt template for the metric. Should contain placeholders for
+        evaluation inputs that will be formatted at runtime.
 
     Examples
     --------
     >>> from ragas.metrics import NumericMetric
-    >>> from ragas.llms import LangchainLLMWrapper
-    >>> from langchain_openai import ChatOpenAI
+    >>> from ragas.llms import llm_factory
+    >>> from openai import OpenAI
+    >>>
+    >>> # Create an LLM instance
+    >>> client = OpenAI(api_key="your-api-key")
+    >>> llm = llm_factory("gpt-4o-mini", client=client)
     >>>
     >>> # Create a custom numeric metric with 0-10 range
-    >>> llm = LangchainLLMWrapper(ChatOpenAI())
     >>> metric = NumericMetric(
     ...     name="quality_score",
     ...     llm=llm,
+    ...     prompt="Rate the quality of this response on a scale of 0-10: {response}",
     ...     allowed_values=(0.0, 10.0)
     ... )
+    >>>
+    >>> # Score with the metric
+    >>> result = metric.score(
+    ...     llm=llm,
+    ...     response="This is a great response!"
+    ... )
+    >>> print(result.value)  # Output: a float between 0.0 and 10.0
     """
 
     allowed_values: t.Union[t.Tuple[float, float], range] = (0.0, 1.0)

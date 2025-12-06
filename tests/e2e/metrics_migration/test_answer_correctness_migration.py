@@ -51,13 +51,16 @@ class TestAnswerCorrectnessE2EMigration:
     def test_llm(self):
         """Create a test LLM for legacy answer correctness evaluation."""
         try:
-            from ragas.llms.base import llm_factory
+            from langchain_openai import ChatOpenAI
 
-            return llm_factory("gpt-4o")  # Using GPT-4o for better alignment
+            from ragas.llms import LangchainLLMWrapper
+
+            langchain_llm = ChatOpenAI(model="gpt-4o", temperature=0.01)
+            return LangchainLLMWrapper(langchain_llm)
         except ImportError as e:
-            pytest.skip(f"LLM factory not available: {e}")
+            pytest.skip(f"LangChain LLM not available: {e}")
         except Exception as e:
-            pytest.skip(f"Could not create LLM (API key may be missing): {e}")
+            pytest.skip(f"Could not create LangChain LLM (API key may be missing): {e}")
 
     @pytest.fixture
     def test_modern_llm(self):
@@ -65,12 +68,12 @@ class TestAnswerCorrectnessE2EMigration:
         try:
             import openai
 
-            from ragas.llms import llm_factory
+            from ragas.llms.base import llm_factory
 
             client = openai.AsyncOpenAI()
             return llm_factory("gpt-4o", client=client)
         except ImportError as e:
-            pytest.skip(f"Instructor LLM factory not available: {e}")
+            pytest.skip(f"LLM factory not available: {e}")
         except Exception as e:
             pytest.skip(f"Could not create modern LLM (API key may be missing): {e}")
 
@@ -336,7 +339,10 @@ class TestAnswerCorrectnessE2EMigration:
         """Test that v2 implementation properly validates parameters."""
         from unittest.mock import Mock
 
-        mock_llm = Mock()
+        from ragas.llms.base import InstructorBaseRagasLLM
+
+        # Create proper mocks that inherit from the required base class
+        mock_llm = Mock(spec=InstructorBaseRagasLLM)
         mock_embeddings = Mock()
 
         # Test invalid weights
@@ -356,6 +362,15 @@ class TestAnswerCorrectnessE2EMigration:
         # Test invalid beta - use type: ignore to bypass type checker for intentional error test
         with pytest.raises(ValueError, match="Beta must be a float"):
             AnswerCorrectness(llm=mock_llm, embeddings=mock_embeddings, beta="invalid")  # type: ignore
+
+        # Test optional embeddings - should work with pure factuality (weight=0)
+        metric = AnswerCorrectness(llm=mock_llm, weights=[1.0, 0.0])
+        assert metric.embeddings is None
+        print("✅ Optional embeddings working for pure factuality!")
+
+        # Test embeddings required when similarity weight > 0
+        with pytest.raises(ValueError, match="Embeddings are required"):
+            AnswerCorrectness(llm=mock_llm, embeddings=None, weights=[0.75, 0.25])
 
         print("✅ Parameter validation working correctly!")
 

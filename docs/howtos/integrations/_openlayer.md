@@ -10,7 +10,7 @@ This notebook should be used together with [this blog post](https://www.openlaye
 
 ```bash
 %%bash
-git clone https://huggingface.co/datasets/explodinggradients/prompt-engineering-papers
+git clone https://huggingface.co/datasets/vibrantlabsai/prompt-engineering-papers
 ```
 
 

@@ -33,6 +33,7 @@ else:
 P = ParamSpec("P")
 logger = logging.getLogger(__name__)
 
+# NOTE: This URL intentionally remains as explodinggradients.com (legacy analytics endpoint)
 USAGE_TRACKING_URL = "https://t.explodinggradients.com"
 USAGE_REQUESTS_TIMEOUT_SEC = 1
 USER_DATA_DIR_NAME = "ragas"

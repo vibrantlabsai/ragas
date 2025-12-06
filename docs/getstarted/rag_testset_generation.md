@@ -7,10 +7,10 @@ Let's walk through a quick example of generating a testset for a RAG pipeline. F
 
 ### Load Sample Documents
 
-For the sake of this tutorial we will use sample documents from this [repository](https://huggingface.co/datasets/explodinggradients/Sample_Docs_Markdown). You can replace this with your own documents.
+For the sake of this tutorial we will use sample documents from this [repository](https://huggingface.co/datasets/vibrantlabsai/Sample_Docs_Markdown). You can replace this with your own documents.
 
 ```bash
-git clone https://huggingface.co/datasets/explodinggradients/Sample_Docs_Markdown
+git clone https://huggingface.co/datasets/vibrantlabsai/Sample_Docs_Markdown
 ```
 
 ### Load documents
@@ -59,7 +59,7 @@ Output
 ![testset](./testset_output.png)
 
 !!! note
-Generating synthetic test data can be confusing and hard, but if you need we are happy to help you with it. We have built pipelines to generate test data for various use cases. If you need help with it, please talk to us by booking a [slot](https://bit.ly/3EBYq4J) or drop us a line: [founders@explodinggradients.com](mailto:founders@explodinggradients.com).
+Generating synthetic test data can be confusing and hard, but if you need we are happy to help you with it. We have built pipelines to generate test data for various use cases. If you need help with it, please talk to us by booking a [slot](https://bit.ly/3EBYq4J) or drop us a line: [founders@vibrantlabs.com](mailto:founders@vibrantlabs.com).
 
 ## A Deeper Look
 

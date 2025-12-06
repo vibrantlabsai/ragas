@@ -2,6 +2,76 @@
 
 `FactualCorrectness` is a metric that compares and evaluates the factual accuracy of the generated `response` with the `reference`. This metric is used to determine the extent to which the generated response aligns with the reference. The factual correctness score ranges from 0 to 1, with higher values indicating better performance. To measure the alignment between the response and the reference, the metric uses the LLM to first break down the response and reference into claims and then uses natural language inference to determine the factual overlap between the response and the reference. Factual overlap is quantified using precision, recall, and F1 score, which can be controlled using the `mode` parameter.
 
+### Example
+
+```python
+from openai import AsyncOpenAI
+from ragas.llms import llm_factory
+from ragas.metrics.collections import FactualCorrectness
+
+# Setup LLM
+client = AsyncOpenAI()
+llm = llm_factory("gpt-4o-mini", client=client)
+
+# Create metric
+scorer = FactualCorrectness(llm=llm)
+
+# Evaluate
+result = await scorer.ascore(
+    response="The Eiffel Tower is located in Paris.",
+    reference="The Eiffel Tower is located in Paris. It has a height of 1000ft."
+)
+print(f"Factual Correctness Score: {result.value}")
+```
+
+Output:
+
+```
+Factual Correctness Score: 0.67
+```
+
+By default, the mode is set to `f1`. You can change the mode to `precision` or `recall` by setting the `mode` parameter:
+
+```python
+# Precision mode - measures what fraction of response claims are supported by reference
+scorer = FactualCorrectness(llm=llm, mode="precision")
+result = await scorer.ascore(
+    response="The Eiffel Tower is located in Paris.",
+    reference="The Eiffel Tower is located in Paris. It has a height of 1000ft."
+)
+print(f"Precision Score: {result.value}")
+```
+
+Output:
+
+```
+Precision Score: 1.0
+```
+
+You can also configure the claim decomposition granularity using `atomicity` and `coverage` parameters:
+
+```python
+# High granularity - more detailed claim decomposition
+scorer = FactualCorrectness(
+    llm=llm,
+    mode="f1",
+    atomicity="high",  # More atomic claims
+    coverage="high"    # Comprehensive coverage
+)
+```
+
+!!! note "Synchronous Usage"
+    If you prefer synchronous code, you can use the `.score()` method instead of `.ascore()`:
+    
+    ```python
+    result = scorer.score(
+        response="The Eiffel Tower is located in Paris.",
+        reference="The Eiffel Tower is located in Paris. It has a height of 1000ft."
+    )
+    ```
+
+### How It's Calculated
+
 The formula for calculating True Positive (TP), False Positive (FP), and False Negative (FN) is as follows:
 
 $$
@@ -29,36 +99,6 @@ $$
 $$
 \text{F1 Score} = {2 \times \text{Precision} \times \text{Recall} \over (\text{Precision} + \text{Recall})}
 $$
-
-### Example
-
-```python
-from ragas.dataset_schema import SingleTurnSample
-from ragas.metrics._factual_correctness import FactualCorrectness
-
-
-sample = SingleTurnSample(
-    response="The Eiffel Tower is located in Paris.",
-    reference="The Eiffel Tower is located in Paris. I has a height of 1000ft."
-)
-
-scorer = FactualCorrectness(llm = evaluator_llm)
-await scorer.single_turn_ascore(sample)
-```
-Output
-```
-0.67
-```
-
-By default, the mode is set to `F1`, you can change the mode to `precision` or `recall` by setting the `mode` parameter.
-
-```python
-scorer = FactualCorrectness(llm = evaluator_llm, mode="precision")
-```
-Output
-```
-1.0
-```
 
 ### Controlling the Number of Claims
 
@@ -161,3 +201,58 @@ By adjusting both atomicity and coverage, you can customize the level of detail 
 - Use **Low Atomicity and Low Coverage** when only the key information is necessary, such as for summarization.
 
 This flexibility in controlling the number of claims helps ensure that the information is presented at the right level of granularity for your application's requirements.
+
+## Legacy Metrics API
+
+The following examples use the legacy metrics API pattern. For new projects, we recommend using the collections-based API shown above.
+
+!!! warning "Deprecation Timeline"
+    This API will be deprecated in version 0.4 and removed in version 1.0. Please migrate to the collections-based API shown above.
+
+### Example with SingleTurnSample
+
+```python
+from ragas.dataset_schema import SingleTurnSample
+from ragas.metrics._factual_correctness import FactualCorrectness
+
+
+sample = SingleTurnSample(
+    response="The Eiffel Tower is located in Paris.",
+    reference="The Eiffel Tower is located in Paris. I has a height of 1000ft."
+)
+
+scorer = FactualCorrectness(llm = evaluator_llm)
+await scorer.single_turn_ascore(sample)
+```
+
+Output:
+
+```
+0.67
+```
+
+### Changing the Mode
+
+By default, the mode is set to `F1`, you can change the mode to `precision` or `recall` by setting the `mode` parameter.
+
+```python
+scorer = FactualCorrectness(llm = evaluator_llm, mode="precision")
+```
+
+Output:
+
+```
+1.0
+```
+
+### Controlling Atomicity
+
+```python
+scorer = FactualCorrectness(mode="precision", atomicity="low")
+```
+
+Output:
+
+```
+1.0
+```

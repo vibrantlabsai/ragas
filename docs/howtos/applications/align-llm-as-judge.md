@@ -23,11 +23,11 @@ export OPENAI_API_KEY="your-api-key-here"
 ```
 
 !!! note "Full code"
-    You can view the full code for the judge alignment evaluation pipeline [here](https://github.com/explodinggradients/ragas/tree/main/examples/ragas_examples/judge_alignment).
+    You can view the full code for the judge alignment evaluation pipeline [here](https://github.com/vibrantlabsai/ragas/tree/main/examples/ragas_examples/judge_alignment).
 
 ## Understand the dataset
 
-We'll use the [EvalsBench dataset](https://github.com/explodinggradients/EvalsBench/blob/main/data/benchmark_df.csv) which contains expert-annotated examples of LLM responses to business questions. Each row includes:
+We'll use the [EvalsBench dataset](https://github.com/vibrantlabsai/EvalsBench/blob/main/data/benchmark_df.csv) which contains expert-annotated examples of LLM responses to business questions. Each row includes:
 
 - `question`: The original question asked
 - `grading_notes`: Key points that should be covered in a good response
@@ -39,7 +39,7 @@ We'll use the [EvalsBench dataset](https://github.com/explodinggradients/EvalsBe
 ```bash
 # Create datasets folder and download the dataset
 mkdir -p datasets
-curl -o datasets/benchmark_df.csv https://raw.githubusercontent.com/explodinggradients/EvalsBench/main/data/benchmark_df.csv
+curl -o datasets/benchmark_df.csv https://raw.githubusercontent.com/vibrantlabsai/EvalsBench/main/data/benchmark_df.csv
 ```
 
 **Load and examine the dataset:**
@@ -185,7 +185,7 @@ async def judge_experiment(
 ```python
 import os
 from openai import AsyncOpenAI
-from ragas.llms import instructor_llm_factory
+from ragas.llms import llm_factory
 from ragas_examples.judge_alignment import load_dataset
 
 # Load dataset
@@ -194,7 +194,7 @@ print(f"Dataset loaded with {len(dataset)} samples")
 
 # Initialize LLM client
 openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-llm = instructor_llm_factory("openai", model="gpt-4o-mini", client=openai_client)
+llm = llm_factory("gpt-4o-mini", client=openai_client)
 
 # Run the experiment
 results = await judge_experiment.arun(

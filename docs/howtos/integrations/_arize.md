@@ -62,7 +62,7 @@ Run the cell below to download a dataset of prompt engineering papers in PDF for
 
 
 ```python
-!git clone https://huggingface.co/datasets/explodinggradients/prompt-engineering-papers
+!git clone https://huggingface.co/datasets/vibrantlabsai/prompt-engineering-papers
 ```
 
 
@@ -355,6 +355,6 @@ This notebook is just an introduction to the capabilities of Ragas and Phoenix. 
 
 If you enjoyed this tutorial, please leave a ⭐ on GitHub:
 
-- [Ragas](https://github.com/explodinggradients/ragas)
+- [Ragas](https://github.com/vibrantlabsai/ragas)
 - [Phoenix](https://github.com/Arize-ai/phoenix)
 - [OpenInference](https://github.com/Arize-ai/openinference)

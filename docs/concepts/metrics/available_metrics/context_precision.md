@@ -1,5 +1,6 @@
 # Context Precision
-Context Precision is a metric that evaluates the retriever’s ability to rank relevant chunks higher than irrelevant ones for a given query in the retrieved context. Specifically, it assesses the degree to which relevant chunks in the retrieved context are placed at the top of the ranking.
+
+Context Precision is a metric that evaluates the retriever's ability to rank relevant chunks higher than irrelevant ones for a given query in the retrieved context. Specifically, it assesses the degree to which relevant chunks in the retrieved context are placed at the top of the ranking.
 
 It is calculated as the mean of the precision@k for each chunk in the context. Precision@k is the ratio of the number of relevant chunks at rank k to the total number of chunks at rank k.
 
@@ -13,7 +14,112 @@ $$
 
 Where $K$ is the total number of chunks in `retrieved_contexts` and $v_k \in \{0, 1\}$ is the relevance indicator at rank $k$.
 
-#### Example
+## Examples
+
+### Context Precision
+
+The `ContextPrecision` metric evaluates whether retrieved contexts are useful for answering a question by comparing each context against a reference answer. Use this when you have a reference answer available.
+
+```python
+from openai import AsyncOpenAI
+from ragas.llms import llm_factory
+from ragas.metrics.collections import ContextPrecision
+
+# Setup LLM
+client = AsyncOpenAI()
+llm = llm_factory("gpt-4o-mini", client=client)
+
+# Create metric
+scorer = ContextPrecision(llm=llm)
+
+# Evaluate
+result = await scorer.ascore(
+    user_input="Where is the Eiffel Tower located?",
+    reference="The Eiffel Tower is located in Paris.",
+    retrieved_contexts=[
+        "The Eiffel Tower is located in Paris.",
+        "The Brandenburg Gate is located in Berlin."
+    ]
+)
+print(f"Context Precision Score: {result.value}")
+```
+
+Output:
+```
+Context Precision Score: 0.9999999999
+```
+
+!!! note "Synchronous Usage"
+    If you prefer synchronous code, you can use the `.score()` method instead of `.ascore()`:
+    
+    ```python
+    result = scorer.score(
+        user_input="Where is the Eiffel Tower located?",
+        reference="The Eiffel Tower is located in Paris.",
+        retrieved_contexts=[...]
+    )
+    ```
+
+### Context Utilization
+
+The `ContextUtilization` metric evaluates whether retrieved contexts are useful by comparing each context against the generated response. Use this when you don't have a reference answer but have the response that was generated.
+
+```python
+from openai import AsyncOpenAI
+from ragas.llms import llm_factory
+from ragas.metrics.collections import ContextUtilization
+
+# Setup LLM
+client = AsyncOpenAI()
+llm = llm_factory("gpt-4o-mini", client=client)
+
+# Create metric
+scorer = ContextUtilization(llm=llm)
+
+# Evaluate
+result = await scorer.ascore(
+    user_input="Where is the Eiffel Tower located?",
+    response="The Eiffel Tower is located in Paris.",
+    retrieved_contexts=[
+        "The Eiffel Tower is located in Paris.",
+        "The Brandenburg Gate is located in Berlin."
+    ]
+)
+print(f"Context Utilization Score: {result.value}")
+```
+
+Output:
+```
+Context Utilization Score: 0.9999999999
+```
+
+Note that even if an irrelevant chunk is present at the second position in the array, context precision remains the same. However, if this irrelevant chunk is placed at the first position, context precision reduces:
+
+```python
+result = await scorer.ascore(
+    user_input="Where is the Eiffel Tower located?",
+    response="The Eiffel Tower is located in Paris.",
+    retrieved_contexts=[
+        "The Brandenburg Gate is located in Berlin.",
+        "The Eiffel Tower is located in Paris."
+    ]
+)
+print(f"Context Utilization Score: {result.value}")
+```
+
+Output:
+```
+Context Utilization Score: 0.49999999995
+```
+
+## Legacy Metrics API
+
+The following examples use the legacy metrics API pattern. For new projects, we recommend using the collections-based API shown above.
+
+!!! warning "Deprecation Timeline"
+    This API will be deprecated in version 0.4 and removed in version 1.0. Please migrate to the collections-based API shown above.
+
+### Example with SingleTurnSample
 
 ```python
 from ragas import SingleTurnSample
@@ -27,61 +133,13 @@ sample = SingleTurnSample(
     retrieved_contexts=["The Eiffel Tower is located in Paris."],
 )
 
-
 await context_precision.single_turn_ascore(sample)
 ```
-Output
+
+Output:
 ```
 0.9999999999
 ```
-
-Note that even if an irrelevant chunk is present at the second position in the array, context precision remains the same.
-
-```python
-from ragas import SingleTurnSample
-from ragas.metrics import LLMContextPrecisionWithoutReference
-
-context_precision = LLMContextPrecisionWithoutReference(llm=evaluator_llm)
-
-sample = SingleTurnSample(
-    user_input="Where is the Eiffel Tower located?",
-    response="The Eiffel Tower is located in Paris.",
-    retrieved_contexts=["The Eiffel Tower is located in Paris.", "The Brandenburg Gate is located in Berlin."],
-)
-
-
-await context_precision.single_turn_ascore(sample)
-```
-Output
-```
-0.9999999999
-```
-
-However, if this irrelevant chunk is placed at the first position, context precision reduces.
-
-```python
-from ragas import SingleTurnSample
-from ragas.metrics import LLMContextPrecisionWithoutReference
-
-context_precision = LLMContextPrecisionWithoutReference(llm=evaluator_llm)
-
-sample = SingleTurnSample(
-    user_input="Where is the Eiffel Tower located?",
-    response="The Eiffel Tower is located in Paris.",
-    retrieved_contexts=["The Brandenburg Gate is located in Berlin.", "The Eiffel Tower is located in Paris." ],
-)
-
-
-await context_precision.single_turn_ascore(sample)
-```
-Output
-```
-0.49999999995
-```
-
-## LLM Based Context Precision
-
-The following metrics uses LLM to identify if a retrieved context is relevant or not.
 
 ### Context Precision without reference
 
@@ -101,13 +159,14 @@ sample = SingleTurnSample(
     retrieved_contexts=["The Eiffel Tower is located in Paris."],
 )
 
-
 await context_precision.single_turn_ascore(sample)
 ```
-Output
+
+Output:
 ```
 0.9999999999
 ```
+
 ### Context Precision with reference
 
 The `LLMContextPrecisionWithReference` metric can be used when you have both retrieved contexts and also a reference response associated with a `user_input`. To estimate if the retrieved contexts are relevant, this method uses the LLM to compare each chunk in `retrieved_contexts` with the `reference`.
@@ -128,7 +187,8 @@ sample = SingleTurnSample(
 
 await context_precision.single_turn_ascore(sample)
 ```
-Output
+
+Output:
 ```
 0.9999999999
 ```
@@ -158,7 +218,8 @@ sample = SingleTurnSample(
 
 await context_precision.single_turn_ascore(sample)
 ```
-Output
+
+Output:
 ```
 0.9999999999
 ```
@@ -186,10 +247,9 @@ sample = SingleTurnSample(
 
 id_precision = IDBasedContextPrecision()
 await id_precision.single_turn_ascore(sample)
-
 ```
 
-Output
+Output:
 ```
 0.5
 ```

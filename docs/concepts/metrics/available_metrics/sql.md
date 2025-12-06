@@ -17,7 +17,7 @@ $$
 $$
 
 $$
-\text{Precision } = {|\text{Number of matching rows in response and reference}| \over |\text{Total number of rows in reference}|}
+\text{Recall } = {|\text{Number of matching rows in response and reference}| \over |\text{Total number of rows in reference}|}
 $$
 
 By default, the mode is set to `row`, and metric is F1 score which is the harmonic mean of precision and recall.

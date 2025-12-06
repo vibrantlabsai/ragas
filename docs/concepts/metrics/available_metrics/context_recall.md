@@ -1,14 +1,8 @@
 # Context Recall
 
-Context Recall measures how many of the relevant documents (or pieces of information) were successfully retrieved. It focuses on not missing important results. Higher recall means fewer relevant documents were left out.
-In short, recall is about not missing anything important. Since it is about not missing anything, calculating context recall always requires a reference to compare against.
+Context Recall measures how many of the relevant documents (or pieces of information) were successfully retrieved. It focuses on not missing important results. Higher recall means fewer relevant documents were left out. In short, recall is about not missing anything important. 
 
-
-
-## LLM Based Context Recall
-
-`LLMContextRecall` is computed using `user_input`, `reference` and the `retrieved_contexts`, and the values range between 0 and 1, with higher values indicating better performance. This metric uses `reference` as a proxy to `reference_contexts` which also makes it easier to use as annotating reference contexts can be very time-consuming. To estimate context recall from the `reference`, the reference is broken down into claims each claim in the `reference` answer is analyzed to determine whether it can be attributed to the retrieved context or not. In an ideal scenario, all claims in the reference answer should be attributable to the retrieved context.
-
+Since it is about not missing anything, calculating context recall always requires a reference to compare against. The LLM-based Context Recall metric uses `reference` as a proxy to `reference_contexts`, which makes it easier to use as annotating reference contexts can be very time-consuming. To estimate context recall from the `reference`, the reference is broken down into claims, and each claim is analyzed to determine whether it can be attributed to the retrieved context or not. In an ideal scenario, all claims in the reference answer should be attributable to the retrieved context.
 
 The formula for calculating context recall is as follows:
 
@@ -16,7 +10,50 @@ $$
 \text{Context Recall} = \frac{\text{Number of claims in the reference supported by the retrieved context}}{\text{Total number of claims in the reference}}
 $$
 
-### Example
+## Example
+
+```python
+from openai import AsyncOpenAI
+from ragas.llms import llm_factory
+from ragas.metrics.collections import ContextRecall
+
+# Setup LLM
+client = AsyncOpenAI()
+llm = llm_factory("gpt-4o-mini", client=client)
+
+# Create metric
+scorer = ContextRecall(llm=llm)
+
+# Evaluate
+result = await scorer.ascore(
+    user_input="Where is the Eiffel Tower located?",
+    retrieved_contexts=["Paris is the capital of France."],
+    reference="The Eiffel Tower is located in Paris."
+)
+print(f"Context Recall Score: {result.value}")
+```
+
+Output:
+
+```
+Context Recall Score: 1.0
+```
+
+!!! note "Synchronous Usage"
+    If you prefer synchronous code, you can use the `.score()` method instead of `.ascore()`:
+    
+    ```python
+    result = scorer.score(
+        user_input="Where is the Eiffel Tower located?",
+        retrieved_contexts=["Paris is the capital of France."],
+        reference="The Eiffel Tower is located in Paris."
+    )
+    ```
+
+## LLM Based Context Recall (Legacy API)
+
+!!! warning "Legacy API"
+    The following example uses the legacy metrics API pattern. For new projects, we recommend using the collections-based API shown above. This API will be deprecated in version 0.4 and removed in version 1.0.
 
 ```python
 from ragas.dataset_schema import SingleTurnSample
@@ -31,9 +68,9 @@ sample = SingleTurnSample(
 
 context_recall = LLMContextRecall(llm=evaluator_llm)
 await context_recall.single_turn_ascore(sample)
-
 ```
-Output
+
+Output:
 ```
 1.0
 ```

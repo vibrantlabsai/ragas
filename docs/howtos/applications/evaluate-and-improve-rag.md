@@ -13,7 +13,7 @@ In this guide, you'll learn how to evaluate and iteratively improve a RAG (Retri
 
 We've built a simple RAG system that retrieves relevant documents from the [Hugging Face documentation dataset](https://huggingface.co/datasets/m-ric/huggingface_doc) and generates answers using an LLM. This dataset contains documentation pages for many Hugging Face packages stored as markdown, providing a rich knowledge base for testing RAG capabilities.
 
-The complete implementation is available at: [ragas_examples/improve_rag/](https://github.com/explodinggradients/ragas/blob/main/examples/ragas_examples/improve_rag/)
+The complete implementation is available at: [ragas_examples/improve_rag/](https://github.com/vibrantlabsai/ragas/blob/main/examples/ragas_examples/improve_rag/)
 
 ```mermaid
 flowchart LR
@@ -118,7 +118,7 @@ Here are a few sample rows from the dataset:
 | What is the purpose of the BLIP-Diffusion model? | The BLIP-Diffusion model is designed for controllable text-to-image generation and editing. |
 | What is the purpose of the /healthcheck endpoint in the Datasets server API? | Ensure the app is running |
 
-The evaluation script downloads the dataset from [here](https://raw.githubusercontent.com/explodinggradients/ragas/main/examples/ragas_examples/improve_rag/datasets/hf_doc_qa_eval.csv) and converts it into Ragas Dataset format:
+The evaluation script downloads the dataset from [here](https://raw.githubusercontent.com/vibrantlabsai/ragas/main/examples/ragas_examples/improve_rag/datasets/hf_doc_qa_eval.csv) and converts it into Ragas Dataset format:
 
 ```python
 # examples/ragas_examples/improve_rag/evals.py
@@ -132,7 +132,7 @@ def download_and_save_dataset() -> Path:
     dataset_path.parent.mkdir(exist_ok=True)
     
     if not dataset_path.exists():
-        github_url = "https://raw.githubusercontent.com/explodinggradients/ragas/main/examples/ragas_examples/improve_rag/datasets/hf_doc_qa_eval.csv"
+        github_url = "https://raw.githubusercontent.com/vibrantlabsai/ragas/main/examples/ragas_examples/improve_rag/datasets/hf_doc_qa_eval.csv"
         urllib.request.urlretrieve(github_url, dataset_path)
     
     return dataset_path
@@ -246,6 +246,19 @@ With our dataset, metrics, and experiment function ready, we can now evaluate ou
 
 ## Run initial RAG experiment
 
+## Start MLflow server
+
+Before running the evaluation, you must start the MLflow server. The RAG system automatically logs traces to MLFlow for debugging and analysis:
+
+```bash
+# Start MLflow server (required - in a separate terminal)
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000
+```
+
+The MLflow UI will be available at [http://127.0.0.1:5000](http://127.0.0.1:5000).
+
+## Run initial RAG experiment
+
 Now let's run the complete evaluation pipeline to get baseline performance metrics for our RAG system:
 
 ```python
@@ -254,7 +267,7 @@ import asyncio
 from datetime import datetime
 from ragas_examples.improve_rag.evals import (
     evaluate_rag,
-    download_and_save_dataset, 
+    download_and_save_dataset,
     create_ragas_dataset,
     get_openai_client,
     get_llm_client
@@ -309,57 +322,19 @@ This downloads the dataset, initializes the BM25 retriever, runs the evaluation 
 
 With a 65.2% pass rate, we now have a baseline. The detailed results CSV in `experiments/` now contains all the data we need for error analysis and systematic improvement.
 
-### Using observability tools for better analysis
+### Viewing traces in MLflow
 
-For detailed trace analysis, you can use MLflow (as shown in this example) or your preferred observability tool. The experiment results CSV includes both `mlflow_trace_id` and `mlflow_trace_url` for each evaluation:
+The experiment results CSV includes both `mlflow_trace_id` and `mlflow_trace_url` for each evaluation, allowing you to analyze detailed execution traces. The traces help you understand exactly where failures occur - whether in retrieval, generation, or evaluation steps.
 
-```python
-# In rag.py - capture trace ID after LLM call
-trace_id = mlflow.get_last_active_trace_id()
-return {
-    "answer": response.choices[0].message.content.strip(),
-    "mlflow_trace_id": trace_id,
-    # ... other fields
-}
-
-# In evals.py - include both trace ID and clickable URL
-trace_id = rag_response.get("mlflow_trace_id", "N/A")
-trace_url = construct_mlflow_trace_url(trace_id) if trace_id != "N/A" else "N/A"
-
-result = {
-    **row,
-    "model_response": model_response,
-    "mlflow_trace_id": trace_id,
-    "mlflow_trace_url": trace_url,
-    # ... other evaluation fields
-}
-```
+The RAG system automatically logs traces to the MLflow server (started earlier), and you can view them at [http://127.0.0.1:5000](http://127.0.0.1:5000).
 
 This allows you to:
 
 1. **Analyze results in CSV**: View responses, metric scores and reasons
-2. **Deep-dive with traces**: Use the trace ID/trace url to view detailed execution in MLflow UI at [http://127.0.0.1:5000](http://127.0.0.1:5000)
+2. **Deep-dive with traces**: Click the `mlflow_trace_url` in the results to jump directly to the detailed execution trace in MLflow UI for that evaluation
 
-!!! tip "Pro Tip: Add Direct Trace URLs to your evaluation results"
-    In this example, we've added `mlflow_trace_url` - a direct clickable link to each trace in MLflow UI. No need to manually copy trace IDs or navigate through the interface. Just click the URL and jump straight to the detailed execution trace for debugging!
-
-The traces help you understand exactly where failures occur - whether in retrieval, generation, or evaluation steps. 
-
-```bash
-# Start MLflow server for tracing (optional, in a separate terminal)
-uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000
-```
-
-```python
-# Configure MLflow for automatic logging
-import mlflow
-
-# Set tracking URI (optional, defaults to local)
-mlflow.set_tracking_uri("sqlite:///mlflow.db")
-
-# Enable autologging for experiment tracking
-mlflow.autolog()
-```
+!!! tip "Pro Tip: Click Trace URLs for Debugging"
+    Each evaluation result includes `mlflow_trace_url` - a direct clickable link to the trace in MLflow UI. No need to manually navigate or copy trace IDs. Just click and jump straight to the detailed execution trace!
 
 ![MLflow tracing interface showing RAG evaluation traces](../../_static/imgs/howto_improve_rag_mlflow.png)
 

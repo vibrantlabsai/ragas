@@ -257,8 +257,8 @@ class AnswerCorrectness(MetricWithLLM, MetricWithEmbeddings, SingleTurnMetric):
         else:
             assert self.answer_similarity is not None, "AnswerSimilarity must be set"
 
-            similarity_score = await self.answer_similarity.ascore(
-                row, callbacks=callbacks
+            similarity_score = await self.answer_similarity.single_turn_ascore(
+                SingleTurnSample(**row), callbacks=callbacks
             )
 
         score = np.average(

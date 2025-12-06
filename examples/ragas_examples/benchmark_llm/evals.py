@@ -74,7 +74,7 @@ def load_dataset():
     # Download dataset from GitHub if it doesn't exist locally
     if not os.path.exists(dataset_path):
         os.makedirs(os.path.dirname(dataset_path), exist_ok=True)
-        urllib.request.urlretrieve("https://raw.githubusercontent.com/explodinggradients/ragas/main/examples/ragas_examples/benchmark_llm/datasets/discount_benchmark.csv", dataset_path)
+        urllib.request.urlretrieve("https://raw.githubusercontent.com/vibrantlabsai/ragas/main/examples/ragas_examples/benchmark_llm/datasets/discount_benchmark.csv", dataset_path)
     return Dataset.load(name="discount_benchmark", backend="local/csv", root_dir=current_dir)
 
 

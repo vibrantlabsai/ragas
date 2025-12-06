@@ -17,8 +17,8 @@ There are two main ways to use Opik with Ragas:
 
 
 ```python
-import os
 import getpass
+import os
 
 os.environ["OPIK_API_KEY"] = getpass.getpass("Opik API Key: ")
 os.environ["OPIK_WORKSPACE"] = input(
@@ -42,8 +42,8 @@ First, we will install the necessary libraries, configure the OpenAI API key and
 ```python
 %pip install opik --quiet
 
-import os
 import getpass
+import os
 
 os.environ["OPENAI_API_KEY"] = getpass.getpass("Enter your OpenAI API key: ")
 ```
@@ -66,13 +66,13 @@ We will first start by initializing the Ragas metric:
 
 ```python
 # Import the metric
-from ragas.metrics import AnswerRelevancy
-
 # Import some additional dependencies
 from langchain_openai.chat_models import ChatOpenAI
 from langchain_openai.embeddings import OpenAIEmbeddings
-from ragas.llms import LangchainLLMWrapper
+
 from ragas.embeddings import LangchainEmbeddingsWrapper
+from ragas.llms import LangchainLLMWrapper
+from ragas.metrics import AnswerRelevancy
 
 # Initialize the Ragas metric
 llm = LangchainLLMWrapper(ChatOpenAI())
@@ -94,8 +94,9 @@ nest_asyncio.apply()
 
 ```python
 import asyncio
-from ragas.integrations.opik import OpikTracer
+
 from ragas.dataset_schema import SingleTurnSample
+from ragas.integrations.opik import OpikTracer
 
 
 # Define the scoring function
@@ -187,20 +188,12 @@ rag_pipeline("What is the capital of France?")
 
 
 
-#### Evaluating datasets
-
-If you are looking at evaluating a dataset, you can use the Ragas `evaluate` function. When using this function, the Ragas library will compute the metrics on all the rows of the dataset and return a summary of the results.
-
-You can use the OpikTracer callback to log the results of the evaluation to the Opik platform. For this we will configure the OpikTracer
-
-
-```python
 from datasets import load_dataset
-from ragas.metrics import context_precision, answer_relevancy, faithfulness
-from ragas import evaluate
-from ragas.integrations.opik import OpikTracer
 
-fiqa_eval = load_dataset("explodinggradients/fiqa", "ragas_eval")
+from ragas import evaluate
+from ragas.metrics import answer_relevancy, context_precision, faithfulness
+
+fiqa_eval = load_dataset("vibrantlabsai/fiqa", "ragas_eval")
 
 # Reformat the dataset to match the schema expected by the Ragas evaluate function
 dataset = fiqa_eval["baseline"].select(range(3))
@@ -208,7 +201,37 @@ dataset = fiqa_eval["baseline"].select(range(3))
 dataset = dataset.map(
     lambda x: {
         "user_input": x["question"],
-        "reference": x["ground_truths"][0],
+        "reference": x["ground_truth"],
+        "retrieved_contexts": x["contexts"],
+    }
+)
+
+opik_tracer_eval = OpikTracer(tags=["ragas_eval"], metadata={"evaluation_run": True})
+
+result = evaluate(
+    dataset,
+    metrics=[context_precision, faithfulness, answer_relevancy],
+    callbacks=[opik_tracer_eval],
+)
+
+print(result)
+
+
+```python
+from datasets import load_dataset
+
+from ragas import evaluate
+from ragas.metrics import answer_relevancy, context_precision, faithfulness
+
+fiqa_eval = load_dataset("vibrantlabsai/fiqa", "ragas_eval")
+
+# Reformat the dataset to match the schema expected by the Ragas evaluate function
+dataset = fiqa_eval["baseline"].select(range(3))
+
+dataset = dataset.map(
+    lambda x: {
+        "user_input": x["question"],
+        "reference": x["ground_truth"],
         "retrieved_contexts": x["contexts"],
     }
 )

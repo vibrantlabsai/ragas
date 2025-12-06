@@ -36,7 +36,7 @@ graph LR
 
 ## Creating Experiments with Ragas
 
-Ragas provides an `@experiment` decorator to streamline the experiment creation process. If you prefer a hands-on intro first, see [Run your first experiment](../getstarted/experiments_quickstart.md).
+Ragas provides an `@experiment` decorator to streamline the experiment creation process. If you prefer a hands-on intro first, see the [Quick Start guide](../getstarted/quickstart.md).
 
 ### Basic Experiment Structure
 

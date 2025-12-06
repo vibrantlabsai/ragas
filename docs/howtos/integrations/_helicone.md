@@ -25,16 +25,18 @@ First, let's install the required packages and set up our environment.
 
 ```python
 import os
-from datasets import Dataset
-from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy, context_precision
-from ragas.integrations.helicone import helicone_config  # import helicone_config
 
+from datasets import Dataset
+
+from ragas import evaluate
+from ragas.integrations.helicone import helicone_config  # import helicone_config
+from ragas.metrics import answer_relevancy, context_precision, faithfulness
 
 # Set up Helicone
-helicone_config.api_key = (
+HELICONE_API_KEY = (
     "your_helicone_api_key_here"  # Replace with your actual Helicone API key
 )
+helicone_config.api_key = HELICONE_API_KEY
 os.environ["OPENAI_API_KEY"] = (
     "your_openai_api_key_here"  # Replace with your actual OpenAI API key
 )

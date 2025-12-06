@@ -1,8 +1,8 @@
 site_name: Ragas
 site_description: Evaluation framework for your AI Application
 site_url: !ENV READTHEDOCS_CANONICAL_URL
-repo_name: explodinggradients/ragas
-repo_url: https://github.com/explodinggradients/ragas
+repo_name: vibrantlabsai/ragas
+repo_url: https://github.com/vibrantlabsai/ragas
 watch:
   - src
 
@@ -12,24 +12,16 @@ nav:
   - 🚀 Get Started:
       - getstarted/index.md
       - Installation: getstarted/install.md
-      - Evaluate your first LLM App: getstarted/evals.md
-      - Evaluate a simple RAG: getstarted/rag_eval.md
-      - Generate Synthetic Testset for RAG: getstarted/rag_testset_generation.md
-      - Experiments:
-          - Run your first experiment: getstarted/experiments_quickstart.md
+      - Quick Start: getstarted/quickstart.md
+      - Tutorials:
           - Evaluate a prompt: tutorials/prompt.md
           - Evaluate a simple RAG system: tutorials/rag.md
           - Evaluate an AI Workflow: tutorials/workflow.md
           - Evaluate an AI Agent: tutorials/agent.md
   - 📚 Core Concepts:
       - concepts/index.md
-      - Components:
-          - concepts/components/index.md
-          - General:
-              - Prompt: concepts/components/prompt.md
-          - Evaluation:
-              - Evaluation Sample: concepts/components/eval_sample.md
-              - Evaluation Dataset: concepts/components/eval_dataset.md
+      - Experimentation: concepts/experimentation.md
+      - Datasets: concepts/datasets.md
       - Metrics:
           - concepts/metrics/index.md
           - Overview: concepts/metrics/overview/index.md
@@ -83,10 +75,13 @@ nav:
               - Scenario Generation: concepts/test_data_generation/rag/#scenario-generation
           - Agents or tool use:
               - concepts/test_data_generation/agents.md
-      - Feedback Intelligence:
-          - concepts/feedback/index.md
-      - Datasets: concepts/datasets.md
-      - Experimentation: concepts/experimentation.md
+      - Components:
+          - concepts/components/index.md
+          - General:
+              - Prompt: concepts/components/prompt.md
+          - Evaluation:
+              - Evaluation Sample: concepts/components/eval_sample.md
+              - Evaluation Dataset: concepts/components/eval_dataset.md
   
   - 🛠️ How-to Guides:
       - howtos/index.md
@@ -94,9 +89,10 @@ nav:
           - howtos/customizations/index.md
           - General:
               - Customise models: howtos/customizations/customize_models.md
-              - Run Config: howtos/customizations/_run_config.md
+              - Run Config: howtos/customizations/run_config.md
               - Caching: howtos/customizations/_caching.md
               - Cancelling Tasks: howtos/customizations/cancellation.md
+          - LLM Adapters: howtos/llm-adapters.md
           - Metrics:
               - Modify Prompts: howtos/customizations/metrics/_modifying-prompts-metrics.md
               - Adapt Metrics to Languages: howtos/customizations/metrics/_metrics_language_adaptation.md
@@ -131,6 +127,7 @@ nav:
           - howtos/integrations/index.md
           - Arize: howtos/integrations/_arize.md
           - Amazon Bedrock: howtos/integrations/amazon_bedrock.md
+          - Google Gemini: howtos/integrations/gemini.md
           - Haystack: howtos/integrations/haystack.md
           - Griptape: howtos/integrations/griptape.md
           - LangChain: howtos/integrations/langchain.md
@@ -144,6 +141,7 @@ nav:
           - Swarm: howtos/integrations/swarm_agent_evaluation.md
       - Migrations:
           - From v0.1 to v0.2: howtos/migrations/migrate_from_v01_to_v02.md
+          - From v0.3 to v0.4: howtos/migrations/migrate_from_v03_to_v04.md
   - 📖 References:
     - references/index.md
     - Core:
@@ -254,14 +252,15 @@ extra:
     provider: google
     property: !ENV GOOGLE_ANALYTICS_KEY
 plugins:
-  - social
+  - social:
+      enabled: !ENV [MKDOCS_CI, true]
   - search
   - git-revision-date-localized:
       enabled: !ENV [MKDOCS_CI, false]
       enable_creation_date: true
   - git-committers:
       enabled: !ENV [MKDOCS_CI, false]
-      repository: explodinggradients/ragas
+      repository: vibrantlabsai/ragas
       branch: main
   - mkdocstrings:
       handlers:

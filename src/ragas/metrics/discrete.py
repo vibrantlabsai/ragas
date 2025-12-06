@@ -22,26 +22,43 @@ class DiscreteMetric(SimpleLLMMetric, DiscreteValidator):
 
     This class is used for metrics that output categorical values like
     "pass/fail", "good/bad/excellent", or custom discrete categories.
+    Uses the instructor library for structured LLM outputs.
 
     Attributes
     ----------
     allowed_values : List[str]
         List of allowed categorical values the metric can output.
         Default is ["pass", "fail"].
+    llm : Optional[BaseRagasLLM]
+        The language model instance for evaluation. Can be created using llm_factory().
+    prompt : Optional[Union[str, Prompt]]
+        The prompt template for the metric. Should contain placeholders for
+        evaluation inputs that will be formatted at runtime.
 
     Examples
     --------
     >>> from ragas.metrics import DiscreteMetric
-    >>> from ragas.llms import LangchainLLMWrapper
-    >>> from langchain_openai import ChatOpenAI
+    >>> from ragas.llms import llm_factory
+    >>> from openai import OpenAI
+    >>>
+    >>> # Create an LLM instance
+    >>> client = OpenAI(api_key="your-api-key")
+    >>> llm = llm_factory("gpt-4o-mini", client=client)
     >>>
     >>> # Create a custom discrete metric
-    >>> llm = LangchainLLMWrapper(ChatOpenAI())
     >>> metric = DiscreteMetric(
     ...     name="quality_check",
     ...     llm=llm,
+    ...     prompt="Check the quality of the response: {response}. Return 'excellent', 'good', or 'poor'.",
     ...     allowed_values=["excellent", "good", "poor"]
     ... )
+    >>>
+    >>> # Score with the metric
+    >>> result = metric.score(
+    ...     llm=llm,
+    ...     response="This is a great response!"
+    ... )
+    >>> print(result.value)  # Output: "excellent" or similar
     """
 
     allowed_values: t.List[str] = field(default_factory=lambda: ["pass", "fail"])

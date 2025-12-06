@@ -193,7 +193,7 @@ We are compressing this knowledge into a product to replace vibe checks with eva
 If you want help with improving and scaling up your AI application using evals.
 
 
-🔗 Book a [slot](https://bit.ly/3EBYq4J) or drop us a line: [founders@explodinggradients.com](mailto:founders@explodinggradients.com).
+🔗 Book a [slot](https://bit.ly/3EBYq4J) or drop us a line: [founders@vibrantlabs.com](mailto:founders@vibrantlabs.com).
 
 ![](../_static/ragas_app.gif)
 

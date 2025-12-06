@@ -70,7 +70,7 @@ metrics = [answer_correctness, FactualCorrectness(llm=cached_llm)]
 
 # load the dataset
 dataset = load_dataset(
-    "explodinggradients/amnesty_qa", "english_v3", trust_remote_code=True
+    "vibrantlabsai/amnesty_qa", "english_v3", trust_remote_code=True
 )
 eval_dataset = EvaluationDataset.from_hf_dataset(dataset["eval"])
 

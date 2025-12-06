@@ -2,183 +2,233 @@
 
 The purpose of this guide is to illustrate a simple workflow for testing and evaluating an LLM application with `ragas`. It assumes minimum knowledge in AI application building and evaluation. Please refer to our [installation instruction](./install.md) for installing `ragas`
 
+!!! tip "Get a Working Example"
+    The fastest way to see these concepts in action is to create a project using the quickstart command:
 
-## Evaluation
+    === "uvx (Recommended)"
+        ```sh
+        uvx ragas quickstart rag_eval
+        cd rag_eval
+        uv sync
+        ```
 
-In this guide, you will evaluate a **text summarization pipeline**. The goal is to ensure that the output summary accurately captures all the key details specified in the text, such as growth figures, market insights, and other essential information.
+    === "Install Ragas First"
+        ```sh
+        pip install ragas
+        ragas quickstart rag_eval
+        cd rag_eval
+        uv sync
+        ```
 
-`ragas` offers a variety of methods for analyzing the performance of LLM applications, referred to as [metrics](../concepts/metrics/available_metrics/index.md). Each metric requires a predefined set of data points, which it uses to calculate scores that indicate performance.
+    This generates a complete project with sample code. Follow along with this guide to understand what's happening in your generated code. Let's get started!
 
-### Evaluating using a Non-LLM Metric
+## Project Structure
 
-Here is a simple example that uses `BleuScore` to score a summary:
+Here's what gets created for you:
+
+```sh
+rag_eval/
+├── README.md             # Project documentation and setup instructions
+├── pyproject.toml        # Project configuration for uv and pip
+├── evals.py              # Your evaluation workflow
+├── rag.py                # Your RAG/LLM application
+├── __init__.py           # Makes this a Python package
+└── evals/                # Evaluation artifacts
+    ├── datasets/         # Test data files (optional)
+    ├── experiments/      # Results from running evaluations (CSV files saved here)
+    └── logs/             # Evaluation execution logs
+```
+
+**Key files to focus on:**
+
+- **`evals.py`** - Your evaluation workflow with dataset loading and evaluation logic
+- **`rag.py`** - Your RAG/LLM application code (query engine, retrieval, etc.)
+
+## Understanding the Code
+
+In your generated project's `evals.py` file, you'll see the main workflow pattern:
+
+1. **Load Dataset** - Define your test cases with `SingleTurnSample`
+2. **Query RAG System** - Get responses from your application
+3. **Evaluate Responses** - Validate responses against ground truth
+4. **Display Results** - Show evaluation summary in console
+5. **Save Results** - Automatically saved to CSV in `evals/experiments/` directory
+
+The template provides modular functions you can customize:
 
 ```python
-from ragas import SingleTurnSample
-from ragas.metrics import BleuScore
+from ragas.dataset_schema import SingleTurnSample
+from ragas import EvaluationDataset
 
-test_data = {
-    "user_input": "summarise given text\nThe company reported an 8% rise in Q3 2024, driven by strong performance in the Asian market. Sales in this region have significantly contributed to the overall growth. Analysts attribute this success to strategic marketing and product localization. The positive trend in the Asian market is expected to continue into the next quarter.",
-    "response": "The company experienced an 8% increase in Q3 2024, largely due to effective marketing strategies and product adaptation, with expectations of continued growth in the coming quarter.",
-    "reference": "The company reported an 8% growth in Q3 2024, primarily driven by strong sales in the Asian market, attributed to strategic marketing and localized products, with continued growth anticipated in the next quarter."
-}
-metric = BleuScore()
-test_data = SingleTurnSample(**test_data)
-metric.single_turn_score(test_data)
+def load_dataset():
+    """Load test dataset for evaluation."""
+    data_samples = [
+        SingleTurnSample(
+            user_input="What is Ragas?",
+            response="",  # Will be filled by querying RAG
+            reference="Ragas is an evaluation framework for LLM applications",
+            retrieved_contexts=[],
+        ),
+        # Add more test cases...
+    ]
+    return EvaluationDataset(samples=data_samples)
 ```
 
-Output
-```
-0.137
-```
+You can extend this with [metrics](../concepts/metrics/available_metrics/index.md) and more sophisticated evaluation logic. Learn more about [evaluation in Ragas](../concepts/evaluation/index.md).
 
-Here we used:
+### Choosing Your LLM Provider
 
-- A test sample containing `user_input`, `response` (the output from the LLM), and `reference` (the expected output from the LLM) as data points to evaluate the summary.
-- A non-LLM metric called [BleuScore](../concepts/metrics/available_metrics/traditional.md#bleu-score)
+Your quickstart project initializes the OpenAI LLM by default in the `_init_clients()` function. You can easily swap to any provider through the `llm_factory`:
 
+=== "OpenAI"
+    Set your OpenAI API key:
 
-As you may observe, this approach has two key limitations:
+    ```sh
+    export OPENAI_API_KEY="your-openai-key"
+    ```
 
-- **Time-consuming preparation:** Evaluating the application requires preparing the expected output (`reference`) for each input, which can be both time-consuming and challenging.
+    In your `evals.py` `_init_clients()` function:
 
-- **Inaccurate scoring:** Even though the `response` and `reference` are similar, the output score was low. This is a known limitation of non-LLM metrics like `BleuScore`.
+    ```python
+    from ragas.llms import llm_factory
 
+    llm = llm_factory("gpt-4o")
+    ```
 
-!!! info
-    A **non-LLM metric** refers to a metric that does not rely on an LLM for evaluation.
+    This is already set up in your quickstart project!
 
-To address these issues, let's try an LLM-based metric.
+=== "Anthropic Claude"
+    Set your Anthropic API key:
 
+    ```sh
+    export ANTHROPIC_API_KEY="your-anthropic-key"
+    ```
 
-### Evaluating using a LLM-based Metric
+    In your `evals.py` `_init_clients()` function:
 
+    ```python
+    from ragas.llms import llm_factory
 
-**Choose your LLM**
---8<--
-choose_evaluator_llm.md
---8<--
+    llm = llm_factory("claude-3-5-sonnet-20241022", provider="anthropic")
+    ```
 
-**Evaluation**
+=== "Google Gemini"
+    Set up your Google credentials:
 
-Here we will use [AspectCritic](../concepts/metrics/available_metrics/aspect_critic.md), which is an LLM based metric that outputs pass/fail given the evaluation criteria.
+    ```sh
+    export GOOGLE_API_KEY="your-google-api-key"
+    ```
+
+    In your `evals.py` `_init_clients()` function:
+
+    ```python
+    from ragas.llms import llm_factory
+
+    llm = llm_factory("gemini-1.5-pro", provider="google")
+    ```
+
+=== "Local Models (Ollama)"
+    Install and run Ollama locally, then in your `evals.py` `_init_clients()` function:
+
+    ```python
+    from ragas.llms import llm_factory
+
+    llm = llm_factory(
+        "mistral",
+        provider="ollama",
+        base_url="http://localhost:11434"  # Default Ollama URL
+    )
+    ```
+
+=== "Custom / Other Providers"
+    For any LLM with OpenAI-compatible API:
+
+    ```python
+    from ragas.llms import llm_factory
+
+    llm = llm_factory(
+        "model-name",
+        api_key="your-api-key",
+        base_url="https://your-api-endpoint"
+    )
+    ```
+
+    For more details, learn about [LLM integrations](../concepts/metrics/index.md).
+
+### Using Pre-Built Metrics
+
+`ragas` comes with pre-built metrics for common evaluation tasks. For example, [Aspect Critique](../concepts/metrics/available_metrics/aspect_critic.md) evaluates any aspect of your output using `DiscreteMetric`:
 
 ```python
-from ragas import SingleTurnSample
-from ragas.metrics import AspectCritic
+from ragas.metrics import DiscreteMetric
+from ragas.llms import llm_factory
 
-test_data = {
-    "user_input": "summarise given text\nThe company reported an 8% rise in Q3 2024, driven by strong performance in the Asian market. Sales in this region have significantly contributed to the overall growth. Analysts attribute this success to strategic marketing and product localization. The positive trend in the Asian market is expected to continue into the next quarter.",
-    "response": "The company experienced an 8% increase in Q3 2024, largely due to effective marketing strategies and product adaptation, with expectations of continued growth in the coming quarter.",
-}
+# Setup your evaluator LLM
+evaluator_llm = llm_factory("gpt-4o")
 
-metric = AspectCritic(name="summary_accuracy",llm=evaluator_llm, definition="Verify if the summary is accurate.")
-test_data = SingleTurnSample(**test_data)
-await metric.single_turn_ascore(test_data)
+# Create a custom aspect evaluator
+metric = DiscreteMetric(
+    name="summary_accuracy",
+    allowed_values=["accurate", "inaccurate"],
+    prompt="""Evaluate if the summary is accurate and captures key information.
 
+Response: {response}
+
+Answer with only 'accurate' or 'inaccurate'.""",
+    llm=evaluator_llm
+)
+
+# Score your application's output
+score = await metric.ascore(
+    response="The summary of the text is..."
+)
+print(f"Score: {score.value}")  # 'accurate' or 'inaccurate'
+print(f"Reason: {score.reason}")
 ```
 
-Output
-```
-1
-```
-
-Success! Here 1 means pass and 0 means fail
+Pre-built metrics like this save you from defining evaluation logic from scratch. Explore [all available metrics](../concepts/metrics/available_metrics/index.md).
 
 !!! info
     There are many other types of metrics that are available in `ragas` (with and without `reference`), and you may also create your own metrics if none of those fits your case. To explore this more checkout [more on metrics](../concepts/metrics/index.md).
 
 ### Evaluating on a Dataset
 
-In the examples above, we used only a single sample to evaluate our application. However, evaluating on just one sample is not robust enough to trust the results. To ensure the evaluation is reliable, you should add more test samples to your test data.
-
-Here, we’ll load a dataset from Hugging Face Hub, but you can load data from any source, such as production logs or other datasets. Just ensure that each sample includes all the required attributes for the chosen metric.
-
-In our case, the required attributes are:
-- **`user_input`**: The input provided to the application (here the input text report).
-- **`response`**: The output generated by the application (here the generated summary).
-
-For example
+In your quickstart project, you'll see in the `load_dataset()` function, which creates test data with multiple samples:
 
 ```python
-[
-    # Sample 1
+from ragas import Dataset
+
+# Create a dataset with multiple test samples
+dataset = Dataset(
+    name="test_dataset",
+    backend="local/csv",  # Can also use JSONL, Google Drive, or in-memory
+    root_dir=".",
+)
+
+# Add samples to the dataset
+data_samples = [
     {
-        "user_input": "summarise given text\nThe Q2 earnings report revealed a significant 15% increase in revenue, ...",
-        "response": "The Q2 earnings report showed a 15% revenue increase, ...",
+        "user_input": "What is ragas?",
+        "response": "Ragas is an evaluation framework...",
+        "expected": "Ragas provides objective metrics..."
     },
-    # Additional samples in the dataset
-    ....,
-    # Sample N
     {
-        "user_input": "summarise given text\nIn 2023, North American sales experienced a 5% decline, ...",
-        "response": "Companies are strategizing to adapt to market challenges and ...",
-    }
+        "user_input": "How do metrics work?",
+        "response": "Metrics score your application...",
+        "expected": "Metrics evaluate performance..."
+    },
 ]
+
+for sample in data_samples:
+    dataset.append(sample)
+
+# Save to disk
+dataset.save()
 ```
 
-```python
-from datasets import load_dataset
-from ragas import EvaluationDataset
-eval_dataset = load_dataset("explodinggradients/earning_report_summary",split="train")
-eval_dataset = EvaluationDataset.from_hf_dataset(eval_dataset)
-print("Features in dataset:", eval_dataset.features())
-print("Total samples in dataset:", len(eval_dataset))
-```
+This gives you multiple test cases instead of evaluating one example at a time. Learn more about [datasets and experiments](../concepts/components/eval_dataset.md).
 
-Output
-```
-Features in dataset: ['user_input', 'response']
-Total samples in dataset: 50
-```
-
-Evaluate using dataset
-
-```python
-from ragas import evaluate
-
-results = evaluate(eval_dataset, metrics=[metric])
-results
-```
-
-!!! tip "Async Usage"
-    For production async applications, use `aevaluate()` to avoid event loop conflicts:
-    ```python
-    from ragas import aevaluate
-
-    # In an async function
-    results = await aevaluate(eval_dataset, metrics=[metric])
-    ```
-
-    Or disable nest_asyncio in sync code:
-    ```python
-    results = evaluate(eval_dataset, metrics=[metric], allow_nest_asyncio=False)
-    ```
-
-Output
-```
-{'summary_accuracy': 0.84}
-```
-
-This score shows that out of all the samples in our test data, only 84% of summaries passes the given evaluation criteria. Now, **It's
-important to see why is this the case**.
-
-Export the sample level scores to pandas dataframe
-
-```python
-results.to_pandas()
-```
-
-Output
-```
-	user_input	                                        response	                                        summary_accuracy
-0	summarise given text\nThe Q2 earnings report r...	The Q2 earnings report showed a 15% revenue in...	1
-1	summarise given text\nIn 2023, North American ...	Companies are strategizing to adapt to market ...	1
-2	summarise given text\nIn 2022, European expans...	Many companies experienced a notable 15% growt...	1
-3	summarise given text\nSupply chain challenges ...	Supply chain challenges in North America, caus...	1
-```
-
-Viewing the sample-level results in a CSV file, as shown above, is fine for quick checks but not ideal for detailed analysis or comparing results across evaluation runs.
+Your generated project includes sample data in the `evals/datasets/` folder - you can edit those files to add more test cases.
 
 ### Want help in improving your AI application using evals?
 
@@ -189,7 +239,7 @@ We are compressing this knowledge into a product to replace vibe checks with eva
 If you want help with improving and scaling up your AI application using evals.
 
 
-🔗 Book a [slot](https://bit.ly/3EBYq4J) or drop us a line: [founders@explodinggradients.com](mailto:founders@explodinggradients.com).
+🔗 Book a [slot](https://bit.ly/3EBYq4J) or drop us a line: [founders@vibrantlabs.com](mailto:founders@vibrantlabs.com).
 
 
 ![](../_static/ragas_app.gif)

@@ -1,4 +1,6 @@
 import os
+import sys
+from pathlib import Path
 
 from openai import OpenAI
 
@@ -6,10 +8,12 @@ from ragas import Dataset, experiment
 from ragas.llms import llm_factory
 from ragas.metrics import DiscreteMetric
 
-from .rag import default_rag_client
+# Add the current directory to the path so we can import rag module when run as a script
+sys.path.insert(0, str(Path(__file__).parent))
+from rag import default_rag_client
 
 openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-rag_client = default_rag_client(llm_client=openai_client)
+rag_client = default_rag_client(llm_client=openai_client, logdir="evals/logs")
 llm = llm_factory("gpt-4o", client=openai_client)
 
 
@@ -17,7 +21,7 @@ def load_dataset():
     dataset = Dataset(
         name="test_dataset",
         backend="local/csv",
-        root_dir=".",
+        root_dir="evals",
     )
 
     data_samples = [
@@ -76,6 +80,11 @@ async def main():
     experiment_results = await run_experiment.arun(dataset)
     print("Experiment completed successfully!")
     print("Experiment results:", experiment_results)
+
+    # Save experiment results to CSV
+    experiment_results.save()
+    csv_path = Path(".") / "experiments" / f"{experiment_results.name}.csv"
+    print(f"\nExperiment results saved to: {csv_path.resolve()}")
 
 
 if __name__ == "__main__":

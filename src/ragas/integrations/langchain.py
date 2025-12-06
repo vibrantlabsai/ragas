@@ -77,9 +77,8 @@ class EvaluatorChain(Chain, RunEvaluator):
             inputs = convert_row_v1_to_v2(inputs)
             if "retrieved_contexts" in inputs:
                 inputs["retrieved_contexts"] = [
-                    doc.page_content
+                    doc.page_content if isinstance(doc, LCDocument) else str(doc)
                     for doc in inputs["retrieved_contexts"]
-                    if isinstance(doc, LCDocument)
                 ]
             inputs = SingleTurnSample(**inputs)
 
@@ -109,9 +108,8 @@ class EvaluatorChain(Chain, RunEvaluator):
             inputs = convert_row_v1_to_v2(inputs)
             if "retrieved_contexts" in inputs:
                 inputs["retrieved_contexts"] = [
-                    doc.page_content
+                    doc.page_content if isinstance(doc, LCDocument) else str(doc)
                     for doc in inputs["retrieved_contexts"]
-                    if isinstance(doc, LCDocument)
                 ]
             inputs = SingleTurnSample(**inputs)
 

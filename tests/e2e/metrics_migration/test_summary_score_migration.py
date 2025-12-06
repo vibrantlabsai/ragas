@@ -177,8 +177,8 @@ class TestSummaryScoreE2EMigration:
 
         # V2 implementation should not accept legacy components
         with pytest.raises((TypeError, ValueError, AttributeError)):
-            SummaryScore(llm="invalid_llm_type")  # Should reject string
+            SummaryScore(llm="invalid_llm_type")  # type: ignore[arg-type]  # Should reject string
 
         # V2 should only accept InstructorBaseRagasLLM
         with pytest.raises((TypeError, ValueError, AttributeError)):
-            SummaryScore(llm=None)  # Should reject None
+            SummaryScore(llm=None)  # type: ignore[arg-type]  # Should reject None

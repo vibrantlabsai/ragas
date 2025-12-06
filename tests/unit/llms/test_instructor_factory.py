@@ -17,18 +17,22 @@ class MockClient:
         self.is_async = is_async
         self.chat = Mock()
         self.chat.completions = Mock()
+        self.messages = Mock()
+        self.messages.create = Mock()
         if is_async:
 
             async def async_create(*args, **kwargs):
                 return LLMResponseModel(response="Mock response")
 
             self.chat.completions.create = async_create
+            self.messages.create = async_create
         else:
 
             def sync_create(*args, **kwargs):
                 return LLMResponseModel(response="Mock response")
 
             self.chat.completions.create = sync_create
+            self.messages.create = sync_create
 
 
 class MockInstructor:
@@ -109,11 +113,12 @@ def test_llm_factory_with_model_args(mock_sync_client, monkeypatch):
     assert llm.model_args.get("temperature") == 0.7  # type: ignore
 
 
-def test_unsupported_provider():
-    """Test that unsupported providers raise ValueError."""
+def test_unsupported_provider(monkeypatch):
+    """Test that invalid clients are handled gracefully for unknown providers."""
     mock_client = Mock()
+    mock_client.messages = None
 
-    with pytest.raises(ValueError, match="Unsupported provider"):
+    with pytest.raises(ValueError, match="Failed to initialize"):
         llm_factory("test-model", provider="unsupported", client=mock_client)
 
 
@@ -168,28 +173,36 @@ def test_sync_client_agenerate_error(mock_sync_client, monkeypatch):
         asyncio.run(llm.agenerate("Test prompt", LLMResponseModel))
 
 
-def test_provider_support():
-    """Test that all expected providers are supported."""
-    supported_providers = {
-        "openai": "from_openai",
-        "anthropic": "from_anthropic",
-        "google": "from_gemini",
-        "litellm": "from_litellm",
-    }
+def test_provider_support(monkeypatch):
+    """Test that major providers are supported."""
+    import instructor
 
-    for provider, func_name in supported_providers.items():
-        mock_client = Mock()
+    # Mock all provider-specific methods
+    def mock_from_openai(client):
+        return MockInstructor(client)
 
-        import instructor
+    def mock_from_anthropic(client):
+        return MockInstructor(client)
 
-        mock_instructor_func = Mock(return_value=MockInstructor(mock_client))
-        setattr(instructor, func_name, mock_instructor_func)
+    def mock_from_gemini(client):
+        return MockInstructor(client)
 
-        try:
-            llm = llm_factory("test-model", provider=provider, client=mock_client)
-            assert llm.model == "test-model"  # type: ignore
-        except Exception as e:
-            pytest.fail(f"Provider {provider} should be supported but got error: {e}")
+    def mock_from_litellm(client):
+        return MockInstructor(client)
+
+    # Use setattr with the module object directly to avoid attribute existence checks
+    monkeypatch.setattr(instructor, "from_openai", mock_from_openai, raising=False)
+    monkeypatch.setattr(
+        instructor, "from_anthropic", mock_from_anthropic, raising=False
+    )
+    monkeypatch.setattr(instructor, "from_gemini", mock_from_gemini, raising=False)
+    monkeypatch.setattr(instructor, "from_litellm", mock_from_litellm, raising=False)
+
+    # Test all major providers
+    for provider in ["openai", "anthropic", "google", "gemini", "litellm"]:
+        mock_client = MockClient(is_async=False)
+        llm = llm_factory("test-model", provider=provider, client=mock_client)
+        assert llm.model == "test-model"  # type: ignore
 
 
 def test_llm_model_args_storage(mock_sync_client, monkeypatch):

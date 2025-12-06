@@ -12,7 +12,7 @@ Langfuse ([GitHub](https://github.com/langfuse/langfuse)) is an open-source plat
 - **Detailed Analytics**: Segment and [analyze](https://langfuse.com/docs/analytics/overview) traces to identify low-quality scores and improve your system's performance.
 - **Score Reporting**: Drill down into detailed reports for specific use cases and user segments.
 
-Ragas ([GitHub](https://github.com/explodinggradients/ragas)) is an open-source tool that can help you run [Model-Based Evaluation](https://langfuse.com/docs/scores/model-based-evals) on your traces/spans, especially for RAG pipelines. Ragas can perform reference-free evaluations of various aspects of your RAG pipeline. Because it is reference-free you don't need ground-truths when running the evaluations and can run it on production traces that you've collected with Langfuse.
+Ragas ([GitHub](https://github.com/vibrantlabsai/ragas)) is an open-source tool that can help you run [Model-Based Evaluation](https://langfuse.com/docs/scores/model-based-evals) on your traces/spans, especially for RAG pipelines. Ragas can perform reference-free evaluations of various aspects of your RAG pipeline. Because it is reference-free you don't need ground-truths when running the evaluations and can run it on production traces that you've collected with Langfuse.
 
 ## Getting Started
 
@@ -53,11 +53,11 @@ The dataset contains the following columns:
 ```python
 from datasets import load_dataset
 
-amnesty_qa = load_dataset("explodinggradients/amnesty_qa", "english_v2")["eval"]
+amnesty_qa = load_dataset("vibrantlabsai/amnesty_qa", "english_v2")["eval"]
 amnesty_qa
 ```
 
-    Found cached dataset amnesty_qa (/home/jjmachan/.cache/huggingface/datasets/explodinggradients___amnesty_qa/english_v2/2.0.0/d0ed9800191a31943ee52a5c22ee4305e28a33f5edcd9a323802112cff07cc24)
+    Found cached dataset amnesty_qa (/home/jjmachan/.cache/huggingface/datasets/vibrantlabs___amnesty_qa/english_v2/2.0.0/d0ed9800191a31943ee52a5c22ee4305e28a33f5edcd9a323802112cff07cc24)
 
 
 

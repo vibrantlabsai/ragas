@@ -20,7 +20,7 @@ from ragas.losses import BinaryMetricLoss, MSELoss
 from ragas.metrics.validators import AllowedValuesType
 from ragas.prompt import FewShotPydanticPrompt, PromptMixin
 from ragas.run_config import RunConfig
-from ragas.utils import camel_to_snake, deprecated, get_metric_language
+from ragas.utils import camel_to_snake, get_metric_language
 
 if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
@@ -149,79 +149,6 @@ class Metric(ABC):
             Configuration for the metric run including timeouts and other settings.
         """
         ...
-
-    @deprecated("0.2", removal="0.3", alternative="single_turn_ascore")
-    def score(self, row: t.Dict, callbacks: Callbacks = None) -> float:
-        """
-        Calculates the score for a single row of data.
-
-        Note
-        ----
-        This method is deprecated and will be removed in 0.3. Please use `single_turn_ascore` or `multi_turn_ascore` instead.
-        """
-        callbacks = callbacks or []
-        rm, group_cm = new_group(
-            self.name,
-            inputs=row,
-            callbacks=callbacks,
-            metadata={"type": ChainType.METRIC},
-        )
-
-        async def _async_wrapper():
-            try:
-                result = await self._ascore(row=row, callbacks=group_cm)
-            except Exception as e:
-                if not group_cm.ended:
-                    rm.on_chain_error(e)
-                raise e
-            else:
-                if not group_cm.ended:
-                    rm.on_chain_end({"output": result})
-                return result
-
-        # Apply nest_asyncio logic to ensure compatibility in notebook/Jupyter environments.
-        apply_nest_asyncio()
-        return run(_async_wrapper)
-
-    @deprecated("0.2", removal="0.3", alternative="single_turn_ascore")
-    async def ascore(
-        self,
-        row: t.Dict,
-        callbacks: Callbacks = None,
-        timeout: t.Optional[float] = None,
-    ) -> float:
-        """
-        Asynchronously calculates the score for a single row of data.
-
-        Note
-        ----
-        This method is deprecated and will be removed in 0.3. Please use `single_turn_ascore` instead.
-        """
-        callbacks = callbacks or []
-        rm, group_cm = new_group(
-            self.name,
-            inputs=row,
-            callbacks=callbacks,
-            metadata={"type": ChainType.METRIC},
-        )
-        try:
-            score = await asyncio.wait_for(
-                self._ascore(row=row, callbacks=group_cm),
-                timeout=timeout,
-            )
-        except Exception as e:
-            if not group_cm.ended:
-                rm.on_chain_error(e)
-            raise e
-        else:
-            if not group_cm.ended:
-                rm.on_chain_end({"output": score})
-        return score
-
-    async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> float:
-        raise NotImplementedError(
-            f"Metric '{self.name}' has no implementation for _ascore. score() is deprecated and will be removed in 0.3. Please use single_turn_ascore or multi_turn_ascore instead."
-        )
 
 
 @dataclass

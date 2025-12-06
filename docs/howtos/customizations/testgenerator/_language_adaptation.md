@@ -6,7 +6,7 @@ In this notebook, you'll learn how to adapt synthetic test data generation to no
 
 
 ```python
-! git clone https://huggingface.co/datasets/explodinggradients/Sample_non_english_corpus
+! git clone https://huggingface.co/datasets/vibrantlabsai/Sample_non_english_corpus
 ```
 
     Cloning into 'Sample_non_english_corpus'...

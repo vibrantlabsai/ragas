@@ -76,7 +76,7 @@ def load_amnesty_dataset_safe(config: str = "english_v3"):
     """
     try:
         logger.info(f"Attempting to load amnesty_qa dataset with config '{config}'")
-        dataset = load_dataset("explodinggradients/amnesty_qa", config)["eval"]
+        dataset = load_dataset("vibrantlabsai/amnesty_qa", config)["eval"]
         logger.info(f"Successfully loaded dataset with {len(dataset)} samples")
         return dataset
     except Exception as e:
@@ -101,7 +101,7 @@ def load_fiqa_dataset_safe(config: str = "ragas_eval_v3"):
     """
     try:
         logger.info(f"Attempting to load fiqa dataset with config '{config}'")
-        dataset = load_dataset("explodinggradients/fiqa", config)["baseline"]
+        dataset = load_dataset("vibrantlabsai/fiqa", config)["baseline"]
         logger.info(f"Successfully loaded dataset with {len(dataset)} samples")
         return dataset
     except Exception as e:

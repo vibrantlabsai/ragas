@@ -10,7 +10,7 @@ In this guide, you'll learn how to evaluate and iteratively improve a prompt usi
 
 !!! note "Full code"
     - The dataset and scripts live under `examples/iterate_prompt/` in the repo
-    - Full code is available on [GitHub](https://github.com/explodinggradients/ragas/tree/main/examples/iterate_prompt)
+    - Full code is available on [GitHub](https://github.com/vibrantlabsai/ragas/tree/main/examples/iterate_prompt)
 
 ## Task definition
 In this case, we are considering a customer support ticket classification task.

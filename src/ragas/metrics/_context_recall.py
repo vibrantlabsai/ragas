@@ -18,7 +18,6 @@ from ragas.metrics.base import (
 )
 from ragas.prompt import PydanticPrompt
 from ragas.run_config import RunConfig
-from ragas.utils import deprecated
 
 if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
@@ -160,17 +159,6 @@ class LLMContextRecall(MetricWithLLM, SingleTurnMetric):
 @dataclass
 class ContextRecall(LLMContextRecall):
     name: str = "context_recall"
-
-    @deprecated(since="0.2", removal="0.3", alternative="LLMContextRecall")
-    async def _single_turn_ascore(
-        self, sample: SingleTurnSample, callbacks: Callbacks
-    ) -> float:
-        row = sample.to_dict()
-        return await self._ascore(row, callbacks)
-
-    @deprecated(since="0.2", removal="0.3", alternative="LLMContextRecall")
-    async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> float:
-        return await super()._ascore(row, callbacks)
 
 
 @dataclass

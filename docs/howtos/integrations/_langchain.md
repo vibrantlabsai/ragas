@@ -13,8 +13,9 @@ With this integration you can easily evaluate your QA chains with the metrics of
 
 ```python
 # attach to the existing event loop when using jupyter notebooks
-import nest_asyncio
 import os
+
+import nest_asyncio
 import openai
 from dotenv import load_dotenv
 
@@ -35,9 +36,9 @@ First lets load the dataset. We are going to build a generic QA system over the 
 
 
 ```python
-from langchain_community.document_loaders import TextLoader
-from langchain.indexes import VectorstoreIndexCreator
 from langchain.chains import RetrievalQA
+from langchain.indexes import VectorstoreIndexCreator
+from langchain_community.document_loaders import TextLoader
 from langchain_openai import ChatOpenAI
 
 loader = TextLoader("./nyc_wikipedia/nyc_text.txt")
@@ -129,7 +130,7 @@ examples = [
 
 ## Introducing `RagasEvaluatorChain`
 
-`RagasEvaluatorChain` creates a wrapper around the metrics ragas provides (documented [here](https://github.com/explodinggradients/ragas/blob/main/docs/concepts/metrics/index.md)), making it easier to run these evaluation with langchain and langsmith.
+`RagasEvaluatorChain` creates a wrapper around the metrics ragas provides (documented [here](https://github.com/vibrantlabsai/ragas/blob/main/docs/concepts/metrics/index.md)), making it easier to run these evaluation with langchain and langsmith.
 
 The evaluator chain has the following APIs
 
@@ -155,10 +156,10 @@ result["result"]
 ```python
 from ragas.langchain.evalchain import RagasEvaluatorChain
 from ragas.metrics import (
-    faithfulness,
     answer_relevancy,
     context_precision,
     context_recall,
+    faithfulness,
 )
 
 # create evaluation chains

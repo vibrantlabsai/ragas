@@ -22,26 +22,42 @@ class RankingMetric(SimpleLLMMetric, RankingValidator):
 
     This class is used for metrics that output ordered lists, such as
     ranking search results, prioritizing features, or ordering responses
-    by relevance.
+    by relevance. Uses the instructor library for structured LLM outputs.
 
     Attributes
     ----------
     allowed_values : int
         Expected number of items in the ranking list. Default is 2.
+    llm : Optional[BaseRagasLLM]
+        The language model instance for evaluation. Can be created using llm_factory().
+    prompt : Optional[Union[str, Prompt]]
+        The prompt template for the metric. Should contain placeholders for
+        evaluation inputs that will be formatted at runtime.
 
     Examples
     --------
     >>> from ragas.metrics import RankingMetric
-    >>> from ragas.llms import LangchainLLMWrapper
-    >>> from langchain_openai import ChatOpenAI
+    >>> from ragas.llms import llm_factory
+    >>> from openai import OpenAI
+    >>>
+    >>> # Create an LLM instance
+    >>> client = OpenAI(api_key="your-api-key")
+    >>> llm = llm_factory("gpt-4o-mini", client=client)
     >>>
     >>> # Create a ranking metric that returns top 3 items
-    >>> llm = LangchainLLMWrapper(ChatOpenAI())
     >>> metric = RankingMetric(
     ...     name="relevance_ranking",
     ...     llm=llm,
+    ...     prompt="Rank these results by relevance: {results}",
     ...     allowed_values=3
     ... )
+    >>>
+    >>> # Score with the metric
+    >>> result = metric.score(
+    ...     llm=llm,
+    ...     results="result1, result2, result3"
+    ... )
+    >>> print(result.value)  # Output: a list of 3 ranked items
     """
 
     allowed_values: int = 2

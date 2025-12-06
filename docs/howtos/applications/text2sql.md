@@ -62,7 +62,7 @@ uv run python -m ragas_examples.text2sql.data_utils --download-data
 If you see authentication errors, visit the dataset page and accept terms first: [BookSQL on Hugging Face](https://huggingface.co/datasets/Exploration-Lab/BookSQL)
 
 !!! note "Full code"
-    You can view the full code for the agent and evaluation pipeline [here](https://github.com/explodinggradients/ragas/tree/main/examples/ragas_examples/text2sql).
+    You can view the full code for the agent and evaluation pipeline [here](https://github.com/vibrantlabsai/ragas/tree/main/examples/ragas_examples/text2sql).
 
 ## Prepare your dataset
 
@@ -72,7 +72,7 @@ We've prepared a balanced sample dataset with 99 examples (33 each of easy, medi
 
 ```bash
 # Download the sample CSV from GitHub
-curl -o booksql_sample.csv https://raw.githubusercontent.com/explodinggradients/ragas/main/examples/ragas_examples/text2sql/datasets/booksql_sample.csv
+curl -o booksql_sample.csv https://raw.githubusercontent.com/vibrantlabsai/ragas/main/examples/ragas_examples/text2sql/datasets/booksql_sample.csv
 # View the first few rows to understand the structure
 head -5 booksql_sample.csv
 ```
