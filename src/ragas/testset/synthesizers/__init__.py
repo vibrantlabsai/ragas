@@ -24,12 +24,13 @@ QueryDistribution = t.List[t.Tuple[BaseSynthesizer, float]]
 def default_query_distribution(
     llm: t.Union[BaseRagasLLM, "InstructorBaseRagasLLM"],
     kg: t.Optional[KnowledgeGraph] = None,
+    llm_context: t.Optional[str] = None,
 ) -> QueryDistribution:
     """ """
     default_queries = [
-        SingleHopSpecificQuerySynthesizer(llm=llm),
-        MultiHopAbstractQuerySynthesizer(llm=llm),
-        MultiHopSpecificQuerySynthesizer(llm=llm),
+        SingleHopSpecificQuerySynthesizer(llm=llm, llm_context=llm_context),
+        MultiHopAbstractQuerySynthesizer(llm=llm, llm_context=llm_context),
+        MultiHopSpecificQuerySynthesizer(llm=llm, llm_context=llm_context),
     ]
     if kg is not None:
         available_queries = []

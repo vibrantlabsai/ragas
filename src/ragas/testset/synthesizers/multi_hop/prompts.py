@@ -61,6 +61,7 @@ class QueryConditions(BaseModel):
     query_style: str
     query_length: str
     context: t.List[str]
+    llm_context: t.Optional[str] = None
 
 
 class GeneratedQueryAnswer(BaseModel):
@@ -84,7 +85,10 @@ class QueryAnswerGenerationPrompt(
         "the query. Avoid adding information that is not directly present or inferable from the given context.\n"
         "3. **Multi-Hop Context Tags**:\n"
         "   - Each context segment is tagged as `<1-hop>`, `<2-hop>`, etc.\n"
-        "   - Ensure the query uses information from at least two segments and connects them meaningfully."
+        "   - Ensure the query uses information from at least two segments and connects them meaningfully.\n"
+        "4. **Additional Context** (if provided): If llm_context is provided, use it as guidance for "
+        "what type of question to generate (e.g., comparison questions, cause-effect questions, application-based questions) "
+        "and how to structure the answer accordingly. Still ensure the content comes only from the provided context."
     )
     input_model: t.Type[QueryConditions] = QueryConditions
     output_model: t.Type[GeneratedQueryAnswer] = GeneratedQueryAnswer

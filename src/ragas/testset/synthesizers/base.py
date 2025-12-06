@@ -87,6 +87,7 @@ class BaseSynthesizer(ABC, t.Generic[Scenario], PromptMixin):
     llm: t.Union[BaseRagasLLM, "InstructorBaseRagasLLM"] = field(
         default_factory=_default_llm_factory
     )
+    llm_context: t.Optional[str] = None
 
     def __post_init__(self):
         if not self.name:

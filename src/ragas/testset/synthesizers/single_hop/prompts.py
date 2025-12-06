@@ -12,6 +12,7 @@ class QueryCondition(BaseModel):
     query_style: str
     query_length: str
     context: str
+    llm_context: t.Optional[str] = None
 
 
 class GeneratedQueryAnswer(BaseModel):
@@ -29,6 +30,9 @@ class QueryAnswerGenerationPrompt(PydanticPrompt[QueryCondition, GeneratedQueryA
         "that aligns with the persona's perspective and incorporates the term.\n"
         "2. **Generate an Answer**: Using only the content from the provided context, construct a detailed answer "
         "to the query. Do not add any information not included in or inferable from the context.\n"
+        "3. **Additional Context** (if provided): If llm_context is provided, use it as guidance for "
+        "what type of question to generate (e.g., comparison questions, how-to questions, application-based questions) "
+        "and how to structure the answer accordingly. Still ensure the content comes only from the provided context.\n"
     )
     input_model: t.Type[QueryCondition] = QueryCondition
     output_model: t.Type[GeneratedQueryAnswer] = GeneratedQueryAnswer

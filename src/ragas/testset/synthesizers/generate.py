@@ -57,12 +57,16 @@ class TestsetGenerator:
         The language model to use for the generation process.
     knowledge_graph : KnowledgeGraph, default empty
         The knowledge graph to use for the generation process.
+    llm_context : Optional[str], default None
+        Additional context to provide to the LLM when generating responses.
+        This context will be used to guide how the LLM generates queries and answers.
     """
 
     llm: BaseRagasLLM
     embedding_model: BaseRagasEmbeddings
     knowledge_graph: KnowledgeGraph = field(default_factory=KnowledgeGraph)
     persona_list: t.Optional[t.List[Persona]] = None
+    llm_context: t.Optional[str] = None
 
     @classmethod
     def from_langchain(
@@ -70,6 +74,7 @@ class TestsetGenerator:
         llm: LangchainLLM,
         embedding_model: LangchainEmbeddings,
         knowledge_graph: t.Optional[KnowledgeGraph] = None,
+        llm_context: t.Optional[str] = None,
     ) -> TestsetGenerator:
         """
         Creates a `TestsetGenerator` from a Langchain LLMs.
@@ -79,6 +84,7 @@ class TestsetGenerator:
             LangchainLLMWrapper(llm),
             LangchainEmbeddingsWrapper(embedding_model),
             knowledge_graph,
+            llm_context=llm_context,
         )
 
     @classmethod
@@ -87,6 +93,7 @@ class TestsetGenerator:
         llm: LlamaIndexLLM,
         embedding_model: LlamaIndexEmbedding,
         knowledge_graph: t.Optional[KnowledgeGraph] = None,
+        llm_context: t.Optional[str] = None,
     ) -> TestsetGenerator:
         """
         Creates a `TestsetGenerator` from a LlamaIndex LLM and embedding model.
@@ -96,6 +103,7 @@ class TestsetGenerator:
             LlamaIndexLLMWrapper(llm),
             LlamaIndexEmbeddingsWrapper(embedding_model),
             knowledge_graph,
+            llm_context=llm_context,
         )
 
     def generate_with_langchain_docs(
@@ -192,7 +200,7 @@ class TestsetGenerator:
         kg = KnowledgeGraph(nodes=nodes)
 
         # apply transforms and update the knowledge graph
-        apply_transforms(kg, transforms)
+        apply_transforms(kg, transforms, run_config=run_config or RunConfig())
         self.knowledge_graph = kg
 
         return self.generate(
@@ -349,7 +357,7 @@ class TestsetGenerator:
             self.llm.set_run_config(run_config)
 
         query_distribution = query_distribution or default_query_distribution(
-            self.llm, self.knowledge_graph
+            self.llm, self.knowledge_graph, self.llm_context
         )
         callbacks = callbacks or []
 
