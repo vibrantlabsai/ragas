@@ -137,17 +137,20 @@ def run(
     if is_event_loop_running():
         # Check if we're in a Jupyter environment
         if is_jupyter_environment():
-            # In Jupyter, schedule on the existing loop
+            # In Jupyter, schedule on the existing loop and run until complete
             import asyncio
 
             loop = asyncio.get_running_loop()
-            # Create a task and run it
+            # Create task and ensure it's scheduled
             task = loop.create_task(coro)
-            # Use a simple polling approach to wait for the task
+
+            # Run the loop until the task completes
+            # This is similar to what nest_asyncio did, but more explicit
             while not task.done():
+                # Process one iteration of the event loop
                 loop._run_once()
-                if task.done():
-                    break
+
+            # Return result or raise exception
             return task.result()
         else:
             # In non-Jupyter with running loop, this is an error
