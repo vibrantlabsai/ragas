@@ -39,32 +39,30 @@ def main():
 
     # LLM Context for generating calculation-based questions
     llm_context = """
-CRITICAL: Generate Pell Grant CALCULATION and APPLICATION questions with specific numerical examples from the document.
+Generate ONLY Calculation/Application Questions. 
+These questions must require applying the Pell Grant formulas and rules from the document to a specific scenario in order to:
+    • calculate a numerical outcome (e.g., award amount, disbursement, enrollment intensity)
 
-Question types to generate:
-
-1. CALCULATION QUESTIONS with SPECIFIC NUMBERS:
-- "A student's calculated SAI is [number] and their Pell COA is $[amount]. If the maximum Pell is $[amount] and the minimum Pell is $[amount], what would be the student's Scheduled Award?"
-- "A student has a Scheduled Award of $[amount] and an enrollment intensity of [percentage]%. What would be their actual Pell Grant disbursement?"
-- "If a student's LEU is [percentage]% and they receive a Pell Grant of $[amount], what is their remaining eligibility?"
-
-2. CONVERSION/APPLICATION QUESTIONS with NUMBERS:
-- "A student is taking [number] semester hours at their home school and [number] quarter hours at a different school under a consortium agreement. What would be the total semester hours for determining enrollment intensity?"
-- "A student has completed [number] payment periods and used [percentage]% of their Pell eligibility. How many semesters of eligibility remain?"
-
-3. ELIGIBILITY SCENARIO QUESTIONS with SPECIFIC AMOUNTS:
-- "A student has a Scheduled Award of $[amount] and a current LEU of [percentage]%. If the school only disburses in whole dollars, what is the maximum Pell Grant amount the student is eligible to receive for the remaining eligibility?"
-- "If a student withdraws after completing [percentage]% of the payment period with a Scheduled Award of $[amount], what amount should be returned?"
+Examples:
+- "A student's calculated SAI is 1,004 and their Pell COA is $6,493. If the maximum Pell is $7,500 and the minimum Pell is $750, what would be the student's Scheduled Award?"
+- "A student has a Scheduled Award of $6,200 and an enrollment intensity of 75%. What would be their actual Pell Grant disbursement?"
+- "If a student's LEU is 450% and they receive a Pell Grant of $3,000 (representing 50% of their Scheduled Award), what is their remaining eligibility in percentage?"
+- "A student is taking 6 semester hours at their home school and 4 quarter hours at a different school under a consortium agreement. What would be the total semester hours for determining enrollment intensity?"
+- "A student has a Scheduled Award of $5,000 and a current LEU of 500%. If the school only disburses in whole dollars, what is the maximum Pell Grant amount the student is eligible to receive for the remaining eligibility?"
+- "If a student withdraws after completing 40% of the payment period with a Scheduled Award of $4,800, what amount should be returned?"
 
 Requirements:
-- ALL questions MUST include specific numbers and amounts from the document
-- Questions MUST require calculation or application of Pell Grant formulas
-- Use realistic SAI amounts ($0-$6,000), Pell amounts ($750-$7,500), and percentages
+- Don't combine multiple questions in one question.
+- ALL questions MUST include specific numbers and amounts from the document when possible (e.g., SAI of 1,004; Pell COA of $6,493; max Pell of $7,500; min Pell of $750).
+- Questions MUST require calculation or application of Pell Grant formulas.
+- Use realistic SAI amounts ($0-$6,000), Pell amounts ($750-$7,500), and percentages.
 - Avoid simple factual questions like "What is a Pell Grant?" or "What is SAI?"
-- Focus on practical scenarios that financial aid officers would encounter
-- Extract actual numbers from examples in the document (e.g., SAI of 1,004, Pell COA of $6,493, etc.)
+- Focus on practical scenarios that students or financial aid officers would encounter.
+- Extract actual numbers from examples in the document whenever possible.
+- Never generate repetitive questions.
 
 Answers should show the calculation steps and final numerical result.
+
 """
 
     print("\n🎯 Testing WITH llm_context (calculation-based questions)...")
@@ -97,7 +95,7 @@ Answers should show the calculation steps and final numerical result.
 
     dataset_with_context = generator_with_context.generate_with_langchain_docs(
         docs[:num_docs],
-        testset_size=5,  # Generate 5 calculation-based questions
+        testset_size=4,  # Generate 4 calculation-based questions
         transforms=minimal_transforms,
         run_config=run_config
     )
@@ -109,7 +107,7 @@ Answers should show the calculation steps and final numerical result.
     print("📊 SAMPLE QUESTIONS (WITH LLM CONTEXT):")
     print("=" * 80)
 
-    for i, sample in enumerate(dataset_with_context.samples[:5], 1):
+    for i, sample in enumerate(dataset_with_context.samples[:4], 1):
         eval_sample = sample.eval_sample
         print(f"\n[{i}] Synthesizer: {sample.synthesizer_name}")
         print(f"Question: {eval_sample.user_input}")
@@ -138,7 +136,7 @@ Answers should show the calculation steps and final numerical result.
 
     dataset_no_context = generator_no_context.generate_with_langchain_docs(
         docs[:num_docs],
-        testset_size=5,
+        testset_size=4,
         transforms=minimal_transforms,
         run_config=run_config
     )
@@ -150,7 +148,7 @@ Answers should show the calculation steps and final numerical result.
     print("📊 SAMPLE QUESTIONS (WITHOUT LLM CONTEXT):")
     print("=" * 80)
 
-    for i, sample in enumerate(dataset_no_context.samples[:5], 1):
+    for i, sample in enumerate(dataset_no_context.samples[:4], 1):
         eval_sample = sample.eval_sample
         print(f"\n[{i}] Synthesizer: {sample.synthesizer_name}")
         print(f"Question: {eval_sample.user_input}")
