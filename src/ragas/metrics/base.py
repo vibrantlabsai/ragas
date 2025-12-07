@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from tqdm import tqdm
 
 from ragas._analytics import EvaluationEvent, _analytics_batcher
-from ragas.async_utils import apply_nest_asyncio, run
+from ragas.async_utils import run
 from ragas.callbacks import ChainType, new_group
 from ragas.dataset_schema import MetricAnnotation, MultiTurnSample, SingleTurnSample
 from ragas.llms import BaseRagasLLM
@@ -443,7 +443,6 @@ class SingleTurnMetric(Metric):
                     rm.on_chain_end({"output": result})
                 return result
 
-        apply_nest_asyncio()
         score = run(_async_wrapper)
 
         # track the evaluation event
@@ -567,7 +566,6 @@ class MultiTurnMetric(Metric):
                     rm.on_chain_end({"output": result})
                 return result
 
-        apply_nest_asyncio()
         score = run(_async_wrapper)
 
         # track the evaluation event
