@@ -24,14 +24,14 @@ class DataCompyScore(SingleTurnMetric):
 
     def __post_init__(self):
         try:
-            import datacompy
             import pandas as pd
+            from datacompy import Compare  # type: ignore[attr-defined]
         except ImportError as e:
             raise ImportError(
                 f"{e.name} is required for bleu score. Please install it using `pip install {e.name}`"
             )
 
-        self.data_compare = datacompy
+        self.Compare = Compare
         self.pd = pd
         if self.mode not in ["rows", "columns"]:
             raise ValueError("Mode should be either rows or columns")
@@ -56,7 +56,7 @@ class DataCompyScore(SingleTurnMetric):
             logging.error(f"Error in reading csv: {e}")
             return np.nan
 
-        compare = self.data_compare.Compare(reference_df, response_df, on_index=True)
+        compare = self.Compare(reference_df, response_df, on_index=True)
         if self.mode == "rows":
             recall = compare.count_matching_rows() / reference_df.shape[0]
             precision = compare.count_matching_rows() / response_df.shape[0]

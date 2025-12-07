@@ -10,7 +10,7 @@ before we start, let's load the dataset and define the LLM:
 from datasets import load_dataset
 from ragas import EvaluationDataset
 
-amnesty_qa = load_dataset("explodinggradients/amnesty_qa", "english_v3")
+amnesty_qa = load_dataset("vibrantlabsai/amnesty_qa", "english_v3")
 eval_dataset = EvaluationDataset.from_hf_dataset(amnesty_qa["eval"])
 ```
 

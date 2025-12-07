@@ -1,5 +1,6 @@
 """Google embeddings implementation supporting both Vertex AI and Google AI (Gemini)."""
 
+import sys
 import typing as t
 
 from .base import BaseRagasEmbedding
@@ -12,27 +13,132 @@ class GoogleEmbeddings(BaseRagasEmbedding):
     Supports both Vertex AI and Google AI (Gemini) embedding models.
     For Vertex AI, requires google-cloud-aiplatform package.
     For Google AI, requires google-generativeai package.
+
+    The client parameter is flexible:
+    - For Gemini: Can be None (auto-imports genai), the genai module, or a GenerativeModel instance
+    - For Vertex: Should be the configured vertex client
+
+    Examples:
+        # Gemini - auto-import (simplest)
+        embeddings = GoogleEmbeddings(client=None, model="text-embedding-004")
+
+        # Gemini - explicit genai module
+        import google.generativeai as genai
+        genai.configure(api_key="...")
+        embeddings = GoogleEmbeddings(client=genai, model="text-embedding-004")
+
+        # Gemini - from LLM client (auto-extracts genai module)
+        llm_client = genai.GenerativeModel("gemini-2.0-flash")
+        embeddings = GoogleEmbeddings(client=llm_client, model="text-embedding-004")
     """
 
     PROVIDER_NAME = "google"
-    REQUIRES_CLIENT = True
+    REQUIRES_CLIENT = False  # Client is optional for Gemini (can auto-import)
     DEFAULT_MODEL = "text-embedding-004"
 
     def __init__(
         self,
-        client: t.Any,
+        client: t.Optional[t.Any] = None,
         model: str = "text-embedding-004",
         use_vertex: bool = False,
         project_id: t.Optional[str] = None,
         location: t.Optional[str] = "us-central1",
         **kwargs: t.Any,
     ):
-        self.client = client
+        self._original_client = client
         self.model = model
         self.use_vertex = use_vertex
         self.project_id = project_id
         self.location = location
         self.kwargs = kwargs
+
+        # Resolve the actual client to use
+        self.client = self._resolve_client(client, use_vertex)
+
+    def _resolve_client(self, client: t.Optional[t.Any], use_vertex: bool) -> t.Any:
+        """Resolve the client to use for embeddings.
+
+        For Vertex AI: Returns the client as-is (must be provided).
+        For Gemini: Handles three scenarios:
+            1. No client (None) - Auto-imports and returns genai module
+            2. genai module - Returns as-is
+            3. GenerativeModel instance - Extracts and returns genai module
+
+        Args:
+            client: The client provided by the user (can be None for Gemini)
+            use_vertex: Whether using Vertex AI or Gemini
+
+        Returns:
+            The resolved client ready for use
+
+        Raises:
+            ValueError: If Vertex AI is used without a client, or if genai cannot be imported
+        """
+        if use_vertex:
+            # Vertex AI requires an explicit client
+            if client is None:
+                raise ValueError(
+                    "Vertex AI embeddings require a client. "
+                    "Please provide a configured Vertex AI client."
+                )
+            return client
+
+        # Gemini path - handle different client types
+        if client is None:
+            # Auto-import genai module
+            return self._import_genai_module()
+
+        # Check if client has embed_content method (it's the genai module or similar)
+        if hasattr(client, "embed_content") and callable(
+            getattr(client, "embed_content")
+        ):
+            return client
+
+        # Check if it's a GenerativeModel instance - extract genai module from it
+        client_module = client.__class__.__module__
+        if "google.generativeai" in client_module or "google.genai" in client_module:
+            # Extract base module name (google.generativeai or google.genai)
+            if "google.generativeai" in client_module:
+                base_module = "google.generativeai"
+            else:
+                base_module = "google.genai"
+
+            # Try to get the module from sys.modules
+            genai_module = sys.modules.get(base_module)
+            if genai_module and hasattr(genai_module, "embed_content"):
+                return genai_module
+
+            # If not in sys.modules, try importing it
+            try:
+                import importlib
+
+                genai_module = importlib.import_module(base_module)
+                if hasattr(genai_module, "embed_content"):
+                    return genai_module
+            except ImportError:
+                pass
+
+        # If we couldn't resolve it, try importing genai as fallback
+        return self._import_genai_module()
+
+    def _import_genai_module(self) -> t.Any:
+        """Import and return the google.generativeai module.
+
+        Returns:
+            The google.generativeai module
+
+        Raises:
+            ImportError: If google-generativeai is not installed
+        """
+        try:
+            import google.generativeai as genai
+
+            return genai
+        except ImportError as e:
+            raise ImportError(
+                "Google AI (Gemini) embeddings require google-generativeai package. "
+                "Install with: pip install google-generativeai"
+            ) from e
 
     def embed_text(self, text: str, **kwargs: t.Any) -> t.List[float]:
         """Embed a single text using Google's embedding service."""

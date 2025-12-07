@@ -1,20 +1,20 @@
 <h1 align="center">
   <img style="vertical-align:middle" height="200"
-  src="https://raw.githubusercontent.com/explodinggradients/ragas/main/docs/_static/imgs/logo.png">
+  src="https://raw.githubusercontent.com/vibrantlabsai/ragas/main/docs/_static/imgs/logo.png">
 </h1>
 <p align="center">
   <i>Supercharge Your LLM Application Evaluations 🚀</i>
 </p>
 
 <p align="center">
-    <a href="https://github.com/explodinggradients/ragas/releases">
-        <img alt="Latest release" src="https://img.shields.io/github/release/explodinggradients/ragas.svg">
+    <a href="https://github.com/vibrantlabsai/ragas/releases">
+        <img alt="Latest release" src="https://img.shields.io/github/release/vibrantlabsai/ragas.svg">
     </a>
     <a href="https://www.python.org/">
         <img alt="Made with Python" src="https://img.shields.io/badge/Made%20with-Python-1f425f.svg?color=purple">
     </a>
-    <a href="https://github.com/explodinggradients/ragas/blob/master/LICENSE">
-        <img alt="License Apache-2.0" src="https://img.shields.io/github/license/explodinggradients/ragas.svg?color=green">
+    <a href="https://github.com/vibrantlabsai/ragas/blob/master/LICENSE">
+        <img alt="License Apache-2.0" src="https://img.shields.io/github/license/vibrantlabsai/ragas.svg?color=green">
     </a>
     <a href="https://pypi.org/project/ragas/">
         <img alt="Ragas Downloads per month" src="https://static.pepy.tech/badge/ragas/month">
@@ -22,7 +22,7 @@
     <a href="https://discord.gg/5djav8GGNZ">
         <img alt="Join Ragas community on Discord" src="https://img.shields.io/discord/1119637219561451644">
     </a>
-    <a target="_blank" href="https://deepwiki.com/explodinggradients/ragas">
+    <a target="_blank" href="https://deepwiki.com/vibrantlabsai/ragas">
       <img 
         src="https://devin.ai/assets/deepwiki-badge.png" 
         alt="Ask DeepWiki.com" 
@@ -68,7 +68,7 @@ pip install ragas
 Alternatively, from source:
 
 ```bash
-pip install git+https://github.com/explodinggradients/ragas
+pip install git+https://github.com/vibrantlabsai/ragas
 ```
 
 ## :fire: Quickstart
@@ -84,12 +84,14 @@ ragas quickstart
 # Create a RAG evaluation project
 ragas quickstart rag_eval
 
-# Create an agent evaluation project
-ragas quickstart agent_evals -o ./my-project
+# Specify where you want to create it.
+ragas quickstart rag_eval -o ./my-project
 ```
 
 Available templates:
 - `rag_eval` - Evaluate RAG systems
+
+Coming Soon:
 - `agent_evals` - Evaluate AI agents
 - `benchmark_llm` - Benchmark and compare LLMs
 - `prompt_evals` - Evaluate prompt variations
@@ -136,7 +138,7 @@ Find the complete [Quickstart Guide](https://docs.ragas.io/en/latest/getstarted/
 
 In the past 2 years, we have seen and helped improve many AI applications using evals. If you want help with improving and scaling up your AI application using evals.
 
-🔗 Book a [slot](https://bit.ly/3EBYq4J) or drop us a line: [founders@explodinggradients.com](mailto:founders@explodinggradients.com).
+🔗 Book a [slot](https://cal.com/team/vibrantlabs/app) or drop us a line: [founders@vibrantlabs.com](mailto:founders@vibrantlabs.com).
 
 ## 🫂 Community
 
@@ -173,7 +175,7 @@ At Ragas, we believe in transparency. We collect minimal, anonymized usage data 
 
 ✅ Open-source data collection [code](./src/ragas/_analytics.py)
 
-✅ Publicly available aggregated [data](https://github.com/explodinggradients/ragas/issues/49)
+✅ Publicly available aggregated [data](https://github.com/vibrantlabsai/ragas/issues/49)
 
 To opt-out, set the `RAGAS_DO_NOT_TRACK` environment variable to `true`.
 
@@ -181,9 +183,9 @@ To opt-out, set the `RAGAS_DO_NOT_TRACK` environment variable to `true`.
 
 ```
 @misc{ragas2024,
-  author       = {ExplodingGradients},
+  author       = {VibrantLabs},
   title        = {Ragas: Supercharge Your LLM Application Evaluations},
   year         = {2024},
-  howpublished = {\url{https://github.com/explodinggradients/ragas}},
+  howpublished = {\url{https://github.com/vibrantlabsai/ragas}},
 }
 ```

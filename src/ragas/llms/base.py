@@ -188,7 +188,7 @@ class LangchainLLMWrapper(BaseRagasLLM):
                     )
 
                 # provied more conditions here
-                # https://github.com/explodinggradients/ragas/issues/1548
+                # https://github.com/vibrantlabsai/ragas/issues/1548
 
             # if generation_info is empty, we parse the response_metadata
             # this is less reliable
@@ -488,6 +488,10 @@ def _get_instructor_client(client: t.Any, provider: str) -> t.Any:
 
     if provider_lower == "openai":
         return instructor.from_openai(client)
+    elif provider_lower == "anthropic":
+        return instructor.from_anthropic(client)
+    elif provider_lower in ("google", "gemini"):
+        return instructor.from_gemini(client)
     elif provider_lower == "litellm":
         return instructor.from_litellm(client)
     elif provider_lower == "perplexity":
@@ -500,32 +504,44 @@ def llm_factory(
     model: str,
     provider: str = "openai",
     client: t.Optional[t.Any] = None,
+    adapter: str = "auto",
     **kwargs: t.Any,
 ) -> InstructorBaseRagasLLM:
     """
-    Create an LLM instance for structured output generation using Instructor.
+    Create an LLM instance for structured output generation with automatic adapter selection.
 
-    Supports multiple LLM providers with unified interface for both sync and async
-    operations. Returns instances with .generate() and .agenerate() methods that
-    accept Pydantic models for structured outputs.
+    Supports multiple LLM providers and structured output backends with unified interface
+    for both sync and async operations. Returns instances with .generate() and .agenerate()
+    methods that accept Pydantic models for structured outputs.
+
+    Auto-detects the best adapter for your provider:
+    - Google Gemini → uses LiteLLM adapter
+    - Other providers → uses Instructor adapter (default)
+    - Explicit control available via adapter parameter
 
     Args:
-        model: Model name (e.g., "gpt-4o", "gpt-4o-mini", "claude-3-sonnet").
+        model: Model name (e.g., "gpt-4o", "claude-3-sonnet", "gemini-2.0-flash").
         provider: LLM provider (default: "openai").
-                 Can be any provider supported by Instructor: openai, anthropic, google, litellm, etc.
+                 Examples: openai, anthropic, google, groq, mistral, etc.
         client: Pre-initialized client instance (required). For OpenAI, can be
                OpenAI(...) or AsyncOpenAI(...).
+        adapter: Structured output adapter to use (default: "auto").
+                - "auto": Auto-detect based on provider/client (recommended)
+                - "instructor": Use Instructor library
+                - "litellm": Use LiteLLM (supports 100+ providers)
         **kwargs: Additional model arguments (temperature, max_tokens, top_p, etc).
 
     Returns:
         InstructorBaseRagasLLM: Instance with generate() and agenerate() methods.
 
     Raises:
-        ValueError: If client is missing, provider is unsupported, or model is invalid.
+        ValueError: If client is missing, provider is unsupported, model is invalid,
+                   or adapter initialization fails.
 
     Examples:
         from openai import OpenAI
 
+        # OpenAI (auto-detects instructor adapter)
         client = OpenAI(api_key="...")
         llm = llm_factory("gpt-4o-mini", client=client)
         response = llm.generate(prompt, ResponseModel)
@@ -534,6 +550,14 @@ def llm_factory(
         from anthropic import Anthropic
         client = Anthropic(api_key="...")
         llm = llm_factory("claude-3-sonnet", provider="anthropic", client=client)
+
+        # Google Gemini (auto-detects litellm adapter)
+        from litellm import OpenAI as LiteLLMClient
+        client = LiteLLMClient(api_key="...", model="gemini-2.0-flash")
+        llm = llm_factory("gemini-2.0-flash", client=client)
+
+        # Explicit adapter selection
+        llm = llm_factory("gemini-2.0-flash", client=client, adapter="litellm")
 
         # Async
         from openai import AsyncOpenAI
@@ -557,11 +581,32 @@ def llm_factory(
 
     provider_lower = provider.lower()
 
+    # Auto-detect adapter if needed
+    if adapter == "auto":
+        from ragas.llms.adapters import auto_detect_adapter
+
+        adapter = auto_detect_adapter(client, provider_lower)
+
+    # Create LLM using selected adapter
+    from ragas.llms.adapters import get_adapter
+
     try:
-        patched_client = _get_instructor_client(client, provider_lower)
+        adapter_instance = get_adapter(adapter)
+        llm = adapter_instance.create_llm(client, model, provider_lower, **kwargs)
+    except ValueError as e:
+        # Re-raise ValueError from get_adapter for unknown adapter names
+        # Also handle adapter initialization failures
+        if "Unknown adapter" in str(e):
+            raise
+        # Adapter-specific failures get wrapped
+        raise ValueError(
+            f"Failed to initialize {provider} client with {adapter} adapter. "
+            f"Ensure you've created a valid {provider} client.\n"
+            f"Error: {str(e)}"
+        )
     except Exception as e:
         raise ValueError(
-            f"Failed to initialize {provider} client with instructor. "
+            f"Failed to initialize {provider} client with {adapter} adapter. "
             f"Ensure you've created a valid {provider} client.\n"
             f"Error: {str(e)}"
         )
@@ -576,13 +621,7 @@ def llm_factory(
         )
     )
 
-    return InstructorLLM(
-        client=patched_client,
-        model=model,
-        provider=provider,
-        model_args=InstructorModelArgs(),
-        **kwargs,
-    )
+    return llm
 
 
 # Experimental LLM classes migrated from ragas.experimental.llms
@@ -770,11 +809,66 @@ class InstructorLLM(InstructorBaseRagasLLM):
         return google_kwargs
 
     def _check_client_async(self) -> bool:
-        """Determine if the client is async-capable."""
+        """Determine if the client is async-capable.
+
+        Handles multiple cases:
+        1. Instructor-wrapped AsyncInstructor clients (OpenAI/Anthropic/etc)
+        2. Instructor-wrapped Instructor clients that wrap async underlying clients
+        3. Direct async clients with chat.completions.create
+        4. Instructor-wrapped clients where the underlying client is in a closure
+        """
         try:
+            # Check if this is an AsyncInstructor wrapper
+            if self.client.__class__.__name__ == "AsyncInstructor":
+                return True
+
+            # Check if this is a sync Instructor wrapper that wraps an async client
+            if hasattr(self.client, "client"):
+                underlying = self.client.client
+                # For OpenAI/Anthropic async clients
+                if hasattr(underlying, "chat") and hasattr(
+                    underlying.chat, "completions"
+                ):
+                    if hasattr(underlying.chat.completions, "create"):
+                        if inspect.iscoroutinefunction(
+                            underlying.chat.completions.create
+                        ):
+                            return True
+
             # Check if this is an async client by checking for a coroutine method
-            if hasattr(self.client.chat.completions, "create"):
-                return inspect.iscoroutinefunction(self.client.chat.completions.create)
+            if hasattr(self.client, "chat") and hasattr(
+                self.client.chat, "completions"
+            ):
+                if hasattr(self.client.chat.completions, "create"):
+                    return inspect.iscoroutinefunction(
+                        self.client.chat.completions.create
+                    )
+
+            # For instructor-wrapped clients, also check the closure of create_fn
+            # This handles cases where the underlying client is stored in a closure
+            if (
+                hasattr(self.client, "create_fn")
+                and hasattr(self.client.create_fn, "__closure__")
+                and self.client.create_fn.__closure__
+            ):
+                for cell in self.client.create_fn.__closure__:
+                    try:
+                        obj = cell.cell_contents
+                        # Check if the closure object is an async client
+                        if hasattr(obj, "chat") and hasattr(obj.chat, "completions"):
+                            if hasattr(obj.chat.completions, "create"):
+                                if inspect.iscoroutinefunction(
+                                    obj.chat.completions.create
+                                ):
+                                    return True
+                        # Also check for acompletion (e.g., litellm Router)
+                        if hasattr(obj, "acompletion"):
+                            if inspect.iscoroutinefunction(obj.acompletion):
+                                return True
+                    except (ValueError, AttributeError):
+                        # cell_contents might not be accessible
+                        pass
+
             return False
         except (AttributeError, TypeError):
             return False

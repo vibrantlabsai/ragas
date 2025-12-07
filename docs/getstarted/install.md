@@ -9,13 +9,13 @@ pip install ragas
 If you'd like to experiment with the latest features, install the most recent version from the main branch:
 
 ```bash
-pip install git+https://github.com/explodinggradients/ragas.git
+pip install git+https://github.com/vibrantlabsai/ragas.git
 ```
 
 If you're planning to contribute and make modifications to the code, ensure that you clone the repository and set it up as an [editable install](https://pip.pypa.io/en/stable/topics/local-project-installs/#editable-installs).
 
 ```bash
-git clone https://github.com/explodinggradients/ragas.git 
+git clone https://github.com/vibrantlabsai/ragas.git 
 pip install -e .
 ```
 

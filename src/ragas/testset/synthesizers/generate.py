@@ -346,7 +346,9 @@ class TestsetGenerator:
         5. Compile the results into an EvaluationDataset.
         """
         if run_config is not None:
-            self.llm.set_run_config(run_config)
+            # Only BaseRagasLLM has set_run_config method, not InstructorBaseRagasLLM
+            if isinstance(self.llm, BaseRagasLLM):
+                self.llm.set_run_config(run_config)
 
         query_distribution = query_distribution or default_query_distribution(
             self.llm, self.knowledge_graph

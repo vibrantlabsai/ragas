@@ -45,7 +45,7 @@ def download_and_save_dataset() -> Path:
         return dataset_path
     
     logger.info("Downloading HuggingFace doc Q&A evaluation dataset from GitHub...")
-    github_url = "https://raw.githubusercontent.com/explodinggradients/ragas/main/examples/ragas_examples/improve_rag/datasets/hf_doc_qa_eval.csv"
+    github_url = "https://raw.githubusercontent.com/vibrantlabsai/ragas/main/examples/ragas_examples/improve_rag/datasets/hf_doc_qa_eval.csv"
     
     import urllib.request
     
@@ -206,7 +206,7 @@ async def run_experiment(mode: str = "naive", model: str = "gpt-5-mini", name: O
         dataset, 
         name=name or f"{datetime.now().strftime('%Y%m%d-%H%M%S')}_{'agenticrag' if mode == 'agentic' else 'naiverag'}",
         rag=rag,
-        llm=llm_factory("gpt-5-mini", client=openai_client)
+        llm=llm_factory("gpt-5-mini", client=openai_client, temperature=1, top_p=None)
     )
     
     # Print basic results

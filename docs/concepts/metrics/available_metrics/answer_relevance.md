@@ -36,7 +36,7 @@ from ragas.metrics.collections import AnswerRelevancy
 # Setup LLM and embeddings
 client = AsyncOpenAI()
 llm = llm_factory("gpt-4o-mini", client=client)
-embeddings = embedding_factory("openai", model="text-embedding-3-small", client=client, interface="modern")
+embeddings = embedding_factory("openai", model="text-embedding-3-small", client=client)
 
 # Create metric
 scorer = AnswerRelevancy(llm=llm, embeddings=embeddings)

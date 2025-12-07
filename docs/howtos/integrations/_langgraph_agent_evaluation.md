@@ -8,7 +8,7 @@ In this tutorial, we'll:
 2. Set up an evaluation pipeline to track key performance metrics.
 3. Run and assess the agent's effectiveness with different queries.
 
-Click the [link](https://colab.research.google.com/github/explodinggradients/ragas/blob/main/docs/howtos/integrations/langgraph_agent_evaluation.ipynb) to open the notebook in Google Colab.
+Click the [link](https://colab.research.google.com/github/vibrantlabsai/ragas/blob/main/docs/howtos/integrations/langgraph_agent_evaluation.ipynb) to open the notebook in Google Colab.
 
 ## Prerequisites
 - Python 3.8+

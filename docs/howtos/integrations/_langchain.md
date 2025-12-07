@@ -130,7 +130,7 @@ examples = [
 
 ## Introducing `RagasEvaluatorChain`
 
-`RagasEvaluatorChain` creates a wrapper around the metrics ragas provides (documented [here](https://github.com/explodinggradients/ragas/blob/main/docs/concepts/metrics/index.md)), making it easier to run these evaluation with langchain and langsmith.
+`RagasEvaluatorChain` creates a wrapper around the metrics ragas provides (documented [here](https://github.com/vibrantlabsai/ragas/blob/main/docs/concepts/metrics/index.md)), making it easier to run these evaluation with langchain and langsmith.
 
 The evaluator chain has the following APIs
 

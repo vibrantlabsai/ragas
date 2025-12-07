@@ -1,0 +1,7 @@
+{
+  "setup-worktree": [
+    "cp $ROOT_WORKTREE_PATH/.env .env",
+    "make install-minimal",
+    "make check"
+  ]
+}

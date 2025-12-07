@@ -270,4 +270,4 @@ result = evaluate(
 For issues specific to OCI Gen AI integration:
 - Check OCI documentation: https://docs.oracle.com/en-us/iaas/Content/generative-ai/
 - OCI Python SDK: https://docs.oracle.com/en-us/iaas/tools/python/2.160.1/api/generative_ai.html
-- Ragas GitHub issues: https://github.com/explodinggradients/ragas/issues
+- Ragas GitHub issues: https://github.com/vibrantlabsai/ragas/issues

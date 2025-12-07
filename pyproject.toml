@@ -17,7 +17,6 @@ dependencies = [
     "openai>=1.0.0",
     "tqdm",
     "instructor",
-    "gitpython",
     "pillow>=10.4.0",
     "networkx",
     "scikit-network",
@@ -31,10 +30,10 @@ dependencies = [
 dynamic = ["version", "readme"]
 
 [project.urls]
-Homepage = "https://github.com/explodinggradients/ragas"
+Homepage = "https://github.com/vibrantlabsai/ragas"
 Documentation = "https://docs.ragas.io"
-Code = "https://github.com/explodinggradients/ragas"
-Issues = "https://github.com/explodinggradients/ragas/issues"
+Code = "https://github.com/vibrantlabsai/ragas"
+Issues = "https://github.com/vibrantlabsai/ragas/issues"
 
 [project.optional-dependencies]
 # Core optional features
@@ -48,10 +47,12 @@ all = [
     "datacompy",
     "sacrebleu",
     "llama_index",
-    "r2r"
+    "r2r",
+    "GitPython"
 ]
 
 # Specific integrations
+git = ["GitPython"]
 tracing = ["langfuse>=3.2.4", "mlflow>=3.1.4"]
 gdrive = [
     "google-api-python-client>=2.178.0",

@@ -1,10 +1,10 @@
 # Create custom single-hop queries from your documents
 
 ### Load sample documents
-I am using documents from [sample of GitLab handbook](https://huggingface.co/datasets/explodinggradients/Sample_Docs_Markdown). You can download it by running the below command.
+I am using documents from [sample of GitLab handbook](https://huggingface.co/datasets/vibrantlabsai/Sample_Docs_Markdown). You can download it by running the below command.
 
 ```
-! git clone https://huggingface.co/datasets/explodinggradients/Sample_Docs_Markdown
+! git clone https://huggingface.co/datasets/vibrantlabsai/Sample_Docs_Markdown
 
 ```
 

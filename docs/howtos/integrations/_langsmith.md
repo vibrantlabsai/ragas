@@ -30,7 +30,7 @@ from datasets import load_dataset
 from ragas import evaluate
 from ragas.metrics import answer_relevancy, context_precision, faithfulness
 
-fiqa_eval = load_dataset("explodinggradients/fiqa", "ragas_eval")
+fiqa_eval = load_dataset("vibrantlabsai/fiqa", "ragas_eval")
 
 result = evaluate(
     fiqa_eval["baseline"].select(range(3)),
@@ -40,7 +40,7 @@ result = evaluate(
 result
 ```
 
-    Found cached dataset fiqa (/home/jjmachan/.cache/huggingface/datasets/explodinggradients___fiqa/ragas_eval/1.0.0/3dc7b639f5b4b16509a3299a2ceb78bf5fe98ee6b5fee25e7d5e4d290c88efb8)
+    Found cached dataset fiqa (/home/jjmachan/.cache/huggingface/datasets/vibrantlabs___fiqa/ragas_eval/1.0.0/3dc7b639f5b4b16509a3299a2ceb78bf5fe98ee6b5fee25e7d5e4d290c88efb8)
 
 
 

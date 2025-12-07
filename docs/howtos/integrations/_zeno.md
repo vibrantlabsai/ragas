@@ -41,7 +41,7 @@ os.environ["ZENO_API_KEY"] = "your-zeno-api-key"
 
 
 ```python
-fiqa_eval = load_dataset("explodinggradients/fiqa", "ragas_eval")
+fiqa_eval = load_dataset("vibrantlabsai/fiqa", "ragas_eval")
 result = evaluate(
     fiqa_eval["baseline"],
     metrics=[

@@ -12,8 +12,8 @@ import logging
 from typing import Any, Dict, Optional
 
 import mlflow
-from langchain.docstore.document import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.retrievers import BM25Retriever as LangchainBM25Retriever
 from openai import AsyncOpenAI
 

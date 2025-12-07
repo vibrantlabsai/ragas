@@ -3,11 +3,11 @@
 In this tutorial you will get to learn how to create custom multi-hop queries from your documents. This is a very powerful feature that allows you to create queries that are not possible with the standard query types. This also helps you to create queries that are more specific to your use case.
 
 ### Load sample documents
-I am using documents from [sample of GitLab handbook](https://huggingface.co/datasets/explodinggradients/Sample_Docs_Markdown). You can download it by running the below command.
+I am using documents from [sample of GitLab handbook](https://huggingface.co/datasets/vibrantlabsai/Sample_Docs_Markdown). You can download it by running the below command.
 
 
 ```python
-! git clone https://huggingface.co/datasets/explodinggradients/Sample_Docs_Markdown
+! git clone https://huggingface.co/datasets/vibrantlabsai/Sample_Docs_Markdown
 ```
 
 

@@ -6,7 +6,6 @@ import asyncio
 import typing as t
 from pathlib import Path
 
-import git
 from pydantic import BaseModel
 from tqdm import tqdm
 
@@ -26,7 +25,37 @@ def version_experiment(
     create_branch: bool = True,
     stage_all: bool = False,
 ) -> str:
-    """Version control the current state of the codebase for an experiment."""
+    """Version control the current state of the codebase for an experiment.
+
+    This function requires GitPython to be installed. You can install it with:
+        pip install ragas[git]
+        # or
+        uv pip install ragas[git]
+
+    Args:
+        experiment_name: Name for the experiment (used in branch name)
+        commit_message: Custom commit message (defaults to "Experiment: {experiment_name}")
+        repo_path: Path to git repository (defaults to current directory)
+        create_branch: Whether to create a git branch for the experiment
+        stage_all: Whether to stage untracked files (default: tracked files only)
+
+    Returns:
+        The commit hash of the versioned state
+    """
+    try:
+        import git
+    except ImportError as e:
+        raise ImportError(
+            "version_experiment() requires GitPython. Install it with:\n"
+            "  pip install ragas[git]\n"
+            "  # or\n"
+            "  uv pip install ragas[git]\n\n"
+            "Or install with full features:\n"
+            "  pip install ragas[all]\n"
+            "  # or\n"
+            "  uv pip install ragas[all]"
+        ) from e
+
     # Default to current directory if no repo path is provided
     if repo_path is None:
         repo_path = find_git_root()

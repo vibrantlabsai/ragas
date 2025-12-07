@@ -55,12 +55,14 @@ By default, the quickstart example uses OpenAI. Set your API key and you're read
     export ANTHROPIC_API_KEY="your-anthropic-key"
     ```
 
-    Then update the `_init_clients()` function in `evals.py`:
+    Then update the LLM initialization in `evals.py`:
 
     ```python
+    from anthropic import Anthropic
     from ragas.llms import llm_factory
 
-    llm = llm_factory("claude-3-5-sonnet-20241022", provider="anthropic")
+    client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+    llm = llm_factory("claude-3-5-sonnet-20241022", provider="anthropic", client=client)
     ```
 
 === "Google Gemini"
@@ -70,38 +72,49 @@ By default, the quickstart example uses OpenAI. Set your API key and you're read
     export GOOGLE_API_KEY="your-google-api-key"
     ```
 
-    Then update the `_init_clients()` function in `evals.py`:
+    Then update the LLM initialization in `evals.py`:
+
+    **Option 1: Using Google's Official Library (Recommended)**
 
     ```python
+    import google.generativeai as genai
     from ragas.llms import llm_factory
 
-    llm = llm_factory("gemini-1.5-pro", provider="google")
+    genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+    client = genai.GenerativeModel("gemini-2.0-flash")
+    llm = llm_factory("gemini-2.0-flash", provider="google", client=client)
+    # Adapter is auto-detected as "litellm" for google provider
     ```
 
+    For more Gemini options and detailed setup, see the [Google Gemini Integration Guide](../howtos/integrations/gemini.md).
+
 === "Local Models (Ollama)"
-    Install and run Ollama locally, then update the `_init_clients()` function in `evals.py`:
+    Install and run Ollama locally, then update the LLM initialization in `evals.py`:
 
     ```python
+    from openai import OpenAI
     from ragas.llms import llm_factory
 
-    llm = llm_factory(
-        "mistral",
-        provider="ollama",
-        base_url="http://localhost:11434"  # Default Ollama URL
+    # Create an OpenAI-compatible client for Ollama
+    client = OpenAI(
+        api_key="ollama",  # Ollama doesn't require a real key
+        base_url="http://localhost:11434/v1"
     )
+    llm = llm_factory("mistral", provider="openai", client=client)
     ```
 
 === "Custom / Other Providers"
     For any LLM with OpenAI-compatible API:
 
     ```python
+    from openai import OpenAI
     from ragas.llms import llm_factory
 
-    llm = llm_factory(
-        "model-name",
+    client = OpenAI(
         api_key="your-api-key",
         base_url="https://your-api-endpoint"
     )
+    llm = llm_factory("model-name", provider="openai", client=client)
     ```
 
     For more details, learn about [LLM integrations](../concepts/metrics/index.md).
@@ -157,40 +170,55 @@ Congratulations! You have a complete evaluation setup running. 🎉
 Edit the `load_dataset()` function in `evals.py` to add more test questions:
 
 ```python
-from ragas.dataset_schema import SingleTurnSample
+from ragas import Dataset
 
 def load_dataset():
     """Load test dataset for evaluation."""
+    dataset = Dataset(
+        name="test_dataset",
+        backend="local/csv",
+        root_dir=".",
+    )
+
     data_samples = [
-        SingleTurnSample(
-            user_input="What is Ragas?",
-            response="",  # Will be filled by querying RAG
-            reference="Ragas is an evaluation framework for LLM applications",
-            retrieved_contexts=[],
-        ),
-        SingleTurnSample(
-            user_input="How do metrics work?",
-            response="",
-            reference="Metrics evaluate the quality and performance of LLM responses",
-            retrieved_contexts=[],
-        ),
+        {
+            "question": "What is Ragas?",
+            "grading_notes": "Ragas is an evaluation framework for LLM applications",
+        },
+        {
+            "question": "How do metrics work?",
+            "grading_notes": "Metrics evaluate the quality and performance of LLM responses",
+        },
         # Add more test cases here
     ]
 
-    dataset = EvaluationDataset(samples=data_samples)
+    for sample in data_samples:
+        dataset.append(sample)
+
+    dataset.save()
     return dataset
 ```
 
-### Customize Dataset and RAG System
+### Customize Evaluation Metrics
 
-The template includes:
-- `load_dataset()` - Define your test cases with `SingleTurnSample`
-- `query_rag_system()` - Connect to your RAG system
-- `evaluate_dataset()` - Implement your evaluation logic
-- `display_results()` - Show results in the console
-- `save_results_to_csv()` - Export results to CSV
+The template includes a `DiscreteMetric` for custom evaluation logic. You can customize the evaluation by:
 
-Edit these functions to customize your evaluation workflow.
+1. **Modify the metric prompt** - Change the evaluation criteria
+2. **Adjust allowed values** - Update valid output categories
+3. **Add more metrics** - Create additional metrics for different aspects
+
+Example of modifying the metric:
+
+```python
+from ragas.metrics import DiscreteMetric
+from ragas.llms import llm_factory
+
+my_metric = DiscreteMetric(
+    name="custom_evaluation",
+    prompt="Evaluate this response: {response} based on: {context}. Return 'excellent', 'good', or 'poor'.",
+    allowed_values=["excellent", "good", "poor"],
+)
+```
 
 ## What's Next?
 
@@ -205,4 +233,4 @@ Edit these functions to customize your evaluation workflow.
 
 - 📚 [Full Documentation](https://docs.ragas.io/)
 - 💬 [Join our Discord Community](https://discord.gg/5djav8GGNZ)
-- 🐛 [Report Issues](https://github.com/explodinggradients/ragas/issues)
+- 🐛 [Report Issues](https://github.com/vibrantlabsai/ragas/issues)

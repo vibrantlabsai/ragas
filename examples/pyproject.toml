@@ -59,10 +59,10 @@ ragas-llamaindex-agent-evals = "ragas_examples.llamaIndex_agent_evals.evals:main
 ragas-judge-alignment = "ragas_examples.judge_alignment.evals:main"
 
 [project.urls]
-Homepage = "https://github.com/explodinggradients/ragas"
+Homepage = "https://github.com/vibrantlabsai/ragas"
 Documentation = "https://docs.ragas.io"
-Code = "https://github.com/explodinggradients/ragas"
-Issues = "https://github.com/explodinggradients/ragas/issues"
+Code = "https://github.com/vibrantlabsai/ragas"
+Issues = "https://github.com/vibrantlabsai/ragas/issues"
 
 [tool.setuptools]
 package-dir = {"" = "."}

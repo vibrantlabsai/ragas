@@ -4,7 +4,7 @@
 
 We take the security of RAGAS seriously. If you discover a security vulnerability in this project, please report it to us privately. **Do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.**
 
-To report a vulnerability, please email us at founders@explodinggradients.com. While not all details are mandatory, providing as much information as possible will assist us in effectively triaging and addressing the issue. Please include:
+To report a vulnerability, please email us at founders@vibrantlabs.com. While not all details are mandatory, providing as much information as possible will assist us in effectively triaging and addressing the issue. Please include:
 
 - **Type of Issue**: (e.g., buffer overflow, SQL injection, cross-site scripting)
 - **Affected Versions**: List the versions of RAGAS impacted by this vulnerability.

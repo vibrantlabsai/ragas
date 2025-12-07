@@ -196,3 +196,31 @@ def test_evaluation_dataset_type():
 
     dataset = EvaluationDataset(samples=[multi_turn_sample])
     assert dataset.get_sample_type() == MultiTurnSample
+
+
+def test_multiturn_sample_validate_user_input_invalid_type():
+    """Test that MultiTurnSample validation correctly rejects invalid message types."""
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        MultiTurnSample(
+            user_input=[
+                HumanMessage(content="Hello"),
+                "invalid_string",  # This should be rejected by Pydantic
+            ]
+        )
+
+
+def test_multiturn_sample_validate_user_input_valid_types():
+    """Test that MultiTurnSample validation accepts valid message types."""
+    from ragas.messages import AIMessage
+
+    sample = MultiTurnSample(
+        user_input=[
+            HumanMessage(content="Hello"),
+            AIMessage(content="Hi there"),
+        ]
+    )
+    assert len(sample.user_input) == 2
+    assert isinstance(sample.user_input[0], HumanMessage)
+    assert isinstance(sample.user_input[1], AIMessage)

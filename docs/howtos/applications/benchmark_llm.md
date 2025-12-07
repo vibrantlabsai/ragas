@@ -17,7 +17,7 @@ We'll use discount calculation as our test case: given a customer profile, calcu
 
 *Note: You can adapt this approach to any use case that matters for your application.*
 
-> **📁 Full Code**: The complete source code for this example is available on [Github](https://github.com/explodinggradients/ragas/tree/main/examples/benchmark_llm)
+> **📁 Full Code**: The complete source code for this example is available on [Github](https://github.com/vibrantlabsai/ragas/tree/main/examples/benchmark_llm)
 
 ## Set up your environment and API access
 
@@ -129,7 +129,7 @@ def load_dataset():
     # Download dataset from GitHub if it doesn't exist locally
     if not os.path.exists(dataset_path):
         os.makedirs(os.path.dirname(dataset_path), exist_ok=True)
-        urllib.request.urlretrieve("https://raw.githubusercontent.com/explodinggradients/ragas/main/examples/ragas_examples/benchmark_llm/datasets/discount_benchmark.csv", dataset_path)
+        urllib.request.urlretrieve("https://raw.githubusercontent.com/vibrantlabsai/ragas/main/examples/ragas_examples/benchmark_llm/datasets/discount_benchmark.csv", dataset_path)
     return Dataset.load(name="discount_benchmark", backend="local/csv", root_dir=current_dir)
 ```
 
@@ -326,7 +326,7 @@ In this example:
 
 ## Adapting to your use case
 
-To evaluate models for your specific application, you can use the [GitHub code](https://github.com/explodinggradients/ragas/tree/main/examples/benchmark_llm) as a template and adapt it to your use case.
+To evaluate models for your specific application, you can use the [GitHub code](https://github.com/vibrantlabsai/ragas/tree/main/examples/benchmark_llm) as a template and adapt it to your use case.
 
 The Ragas framework handles the orchestration, parallel execution, and result aggregation automatically for you, helping you evaluate and focus on your use case!
 

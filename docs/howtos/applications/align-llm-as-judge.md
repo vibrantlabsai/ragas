@@ -23,11 +23,11 @@ export OPENAI_API_KEY="your-api-key-here"
 ```
 
 !!! note "Full code"
-    You can view the full code for the judge alignment evaluation pipeline [here](https://github.com/explodinggradients/ragas/tree/main/examples/ragas_examples/judge_alignment).
+    You can view the full code for the judge alignment evaluation pipeline [here](https://github.com/vibrantlabsai/ragas/tree/main/examples/ragas_examples/judge_alignment).
 
 ## Understand the dataset
 
-We'll use the [EvalsBench dataset](https://github.com/explodinggradients/EvalsBench/blob/main/data/benchmark_df.csv) which contains expert-annotated examples of LLM responses to business questions. Each row includes:
+We'll use the [EvalsBench dataset](https://github.com/vibrantlabsai/EvalsBench/blob/main/data/benchmark_df.csv) which contains expert-annotated examples of LLM responses to business questions. Each row includes:
 
 - `question`: The original question asked
 - `grading_notes`: Key points that should be covered in a good response
@@ -39,7 +39,7 @@ We'll use the [EvalsBench dataset](https://github.com/explodinggradients/EvalsBe
 ```bash
 # Create datasets folder and download the dataset
 mkdir -p datasets
-curl -o datasets/benchmark_df.csv https://raw.githubusercontent.com/explodinggradients/EvalsBench/main/data/benchmark_df.csv
+curl -o datasets/benchmark_df.csv https://raw.githubusercontent.com/vibrantlabsai/EvalsBench/main/data/benchmark_df.csv
 ```
 
 **Load and examine the dataset:**

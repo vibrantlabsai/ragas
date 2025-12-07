@@ -193,7 +193,7 @@ from datasets import load_dataset
 from ragas import evaluate
 from ragas.metrics import answer_relevancy, context_precision, faithfulness
 
-fiqa_eval = load_dataset("explodinggradients/fiqa", "ragas_eval")
+fiqa_eval = load_dataset("vibrantlabsai/fiqa", "ragas_eval")
 
 # Reformat the dataset to match the schema expected by the Ragas evaluate function
 dataset = fiqa_eval["baseline"].select(range(3))
@@ -223,7 +223,7 @@ from datasets import load_dataset
 from ragas import evaluate
 from ragas.metrics import answer_relevancy, context_precision, faithfulness
 
-fiqa_eval = load_dataset("explodinggradients/fiqa", "ragas_eval")
+fiqa_eval = load_dataset("vibrantlabsai/fiqa", "ragas_eval")
 
 # Reformat the dataset to match the schema expected by the Ragas evaluate function
 dataset = fiqa_eval["baseline"].select(range(3))

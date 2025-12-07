@@ -581,7 +581,7 @@ def quickstart(
         import urllib.request
         import zipfile
 
-        github_repo = "explodinggradients/ragas"
+        github_repo = "vibrantlabsai/ragas"
         branch = "main"
 
         # Create temporary directory for download
@@ -593,34 +593,28 @@ def quickstart(
                 f"https://github.com/{github_repo}/archive/refs/heads/{branch}.zip"
             )
 
-            with Live(
-                Spinner(
-                    "dots", text="Downloading template from GitHub...", style="cyan"
-                ),
-                console=console,
-            ):
-                zip_path = temp_dir / "repo.zip"
-                urllib.request.urlretrieve(archive_url, zip_path)
+            zip_path = temp_dir / "repo.zip"
+            urllib.request.urlretrieve(archive_url, zip_path)
 
-                with zipfile.ZipFile(zip_path, "r") as zip_ref:
-                    zip_ref.extractall(temp_dir)
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall(temp_dir)
 
-                extracted_folders = [
-                    f
-                    for f in temp_dir.iterdir()
-                    if f.is_dir() and f.name.startswith("ragas-")
-                ]
-                if not extracted_folders:
-                    error("Failed to extract template from GitHub archive")
-                    raise typer.Exit(1)
+            extracted_folders = [
+                f
+                for f in temp_dir.iterdir()
+                if f.is_dir() and f.name.startswith("ragas-")
+            ]
+            if not extracted_folders:
+                error("Failed to extract template from GitHub archive")
+                raise typer.Exit(1)
 
-                repo_dir = extracted_folders[0]
-                source_path = repo_dir / "examples" / "ragas_examples" / template_path
+            repo_dir = extracted_folders[0]
+            source_path = repo_dir / "examples" / "ragas_examples" / template_path
 
-                if not source_path.exists():
-                    error(f"Template not found in repository: {template_path}")
-                    console.print(f"Looking for: {source_path}")
-                    raise typer.Exit(1)
+            if not source_path.exists():
+                error(f"Template not found in repository: {template_path}")
+                console.print(f"Looking for: {source_path}")
+                raise typer.Exit(1)
 
         except Exception as e:
             error(f"Failed to download template from GitHub: {e}")
@@ -789,7 +783,7 @@ Visit https://docs.ragas.io for more information.
             f.write(readme_content)
         time.sleep(0.2)
 
-        live.update(Spinner("dots", text="Finalizing project...", style="green"))
+        # live.update(Spinner("dots", text="Finalizing project...", style="green"))
         time.sleep(0.3)
 
     # Cleanup temporary directory if we downloaded from GitHub

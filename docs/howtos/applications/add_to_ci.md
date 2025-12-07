@@ -42,7 +42,7 @@ def assert_in_range(score: float, value: float, plus_or_minus: float):
 
 def test_amnesty_e2e():
     # loading the V2 dataset
-    amnesty_qa = load_dataset("explodinggradients/amnesty_qa", "english_v2")["eval"]
+    amnesty_qa = load_dataset("vibrantlabsai/amnesty_qa", "english_v2")["eval"]
 
 
     result = evaluate(
@@ -96,7 +96,7 @@ def assert_in_range(score: float, value: float, plus_or_minus: float):
 @pytest.mark.ragas_ci
 def test_amnesty_e2e():
     # loading the V2 dataset
-    amnesty_qa = load_dataset("explodinggradients/amnesty_qa", "english_v2")["eval"]
+    amnesty_qa = load_dataset("vibrantlabsai/amnesty_qa", "english_v2")["eval"]
 
 
     result = evaluate(

@@ -11,11 +11,11 @@ Join our Discord community [here](https://discord.com/invite/5djav8GGNZ) to conn
 ## **🌟  Contributors**
 Meet some of our outstanding contributors! 
 
-<a href="https://github.com/explodinggradients/ragas/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=explodinggradients/ragas" />
+<a href="https://github.com/vibrantlabsai/ragas/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=vibrantlabsai/ragas" />
 </a>
 
-See the full list [here](https://github.com/explodinggradients/ragas/graphs/contributors).
+See the full list [here](https://github.com/vibrantlabsai/ragas/graphs/contributors).
 
 ## **📚 Blog & Insights**
 

@@ -8,7 +8,7 @@ Ragas is an evaluation toolkit for Large Language Model (LLM) applications. It p
 
 The repository contains:
 
-1. **Ragas Library** - The main evaluation toolkit including experimental features (in `/ragas` directory)
+1. **Ragas Library** - The main evaluation toolkit including experimental features (in `src/ragas/` directory)
    - Core evaluation metrics and test generation
    - Experimental features available at `ragas.experimental`
 
@@ -79,7 +79,7 @@ make type           # Type check all code
 make check          # Quick health check (format + type, no tests)
 
 # Testing
-make test           # Run all unit tests (including experimental)
+make test           # Run all unit tests
 make test-e2e       # Run end-to-end tests
 
 # CI/Build
@@ -120,9 +120,6 @@ make build-docs
 
 # Serve documentation locally
 make serve-docs
-
-# Process experimental notebooks
-make process-experimental-notebooks
 ```
 
 ### Benchmarks

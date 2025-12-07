@@ -21,6 +21,7 @@ from ragas.embeddings.base import (
     BaseRagasEmbedding,
     BaseRagasEmbeddings,
     LangchainEmbeddingsWrapper,
+    _infer_embedding_provider_from_llm,
     embedding_factory,
 )
 from ragas.exceptions import ExceptionInRunner
@@ -173,7 +174,15 @@ async def aevaluate(
             llm_changed.append(i)
         if isinstance(metric, MetricWithEmbeddings) and metric.embeddings is None:
             if embeddings is None:
-                embeddings = embedding_factory()
+                # Infer embedding provider from LLM if available
+                inferred_provider = _infer_embedding_provider_from_llm(llm)
+                # Extract client from LLM if available for modern embeddings
+                embedding_client = None
+                if hasattr(llm, "client"):
+                    embedding_client = getattr(llm, "client")
+                embeddings = embedding_factory(
+                    provider=inferred_provider, client=embedding_client
+                )
             metric.embeddings = embeddings
             embeddings_changed.append(i)
         if isinstance(metric, AnswerCorrectness):
