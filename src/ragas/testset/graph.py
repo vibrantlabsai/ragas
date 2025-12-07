@@ -401,7 +401,7 @@ class KnowledgeGraph:
                 graph.remove_nodes_from(nodes_with_no_outpaths)
 
             # Check if graph is empty after node removal
-            if len(graph) == 0:
+            if not graph:
                 return []
 
             sampled_paths: list[list[uuid.UUID]] = []

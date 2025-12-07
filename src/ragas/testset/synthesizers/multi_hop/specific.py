@@ -68,7 +68,7 @@ class MultiHopSpecificQuerySynthesizer(MultiHopQuerySynthesizer):
 
         triplets = self.get_node_clusters(knowledge_graph)
 
-        if len(triplets) == 0:
+        if not triplets:
             raise ValueError(
                 "No clusters found in the knowledge graph. Try changing the relationship condition."
             )

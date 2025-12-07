@@ -91,7 +91,7 @@ def generate_personas_from_kg(
     """
 
     nodes = [node for node in kg.nodes if filter_fn(node)]
-    if len(nodes) == 0:
+    if not nodes:
         raise ValueError(
             "No nodes that satisfied the given filer. Try changing the filter."
         )

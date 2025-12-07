@@ -43,7 +43,7 @@ def get_debug_mode() -> bool:
 
 
 def safe_nanmean(arr: t.List[float]) -> float:
-    if len(arr) == 0:
+    if not arr:
         return np.nan  # or some other value or behavior for empty arrays
 
     arr_numpy = np.asarray(arr)  # Ensure input is a numpy array
