@@ -756,10 +756,12 @@ async def test_call_ag_ui_endpoint_malformed_json():
 @pytest.mark.asyncio
 async def test_evaluate_ag_ui_agent():
     """Test batch evaluation of AG-UI agent endpoint."""
-    from ragas.dataset_schema import EvaluationDataset, EvaluationResult, SingleTurnSample
+    from ragas.dataset_schema import (
+        EvaluationDataset,
+        EvaluationResult,
+        SingleTurnSample,
+    )
     from ragas.integrations.ag_ui import (
-        MISSING_CONTEXT_PLACEHOLDER,
-        MISSING_RESPONSE_PLACEHOLDER,
         evaluate_ag_ui_agent,
     )
 
@@ -834,10 +836,12 @@ async def test_evaluate_ag_ui_agent():
 @pytest.mark.asyncio
 async def test_evaluate_ag_ui_agent_with_tool_calls():
     """Test evaluation with tool calls in response."""
-    from ragas.dataset_schema import EvaluationDataset, EvaluationResult, SingleTurnSample
+    from ragas.dataset_schema import (
+        EvaluationDataset,
+        EvaluationResult,
+        SingleTurnSample,
+    )
     from ragas.integrations.ag_ui import (
-        MISSING_CONTEXT_PLACEHOLDER,
-        MISSING_RESPONSE_PLACEHOLDER,
         evaluate_ag_ui_agent,
     )
 
@@ -897,7 +901,11 @@ async def test_evaluate_ag_ui_agent_handles_failures():
     """Test evaluation handles HTTP failures gracefully."""
     import math
 
-    from ragas.dataset_schema import EvaluationDataset, EvaluationResult, SingleTurnSample
+    from ragas.dataset_schema import (
+        EvaluationDataset,
+        EvaluationResult,
+        SingleTurnSample,
+    )
     from ragas.integrations.ag_ui import (
         MISSING_CONTEXT_PLACEHOLDER,
         MISSING_RESPONSE_PLACEHOLDER,
@@ -998,7 +1006,11 @@ async def test_evaluate_multi_turn_basic():
     """Test basic multi-turn evaluation."""
     from unittest.mock import patch
 
-    from ragas.dataset_schema import EvaluationDataset, EvaluationResult, MultiTurnSample
+    from ragas.dataset_schema import (
+        EvaluationDataset,
+        EvaluationResult,
+        MultiTurnSample,
+    )
     from ragas.integrations.ag_ui import evaluate_ag_ui_agent
     from ragas.messages import ToolCall
 
@@ -1080,7 +1092,11 @@ async def test_evaluate_multi_turn_with_existing_conversation():
     """Test multi-turn evaluation with pre-existing conversation."""
     from unittest.mock import patch
 
-    from ragas.dataset_schema import EvaluationDataset, EvaluationResult, MultiTurnSample
+    from ragas.dataset_schema import (
+        EvaluationDataset,
+        EvaluationResult,
+        MultiTurnSample,
+    )
     from ragas.integrations.ag_ui import evaluate_ag_ui_agent
     from ragas.messages import ToolCall
 
@@ -1157,7 +1173,11 @@ async def test_evaluate_multi_turn_failed_query():
     import math
     from unittest.mock import patch
 
-    from ragas.dataset_schema import EvaluationDataset, EvaluationResult, MultiTurnSample
+    from ragas.dataset_schema import (
+        EvaluationDataset,
+        EvaluationResult,
+        MultiTurnSample,
+    )
     from ragas.integrations.ag_ui import evaluate_ag_ui_agent
 
     # Create multi-turn sample
@@ -1211,7 +1231,11 @@ async def test_evaluate_ag_ui_agent_trace_structure():
     from unittest.mock import patch
 
     from ragas.callbacks import ChainType
-    from ragas.dataset_schema import EvaluationDataset, EvaluationResult, SingleTurnSample
+    from ragas.dataset_schema import (
+        EvaluationDataset,
+        EvaluationResult,
+        SingleTurnSample,
+    )
     from ragas.integrations.ag_ui import evaluate_ag_ui_agent
 
     # Create dataset with 2 samples

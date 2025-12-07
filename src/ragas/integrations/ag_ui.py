@@ -93,11 +93,14 @@ from ragas.run_config import RunConfig
 
 try:
     from ragas.metrics.collections.base import BaseMetric as CollectionsBaseMetric
-except ImportError:  # pragma: no cover - collections are part of ragas, but guard just in case
+except (
+    ImportError
+):  # pragma: no cover - collections are part of ragas, but guard just in case
     CollectionsBaseMetric = t.cast(t.Type[object], None)
 
-from ragas.metrics.base import Metric, SimpleBaseMetric
 from tqdm.auto import tqdm
+
+from ragas.metrics.base import Metric, SimpleBaseMetric
 
 if t.TYPE_CHECKING:
     from ragas.metrics.collections.base import BaseMetric as _CollectionsBaseMetric
@@ -128,15 +131,15 @@ def _get_metric_params(metric: Any) -> t.List[str]:
     if CollectionsBaseMetric is not None and isinstance(metric, CollectionsBaseMetric):
         return [
             name
-            for name in inspect.signature(metric.ascore).parameters.keys()
+            for name in inspect.signature(metric.ascore).parameters.keys()  # type: ignore[union-attr]
             if name not in ("self", "kwargs")
         ]
 
     # For SimpleLLMMetric (DiscreteMetric, etc.), extract from prompt template
     if isinstance(metric, SimpleBaseMetric):
         prompt_str = ""
-        if hasattr(metric, "prompt") and metric.prompt is not None:
-            prompt_obj = metric.prompt
+        if hasattr(metric, "prompt") and metric.prompt is not None:  # type: ignore[union-attr]
+            prompt_obj = metric.prompt  # type: ignore[union-attr]
             if hasattr(prompt_obj, "instruction"):
                 prompt_str = prompt_obj.instruction
             elif isinstance(prompt_obj, str):
@@ -207,7 +210,7 @@ async def _score_sample_with_metric(
         kwargs["llm"] = evaluator_llm
 
     # Call the metric's async score method
-    result = await metric.ascore(**kwargs)
+    result = await metric.ascore(**kwargs)  # type: ignore[union-attr]
 
     # Normalize the value for EvaluationResult compatibility
     return _normalize_metric_value(metric, result.value)
@@ -1436,7 +1439,11 @@ async def evaluate_ag_ui_agent(
         # This ensures the dataset includes all fields needed for evaluation
         for i, sample in enumerate(samples):
             single_sample = t.cast(SingleTurnSample, sample)
-            response_value = responses[i] if responses[i] is not None else MISSING_RESPONSE_PLACEHOLDER
+            response_value = (
+                responses[i]
+                if responses[i] is not None
+                else MISSING_RESPONSE_PLACEHOLDER
+            )
             single_sample.response = response_value
             contexts_value = (
                 retrieved_contexts[i]
@@ -1483,11 +1490,11 @@ async def evaluate_ag_ui_agent(
                 # Legacy metrics (ToolCallF1, etc.) - use their async score method
                 elif isinstance(metric, Metric):
                     if is_multi_turn and hasattr(metric, "multi_turn_ascore"):
-                        score_value = await metric.multi_turn_ascore(
+                        score_value = await metric.multi_turn_ascore(  # type: ignore[union-attr]
                             t.cast(MultiTurnSample, sample), callbacks=None
                         )
                     elif hasattr(metric, "single_turn_ascore"):
-                        score_value = await metric.single_turn_ascore(
+                        score_value = await metric.single_turn_ascore(  # type: ignore[union-attr]
                             t.cast(SingleTurnSample, sample), callbacks=None
                         )
                     else:

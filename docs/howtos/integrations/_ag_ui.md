@@ -25,8 +25,6 @@ from IPython.display import display
 
 from ragas.dataset_schema import EvaluationDataset, MultiTurnSample, SingleTurnSample
 from ragas.integrations.ag_ui import (
-    convert_messages_snapshot,
-    convert_to_ragas_messages,
     evaluate_ag_ui_agent,
 )
 from ragas.messages import HumanMessage, ToolCall
@@ -118,6 +116,7 @@ For multi-turn agent evaluation, we use:
 
 ```python
 from openai import AsyncOpenAI, OpenAI
+
 from ragas.embeddings.base import embedding_factory
 from ragas.llms import llm_factory
 from ragas.metrics import AgentGoalAccuracyWithReference, DiscreteMetric, ToolCallF1
@@ -178,7 +177,7 @@ In Jupyter/IPython you can `await` the helpers directly once `nest_asyncio.apply
 
 
 ```python
-AG_UI_ENDPOINT = "http://localhost:8000"  # Update to match your agent
+AG_UI_ENDPOINT = "http://localhost:8000/backend_tool_rendering"  # Update to match your agent
 
 RUN_FACTUAL_EVAL = True
 RUN_TOOL_EVAL = True
@@ -250,7 +249,7 @@ if RUN_FACTUAL_EVAL:
       <td>Albert Einstein originated the theory of relat...</td>
       <td>Albert Einstein originated the theory of relat...</td>
       <td>1.0</td>
-      <td>0.999999</td>
+      <td>1.000000</td>
       <td>1.0</td>
     </tr>
     <tr>
@@ -260,7 +259,7 @@ if RUN_FACTUAL_EVAL:
       <td>Hello, Penicillin was discovered in 1928 by Al...</td>
       <td>Alexander Fleming discovered penicillin in 1928.</td>
       <td>1.0</td>
-      <td>0.986753</td>
+      <td>0.986765</td>
       <td>1.0</td>
     </tr>
   </tbody>
@@ -338,9 +337,14 @@ if RUN_TOOL_EVAL:
       <td>The user received the current weather conditio...</td>
       <td>[{'name': 'get_weather', 'args': {'location': ...</td>
       <td>1.0</td>
-      <td>0.0</td>
+      <td>1.0</td>
     </tr>
   </tbody>
 </table>
 </div>
 
+
+
+```python
+
+```
