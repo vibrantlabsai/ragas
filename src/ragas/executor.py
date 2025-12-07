@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from tqdm.auto import tqdm
 
-from ragas.async_utils import apply_nest_asyncio, as_completed, process_futures, run
+from ragas.async_utils import as_completed, process_futures, run
 from ragas.run_config import RunConfig
 from ragas.utils import ProgressBarManager, batched
 
@@ -211,7 +211,6 @@ class Executor:
         async def _async_wrapper():
             return await self.aresults()
 
-        apply_nest_asyncio()
         return run(_async_wrapper)
 
 
