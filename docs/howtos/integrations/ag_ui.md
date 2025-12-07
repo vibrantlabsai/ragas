@@ -9,7 +9,7 @@ This guide assumes you already have an AG-UI compatible agent running (for examp
 The AG-UI helpers live behind an optional extra. Install it together with the dependencies required by your evaluator LLM. When running inside Jupyter or IPython, include `nest_asyncio` so you can reuse the notebook's event loop.
 
 ```bash
-pip install "ragas[ag-ui]" langchain-openai python-dotenv nest_asyncio
+pip install "ragas[ag-ui]" python-dotenv nest_asyncio
 ```
 
 Configure your evaluator LLM credentials. For example, if you are using OpenAI models:
@@ -58,7 +58,7 @@ scientist_questions = EvaluationDataset(
 
 ### Multi-turn samples with tool expectations
 
-When you want to grade intermediate agent behavior—like whether it calls tools correctly—switch to `MultiTurnSample`. Provide an initial conversation history and (optionally) expected tool calls.
+When you want to grade intermediate agent behavior—like whether it calls tools correctly and achieves the user's goal—switch to `MultiTurnSample`. Provide an initial conversation history, expected tool calls, and optionally a reference outcome for goal accuracy evaluation.
 
 ```python
 from ragas.dataset_schema import EvaluationDataset, MultiTurnSample
@@ -69,38 +69,69 @@ weather_queries = EvaluationDataset(
         MultiTurnSample(
             user_input=[HumanMessage(content="What's the weather in Paris?")],
             reference_tool_calls=[
-                ToolCall(name="weatherTool", args={"location": "Paris"})
-            ]
-        )
+                ToolCall(name="get_weather", args={"location": "Paris"})
+            ],
+            # Expected outcome for AgentGoalAccuracyWithReference
+            # Use outcome-focused language that matches what the LLM extracts as end_state
+            reference="The user received the current weather conditions for Paris.",
+        ),
+        MultiTurnSample(
+            user_input=[HumanMessage(content="Is it raining in London right now?")],
+            reference_tool_calls=[
+                ToolCall(name="get_weather", args={"location": "London"})
+            ],
+            reference="The user received the current weather conditions for London.",
+        ),
     ]
 )
 ```
 
 ## Choose metrics and evaluator model
 
-The integration works with any Ragas metric. To unlock the modern collections portfolio, build an Instructor-compatible LLM with `llm_factory`.
+The integration works with any Ragas metric. To unlock the modern collections portfolio (and mix in custom checks), build an Instructor-compatible LLM for the evaluator prompts and use a synchronous OpenAI client for embeddings that still rely on blocking calls.
 
 ```python
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, OpenAI
 from ragas.llms import llm_factory
-from ragas.metrics import ToolCallF1
-from ragas.metrics.collections import (
-    ContextPrecisionWithReference,
-    ContextRecall,
-    FactualCorrectness,
-    ResponseGroundedness,
+from ragas.embeddings import embedding_factory
+from ragas.metrics import AgentGoalAccuracyWithReference, DiscreteMetric, ToolCallF1
+from ragas.metrics.collections import AnswerRelevancy, FactualCorrectness
+
+async_llm_client = AsyncOpenAI()
+evaluator_llm = llm_factory("gpt-4o-mini", client=async_llm_client)
+
+# AnswerRelevancy's embeddings still run synchronously, so pair it with a sync client.
+embedding_client = OpenAI()
+evaluator_embeddings = embedding_factory(
+    "openai", model="text-embedding-3-small", client=embedding_client, interface="modern"
 )
 
-client = AsyncOpenAI()
-evaluator_llm = llm_factory("gpt-4o-mini", client=client)
+conciseness_metric = DiscreteMetric(
+    name="conciseness",
+    allowed_values=["verbose", "concise"],
+    prompt=(
+        "Is the response concise and efficiently conveys information?\n\n"
+        "Response: {response}\n\n"
+        "Answer with only 'verbose' or 'concise'."
+    ),
+)
 
+# Metrics for single-turn Q&A evaluation
 qa_metrics = [
-    FactualCorrectness(llm=evaluator_llm, mode="f1"),
-    ContextPrecisionWithReference(llm=evaluator_llm),
-    ContextRecall(llm=evaluator_llm),
-    ResponseGroundedness(llm=evaluator_llm),
+    FactualCorrectness(
+        llm=evaluator_llm, mode="f1", atomicity="high", coverage="high"
+    ),
+    AnswerRelevancy(llm=evaluator_llm, embeddings=evaluator_embeddings, strictness=2),
+    conciseness_metric,
 ]
-tool_metrics = [ToolCallF1()]  # rule-based metric, no LLM required
+
+# Metrics for multi-turn agent evaluation
+# - ToolCallF1: Rule-based metric for tool call accuracy
+# - AgentGoalAccuracyWithReference: LLM-based metric for goal achievement
+tool_metrics = [
+    ToolCallF1(),
+    AgentGoalAccuracyWithReference(llm=evaluator_llm),
+]
 ```
 
 ## Evaluate a live AG-UI endpoint

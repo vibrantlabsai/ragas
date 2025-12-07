@@ -4,8 +4,14 @@ AG-UI Agent Evaluation Script
 This script demonstrates how to evaluate agents built with the AG-UI protocol
 using Ragas metrics. It includes two evaluation scenarios:
 
-1. Scientist Biographies - Tests factual correctness of agent responses
-2. Weather Tool Usage - Tests tool calling accuracy
+1. Scientist Biographies (Single-turn) - Tests factual correctness and answer relevancy
+2. Weather Tool Usage (Multi-turn) - Tests tool calling accuracy and agent goal achievement
+
+Metrics used:
+- FactualCorrectness: Measures factual accuracy of responses
+- AnswerRelevancy: Measures how relevant the response is to the question
+- ToolCallF1: Rule-based metric for tool call accuracy
+- AgentGoalAccuracyWithReference: LLM-based metric evaluating whether the agent achieved the user's goal
 
 Prerequisites:
 - An AG-UI compatible agent running at the specified endpoint URL
@@ -14,6 +20,7 @@ Prerequisites:
 Usage:
     python evals.py --endpoint-url http://localhost:8000/agentic_chat
     python evals.py --endpoint-url http://localhost:8000/chat --skip-tool-eval
+    python evals.py --endpoint-url http://localhost:8000 --skip-factual
 """
 
 import argparse
@@ -21,10 +28,8 @@ import asyncio
 import csv
 import json
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import List
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI, OpenAI
@@ -33,11 +38,15 @@ from ragas.dataset_schema import (
     MultiTurnSample,
     SingleTurnSample,
 )
-from ragas.embeddings import embedding_factory
+from ragas.embeddings.base import embedding_factory
 from ragas.integrations.ag_ui import evaluate_ag_ui_agent
 from ragas.llms import llm_factory
 from ragas.messages import HumanMessage, ToolCall
-from ragas.metrics import DiscreteMetric, ToolCallF1
+from ragas.metrics import (
+    AgentGoalAccuracyWithReference,
+    DiscreteMetric,
+    ToolCallF1,
+)
 from ragas.metrics.collections import AnswerRelevancy, FactualCorrectness
 from ragas.run_config import RunConfig
 
@@ -82,7 +91,8 @@ def load_weather_dataset() -> EvaluationDataset:
     Load the weather tool call dataset from CSV.
 
     Returns:
-        EvaluationDataset with MultiTurnSample entries for testing tool call accuracy.
+        EvaluationDataset with MultiTurnSample entries for testing tool call accuracy
+        and agent goal accuracy.
     """
     csv_path = TEST_DATA_DIR / "weather_tool_calls.csv"
     logger.info(f"Loading weather tool call dataset from {csv_path}")
@@ -98,9 +108,11 @@ def load_weather_dataset() -> EvaluationDataset:
             ]
 
             # Create MultiTurnSample with user_input as a list of HumanMessage
+            # Include reference for AgentGoalAccuracyWithReference metric
             sample = MultiTurnSample(
                 user_input=[HumanMessage(content=row["user_input"])],
                 reference_tool_calls=tool_calls,
+                reference=row.get("reference"),  # Expected outcome for goal accuracy
             )
             samples.append(sample)
 
@@ -220,12 +232,14 @@ async def evaluate_scientist_biographies(
     return result, df
 
 
-async def evaluate_weather_tool_use(endpoint_url: str) -> tuple:
+async def evaluate_weather_tool_use(endpoint_url: str, evaluator_model: str) -> tuple:
     """
-    Evaluate the agent's ability to correctly call the weather tool.
+    Evaluate the agent's ability to correctly call the weather tool and achieve
+    the user's goal.
 
     Args:
         endpoint_url: The AG-UI endpoint URL
+        evaluator_model: The evaluator LLM model name
 
     Returns:
         Tuple of (result, dataframe) where result is the EvaluationResult
@@ -238,21 +252,33 @@ async def evaluate_weather_tool_use(endpoint_url: str) -> tuple:
     # Load dataset
     dataset = load_weather_dataset()
 
-    # Define metrics
-    metrics = [ToolCallF1()]
+    # Create evaluator LLM for goal accuracy metric
+    evaluator_llm, _ = create_evaluator_components(evaluator_model)
+
+    # Define metrics:
+    # - ToolCallF1: Rule-based metric for tool call accuracy
+    # - AgentGoalAccuracyWithReference: LLM-based metric for goal achievement
+    #   Note: This metric has some variance due to LLM non-determinism
+    metrics = [
+        ToolCallF1(),
+        AgentGoalAccuracyWithReference(llm=evaluator_llm),
+    ]
 
     # Run evaluation
     logger.info(f"Evaluating against endpoint: {endpoint_url}")
+    run_config = RunConfig(max_workers=10, timeout=300)
     result = await evaluate_ag_ui_agent(
         endpoint_url=endpoint_url,
         dataset=dataset,
         metrics=metrics,
+        evaluator_llm=evaluator_llm,
+        run_config=run_config,
     )
 
     # Convert to DataFrame and clean up
     df = result.to_pandas()
     columns_to_drop = [
-        col for col in ["retrieved_contexts", "reference"] if col in df.columns
+        col for col in ["retrieved_contexts"] if col in df.columns
     ]
     if columns_to_drop:
         df = df.drop(columns=columns_to_drop)
@@ -272,6 +298,13 @@ async def evaluate_weather_tool_use(endpoint_url: str) -> tuple:
         )
         logger.info(
             f"Failed scores (F1=0.0): {(df['tool_call_f1'] == 0.0).sum()}/{len(df)}"
+        )
+
+    if "agent_goal_accuracy" in df.columns:
+        avg_goal = df["agent_goal_accuracy"].mean()
+        logger.info(f"\nAverage Agent Goal Accuracy: {avg_goal:.4f}")
+        logger.info(
+            f"Goals achieved (1.0): {(df['agent_goal_accuracy'] == 1.0).sum()}/{len(df)}"
         )
 
     return result, df
@@ -359,7 +392,9 @@ async def main():
             save_results(df, "scientist_biographies", args.output_dir)
 
         if not args.skip_tool_eval:
-            result, df = await evaluate_weather_tool_use(args.endpoint_url)
+            result, df = await evaluate_weather_tool_use(
+                args.endpoint_url, args.evaluator_model
+            )
             save_results(df, "weather_tool_calls", args.output_dir)
 
         logger.info("\n" + "=" * 80)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -756,9 +756,7 @@ async def test_call_ag_ui_endpoint_malformed_json():
 @pytest.mark.asyncio
 async def test_evaluate_ag_ui_agent():
     """Test batch evaluation of AG-UI agent endpoint."""
-    from unittest.mock import MagicMock
-
-    from ragas.dataset_schema import EvaluationDataset, SingleTurnSample
+    from ragas.dataset_schema import EvaluationDataset, EvaluationResult, SingleTurnSample
     from ragas.integrations.ag_ui import (
         MISSING_CONTEXT_PLACEHOLDER,
         MISSING_RESPONSE_PLACEHOLDER,
@@ -807,19 +805,9 @@ async def test_evaluate_ag_ui_agent():
         else:
             return joke_events
 
-    # Mock ragas_aevaluate to return a simple result
-    mock_result = MagicMock()
-    mock_result.to_pandas = MagicMock(return_value=MagicMock())
-
-    with (
-        patch(
-            "ragas.integrations.ag_ui._call_ag_ui_endpoint",
-            side_effect=mock_call_endpoint,
-        ),
-        patch(
-            "ragas.integrations.ag_ui.ragas_aevaluate",
-            new=AsyncMock(return_value=mock_result),
-        ),
+    with patch(
+        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
+        side_effect=mock_call_endpoint,
     ):
         result = await evaluate_ag_ui_agent(
             endpoint_url="http://localhost:8000/agent",
@@ -834,8 +822,10 @@ async def test_evaluate_ag_ui_agent():
         == "Why don't scientists trust atoms? They make up everything!"
     )
 
-    # Check that evaluation was called
-    assert result == mock_result
+    # Check that result is an EvaluationResult
+    assert isinstance(result, EvaluationResult)
+    # With empty metrics, scores should be empty dicts
+    assert result.scores == [{}, {}]
 
 
 @pytest.mark.skipif(
@@ -844,9 +834,7 @@ async def test_evaluate_ag_ui_agent():
 @pytest.mark.asyncio
 async def test_evaluate_ag_ui_agent_with_tool_calls():
     """Test evaluation with tool calls in response."""
-    from unittest.mock import MagicMock
-
-    from ragas.dataset_schema import EvaluationDataset, SingleTurnSample
+    from ragas.dataset_schema import EvaluationDataset, EvaluationResult, SingleTurnSample
     from ragas.integrations.ag_ui import (
         MISSING_CONTEXT_PLACEHOLDER,
         MISSING_RESPONSE_PLACEHOLDER,
@@ -881,19 +869,11 @@ async def test_evaluate_ag_ui_agent_with_tool_calls():
     async def mock_call_endpoint(endpoint_url, user_input, **kwargs):
         return search_events
 
-    mock_result = MagicMock()
-
-    with (
-        patch(
-            "ragas.integrations.ag_ui._call_ag_ui_endpoint",
-            side_effect=mock_call_endpoint,
-        ),
-        patch(
-            "ragas.integrations.ag_ui.ragas_aevaluate",
-            new=AsyncMock(return_value=mock_result),
-        ),
+    with patch(
+        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
+        side_effect=mock_call_endpoint,
     ):
-        await evaluate_ag_ui_agent(
+        result = await evaluate_ag_ui_agent(
             endpoint_url="http://localhost:8000/agent",
             dataset=dataset,
             metrics=[],
@@ -905,6 +885,8 @@ async def test_evaluate_ag_ui_agent_with_tool_calls():
     assert dataset.samples[0].retrieved_contexts is not None
     assert len(dataset.samples[0].retrieved_contexts) == 1
     assert "tutorial1.com" in dataset.samples[0].retrieved_contexts[0]
+    # Check result type
+    assert isinstance(result, EvaluationResult)
 
 
 @pytest.mark.skipif(
@@ -914,9 +896,8 @@ async def test_evaluate_ag_ui_agent_with_tool_calls():
 async def test_evaluate_ag_ui_agent_handles_failures():
     """Test evaluation handles HTTP failures gracefully."""
     import math
-    from unittest.mock import MagicMock
 
-    from ragas.dataset_schema import EvaluationDataset, SingleTurnSample
+    from ragas.dataset_schema import EvaluationDataset, EvaluationResult, SingleTurnSample
     from ragas.integrations.ag_ui import (
         MISSING_CONTEXT_PLACEHOLDER,
         MISSING_RESPONSE_PLACEHOLDER,
@@ -939,18 +920,6 @@ async def test_evaluate_ag_ui_agent_handles_failures():
         RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
     ]
 
-    call_count = [0]
-
-    async def mock_call_endpoint(endpoint_url, user_input, **kwargs):
-        call_count[0] += 1
-        if call_count[0] == 1:
-            return success_events
-        else:
-            # Simulate failure by raising exception
-            raise Exception("Connection failed")
-
-    mock_result = MagicMock()
-
     # Mock Executor to handle the exception
     class MockExecutor:
         def __init__(self, *args, **kwargs):
@@ -966,17 +935,11 @@ async def test_evaluate_ag_ui_agent_handles_failures():
         async def aresults(self):
             return self.results()
 
-    with (
-        patch(
-            "ragas.integrations.ag_ui.Executor",
-            MockExecutor,
-        ),
-        patch(
-            "ragas.integrations.ag_ui.ragas_aevaluate",
-            new=AsyncMock(return_value=mock_result),
-        ),
+    with patch(
+        "ragas.integrations.ag_ui.Executor",
+        MockExecutor,
     ):
-        await evaluate_ag_ui_agent(
+        result = await evaluate_ag_ui_agent(
             endpoint_url="http://localhost:8000/agent",
             dataset=dataset,
             metrics=[],
@@ -986,6 +949,8 @@ async def test_evaluate_ag_ui_agent_handles_failures():
     assert dataset.samples[0].response == "Success response"
     assert dataset.samples[1].response == MISSING_RESPONSE_PLACEHOLDER
     assert dataset.samples[1].retrieved_contexts == [MISSING_CONTEXT_PLACEHOLDER]
+    # Check result type
+    assert isinstance(result, EvaluationResult)
 
 
 # ============================================================================
@@ -1031,9 +996,9 @@ def test_convert_ragas_messages_to_ag_ui():
 @pytest.mark.asyncio
 async def test_evaluate_multi_turn_basic():
     """Test basic multi-turn evaluation."""
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import patch
 
-    from ragas.dataset_schema import EvaluationDataset, MultiTurnSample
+    from ragas.dataset_schema import EvaluationDataset, EvaluationResult, MultiTurnSample
     from ragas.integrations.ag_ui import evaluate_ag_ui_agent
     from ragas.messages import ToolCall
 
@@ -1067,8 +1032,6 @@ async def test_evaluate_multi_turn_basic():
         RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
     ]
 
-    mock_result = MagicMock()
-
     # Mock Executor
     class MockExecutor:
         def __init__(self, *args, **kwargs):
@@ -1083,20 +1046,11 @@ async def test_evaluate_multi_turn_basic():
         async def aresults(self):
             return self.results()
 
-        async def aresults(self):
-            return self.results()
-
-    with (
-        patch(
-            "ragas.integrations.ag_ui.Executor",
-            MockExecutor,
-        ),
-        patch(
-            "ragas.integrations.ag_ui.ragas_aevaluate",
-            new=AsyncMock(return_value=mock_result),
-        ),
+    with patch(
+        "ragas.integrations.ag_ui.Executor",
+        MockExecutor,
     ):
-        await evaluate_ag_ui_agent(
+        result = await evaluate_ag_ui_agent(
             endpoint_url="http://localhost:8000/agent",
             dataset=dataset,
             metrics=[],
@@ -1117,13 +1071,16 @@ async def test_evaluate_multi_turn_basic():
     assert len(ai_messages[0].tool_calls) > 0
     assert ai_messages[0].tool_calls[0].name == "get-weather"
 
+    # Check result type
+    assert isinstance(result, EvaluationResult)
+
 
 @pytest.mark.asyncio
 async def test_evaluate_multi_turn_with_existing_conversation():
     """Test multi-turn evaluation with pre-existing conversation."""
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import patch
 
-    from ragas.dataset_schema import EvaluationDataset, MultiTurnSample
+    from ragas.dataset_schema import EvaluationDataset, EvaluationResult, MultiTurnSample
     from ragas.integrations.ag_ui import evaluate_ag_ui_agent
     from ragas.messages import ToolCall
 
@@ -1154,8 +1111,6 @@ async def test_evaluate_multi_turn_with_existing_conversation():
         ToolCallEndEvent(tool_call_id="tc-1"),
     ]
 
-    mock_result = MagicMock()
-
     class MockExecutor:
         def __init__(self, *args, **kwargs):
             pass
@@ -1166,17 +1121,11 @@ async def test_evaluate_multi_turn_with_existing_conversation():
         def results(self):
             return [agent_events]
 
-    with (
-        patch(
-            "ragas.integrations.ag_ui.Executor",
-            MockExecutor,
-        ),
-        patch(
-            "ragas.integrations.ag_ui.ragas_aevaluate",
-            new=AsyncMock(return_value=mock_result),
-        ),
+    with patch(
+        "ragas.integrations.ag_ui.Executor",
+        MockExecutor,
     ):
-        await evaluate_ag_ui_agent(
+        result = await evaluate_ag_ui_agent(
             endpoint_url="http://localhost:8000/agent",
             dataset=dataset,
             metrics=[],
@@ -1198,14 +1147,17 @@ async def test_evaluate_multi_turn_with_existing_conversation():
     assert len(new_messages) > 0
     assert any(isinstance(msg, AIMessage) for msg in new_messages)
 
+    # Check result type
+    assert isinstance(result, EvaluationResult)
+
 
 @pytest.mark.asyncio
 async def test_evaluate_multi_turn_failed_query():
     """Test multi-turn evaluation handles failed queries correctly."""
     import math
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import patch
 
-    from ragas.dataset_schema import EvaluationDataset, MultiTurnSample
+    from ragas.dataset_schema import EvaluationDataset, EvaluationResult, MultiTurnSample
     from ragas.integrations.ag_ui import evaluate_ag_ui_agent
 
     # Create multi-turn sample
@@ -1216,8 +1168,6 @@ async def test_evaluate_multi_turn_failed_query():
 
     original_length = len(sample.user_input)
     dataset = EvaluationDataset(samples=[sample])
-
-    mock_result = MagicMock()
 
     class MockExecutor:
         def __init__(self, *args, **kwargs):
@@ -1233,17 +1183,11 @@ async def test_evaluate_multi_turn_failed_query():
         async def aresults(self):
             return self.results()
 
-    with (
-        patch(
-            "ragas.integrations.ag_ui.Executor",
-            MockExecutor,
-        ),
-        patch(
-            "ragas.integrations.ag_ui.ragas_aevaluate",
-            new=AsyncMock(return_value=mock_result),
-        ),
+    with patch(
+        "ragas.integrations.ag_ui.Executor",
+        MockExecutor,
     ):
-        await evaluate_ag_ui_agent(
+        result = await evaluate_ag_ui_agent(
             endpoint_url="http://localhost:8000/agent",
             dataset=dataset,
             metrics=[],
@@ -1253,3 +1197,82 @@ async def test_evaluate_multi_turn_failed_query():
     assert len(sample.user_input) == original_length
     assert isinstance(sample.user_input[0], HumanMessage)
     assert sample.user_input[0].content == "Test query"
+
+    # Check result type
+    assert isinstance(result, EvaluationResult)
+
+
+@pytest.mark.skipif(
+    not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
+)
+@pytest.mark.asyncio
+async def test_evaluate_ag_ui_agent_trace_structure():
+    """Test that evaluation creates proper trace structure for debugging."""
+    from unittest.mock import patch
+
+    from ragas.callbacks import ChainType
+    from ragas.dataset_schema import EvaluationDataset, EvaluationResult, SingleTurnSample
+    from ragas.integrations.ag_ui import evaluate_ag_ui_agent
+
+    # Create dataset with 2 samples
+    dataset = EvaluationDataset(
+        samples=[
+            SingleTurnSample(user_input="Query 1", reference="Ref 1"),
+            SingleTurnSample(user_input="Query 2", reference="Ref 2"),
+        ]
+    )
+
+    # Mock events
+    events = [
+        RunStartedEvent(run_id="run-1", thread_id="thread-1"),
+        TextMessageStartEvent(message_id="msg-1", role="assistant"),
+        TextMessageContentEvent(message_id="msg-1", delta="Response"),
+        TextMessageEndEvent(message_id="msg-1"),
+        RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
+    ]
+
+    class MockExecutor:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def submit(self, func, *args, **kwargs):
+            pass
+
+        def results(self):
+            return [events, events]
+
+    with patch("ragas.integrations.ag_ui.Executor", MockExecutor):
+        result = await evaluate_ag_ui_agent(
+            endpoint_url="http://localhost:8000/agent",
+            dataset=dataset,
+            metrics=[],  # No metrics for this test
+        )
+
+    # Verify result type
+    assert isinstance(result, EvaluationResult)
+
+    # Verify trace structure exists
+    assert hasattr(result, "ragas_traces")
+    traces = result.ragas_traces
+
+    # Should have 3 traces: 1 evaluation + 2 rows (no metrics)
+    assert len(traces) == 3
+
+    # Find root evaluation trace
+    root_traces = [t for t in traces.values() if t.parent_run_id is None]
+    assert len(root_traces) == 1
+    root = root_traces[0]
+
+    # Verify root trace properties
+    assert root.name == "ag_ui_evaluation"
+    assert root.metadata["type"] == ChainType.EVALUATION.value
+    assert "endpoint_url" in root.inputs
+    assert len(root.children) == 2  # 2 row runs
+
+    # Verify row traces
+    for row_id in root.children:
+        row_trace = traces[row_id]
+        assert row_trace.parent_run_id == root.run_id
+        assert row_trace.name.startswith("row ")
+        assert row_trace.metadata["type"] == ChainType.ROW.value
+        assert "row_index" in row_trace.metadata
