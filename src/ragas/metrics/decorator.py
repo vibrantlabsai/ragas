@@ -259,9 +259,9 @@ def create_metric_decorator():
 
                     # Check if we're already in an event loop
                     try:
-                        # If we're in a running event loop, we need nest_asyncio for compatibility
+                        # If we're in a running event loop (e.g., Jupyter), use the run utility
                         _ = asyncio.get_running_loop()
-                        # Import nest_asyncio style runner from ragas
+                        # Import environment-aware runner from ragas
                         from ragas.async_utils import run
 
                         return run(_async_wrapper())
