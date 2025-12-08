@@ -192,7 +192,7 @@ class TestsetGenerator:
         kg = KnowledgeGraph(nodes=nodes)
 
         # apply transforms and update the knowledge graph
-        apply_transforms(kg, transforms)
+        apply_transforms(kg, transforms, run_config=run_config or RunConfig())
         self.knowledge_graph = kg
 
         return self.generate(
