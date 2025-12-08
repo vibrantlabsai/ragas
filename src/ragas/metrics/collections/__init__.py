@@ -27,6 +27,7 @@ from ragas.metrics.collections.faithfulness import Faithfulness
 from ragas.metrics.collections.noise_sensitivity import NoiseSensitivity
 from ragas.metrics.collections.response_groundedness import ResponseGroundedness
 from ragas.metrics.collections.summary_score import SummaryScore
+from ragas.metrics.collections.tool_call_accuracy import ToolCallAccuracy
 
 __all__ = [
     "BaseMetric",  # Base class
@@ -52,4 +53,5 @@ __all__ = [
     "SemanticSimilarity",
     "StringPresence",
     "SummaryScore",
+    "ToolCallAccuracy",
 ]
