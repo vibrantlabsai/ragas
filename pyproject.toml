@@ -27,8 +27,6 @@ dependencies = [
     "langchain-community",
     "langchain_openai",
     
-    # Embeddings
-    "cohere",
 ]
 dynamic = ["version", "readme"]
 
