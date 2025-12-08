@@ -750,219 +750,8 @@ async def test_call_ag_ui_endpoint_malformed_json():
     assert events[1].type == "RUN_FINISHED"
 
 
-@pytest.mark.skipif(
-    not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
-)
-@pytest.mark.asyncio
-async def test_evaluate_ag_ui_agent():
-    """Test batch evaluation of AG-UI agent endpoint."""
-    from ragas.dataset_schema import (
-        EvaluationDataset,
-        EvaluationResult,
-        SingleTurnSample,
-    )
-    from ragas.integrations.ag_ui import (
-        evaluate_ag_ui_agent,
-    )
-
-    # Create mock dataset
-    dataset = EvaluationDataset(
-        samples=[
-            SingleTurnSample(
-                user_input="What's the weather?",
-                reference="Check weather API",
-            ),
-            SingleTurnSample(
-                user_input="Tell me a joke",
-                reference="Respond with humor",
-            ),
-        ]
-    )
-
-    # Mock events for first query (weather)
-    weather_events = [
-        RunStartedEvent(run_id="run-1", thread_id="thread-1"),
-        TextMessageStartEvent(message_id="msg-1", role="assistant"),
-        TextMessageContentEvent(message_id="msg-1", delta="It's sunny and 72F"),
-        TextMessageEndEvent(message_id="msg-1"),
-        RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
-    ]
-
-    # Mock events for second query (joke)
-    joke_events = [
-        RunStartedEvent(run_id="run-2", thread_id="thread-2"),
-        TextMessageStartEvent(message_id="msg-2", role="assistant"),
-        TextMessageContentEvent(
-            message_id="msg-2", delta="Why don't scientists trust atoms?"
-        ),
-        TextMessageContentEvent(message_id="msg-2", delta=" They make up everything!"),
-        TextMessageEndEvent(message_id="msg-2"),
-        RunFinishedEvent(run_id="run-2", thread_id="thread-2"),
-    ]
-
-    # Mock _call_ag_ui_endpoint to return different events based on input
-    async def mock_call_endpoint(endpoint_url, user_input, **kwargs):
-        if "weather" in user_input.lower():
-            return weather_events
-        else:
-            return joke_events
-
-    with patch(
-        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
-        side_effect=mock_call_endpoint,
-    ):
-        result = await evaluate_ag_ui_agent(
-            endpoint_url="http://localhost:8000/agent",
-            dataset=dataset,
-            metrics=[],  # Empty for testing
-        )
-
-    # Check that dataset was populated
-    assert dataset.samples[0].response == "It's sunny and 72F"
-    assert (
-        dataset.samples[1].response
-        == "Why don't scientists trust atoms? They make up everything!"
-    )
-
-    # Check that result is an EvaluationResult
-    assert isinstance(result, EvaluationResult)
-    # With empty metrics, scores should be empty dicts
-    assert result.scores == [{}, {}]
-
-
-@pytest.mark.skipif(
-    not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
-)
-@pytest.mark.asyncio
-async def test_evaluate_ag_ui_agent_with_tool_calls():
-    """Test evaluation with tool calls in response."""
-    from ragas.dataset_schema import (
-        EvaluationDataset,
-        EvaluationResult,
-        SingleTurnSample,
-    )
-    from ragas.integrations.ag_ui import (
-        evaluate_ag_ui_agent,
-    )
-
-    dataset = EvaluationDataset(
-        samples=[
-            SingleTurnSample(
-                user_input="Search for Python tutorials",
-            ),
-        ]
-    )
-
-    # Mock events with tool call
-    search_events = [
-        RunStartedEvent(run_id="run-1", thread_id="thread-1"),
-        TextMessageStartEvent(message_id="msg-1", role="assistant"),
-        TextMessageContentEvent(message_id="msg-1", delta="Let me search for that"),
-        TextMessageEndEvent(message_id="msg-1"),
-        ToolCallStartEvent(tool_call_id="tc-1", tool_call_name="search"),
-        ToolCallArgsEvent(tool_call_id="tc-1", delta='{"query": "Python tutorials"}'),
-        ToolCallEndEvent(tool_call_id="tc-1"),
-        ToolCallResultEvent(
-            tool_call_id="tc-1",
-            message_id="result-1",
-            content="Found: tutorial1.com, tutorial2.com",
-        ),
-        RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
-    ]
-
-    async def mock_call_endpoint(endpoint_url, user_input, **kwargs):
-        return search_events
-
-    with patch(
-        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
-        side_effect=mock_call_endpoint,
-    ):
-        result = await evaluate_ag_ui_agent(
-            endpoint_url="http://localhost:8000/agent",
-            dataset=dataset,
-            metrics=[],
-        )
-
-    # Check that response was extracted
-    assert dataset.samples[0].response == "Let me search for that"
-    # Check that tool results are in retrieved_contexts
-    assert dataset.samples[0].retrieved_contexts is not None
-    assert len(dataset.samples[0].retrieved_contexts) == 1
-    assert "tutorial1.com" in dataset.samples[0].retrieved_contexts[0]
-    # Check result type
-    assert isinstance(result, EvaluationResult)
-
-
-@pytest.mark.skipif(
-    not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
-)
-@pytest.mark.asyncio
-async def test_evaluate_ag_ui_agent_handles_failures():
-    """Test evaluation handles HTTP failures gracefully."""
-    import math
-
-    from ragas.dataset_schema import (
-        EvaluationDataset,
-        EvaluationResult,
-        SingleTurnSample,
-    )
-    from ragas.integrations.ag_ui import (
-        MISSING_CONTEXT_PLACEHOLDER,
-        MISSING_RESPONSE_PLACEHOLDER,
-        evaluate_ag_ui_agent,
-    )
-
-    dataset = EvaluationDataset(
-        samples=[
-            SingleTurnSample(user_input="Query 1"),
-            SingleTurnSample(user_input="Query 2"),
-        ]
-    )
-
-    # Mock events - first succeeds, second fails (returns NaN from executor)
-    success_events = [
-        RunStartedEvent(run_id="run-1", thread_id="thread-1"),
-        TextMessageStartEvent(message_id="msg-1", role="assistant"),
-        TextMessageContentEvent(message_id="msg-1", delta="Success response"),
-        TextMessageEndEvent(message_id="msg-1"),
-        RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
-    ]
-
-    # Mock Executor to handle the exception
-    class MockExecutor:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def submit(self, func, *args, **kwargs):
-            pass
-
-        def results(self):
-            # First result succeeds, second is NaN (failed)
-            return [success_events, math.nan]
-
-        async def aresults(self):
-            return self.results()
-
-    with patch(
-        "ragas.integrations.ag_ui.Executor",
-        MockExecutor,
-    ):
-        result = await evaluate_ag_ui_agent(
-            endpoint_url="http://localhost:8000/agent",
-            dataset=dataset,
-            metrics=[],
-        )
-
-    # First sample should have response, second should use placeholders
-    assert dataset.samples[0].response == "Success response"
-    assert dataset.samples[1].response == MISSING_RESPONSE_PLACEHOLDER
-    assert dataset.samples[1].retrieved_contexts == [MISSING_CONTEXT_PLACEHOLDER]
-    # Check result type
-    assert isinstance(result, EvaluationResult)
-
-
 # ============================================================================
-# Multi-turn evaluation tests
+# Experiment-based evaluation tests (new @experiment pattern)
 # ============================================================================
 
 
@@ -1001,302 +790,292 @@ def test_convert_ragas_messages_to_ag_ui():
     assert ag_ui_messages[2].content == "Thanks!"
 
 
-@pytest.mark.asyncio
-async def test_evaluate_multi_turn_basic():
-    """Test basic multi-turn evaluation."""
-    from unittest.mock import patch
+@pytest.mark.skipif(
+    not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
+)
+def test_create_ag_ui_experiment_returns_experiment_protocol():
+    """Test that create_ag_ui_experiment returns an ExperimentProtocol."""
+    from ragas.experiment import ExperimentProtocol
+    from ragas.integrations.ag_ui import create_ag_ui_experiment
 
-    from ragas.dataset_schema import (
-        EvaluationDataset,
-        EvaluationResult,
-        MultiTurnSample,
-    )
-    from ragas.integrations.ag_ui import evaluate_ag_ui_agent
-    from ragas.messages import ToolCall
-
-    # Create multi-turn sample
-    sample = MultiTurnSample(
-        user_input=[HumanMessage(content="What's the weather in SF?")],
-        reference_tool_calls=[ToolCall(name="get-weather", args={"location": "SF"})],
+    experiment_fn = create_ag_ui_experiment(
+        endpoint_url="http://localhost:8000/agent",
+        metrics=[],
     )
 
-    dataset = EvaluationDataset(samples=[sample])
-
-    # Mock events that agent would return
-    # Note: Tool calls are completed before message, so they attach to the next AIMessage
-    agent_events = [
-        RunStartedEvent(run_id="run-1", thread_id="thread-1"),
-        ToolCallStartEvent(
-            tool_call_id="tc-1",
-            tool_call_name="get-weather",
-            parent_message_id="msg-1",
-        ),
-        ToolCallArgsEvent(tool_call_id="tc-1", delta='{"location": "SF"}'),
-        ToolCallEndEvent(tool_call_id="tc-1"),
-        TextMessageStartEvent(message_id="msg-1", role="assistant"),
-        TextMessageContentEvent(message_id="msg-1", delta="Let me check the weather"),
-        TextMessageEndEvent(message_id="msg-1"),
-        ToolCallResultEvent(
-            tool_call_id="tc-1",
-            message_id="result-1",
-            content="Temperature: 72°F",
-        ),
-        RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
-    ]
-
-    # Mock Executor
-    class MockExecutor:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def submit(self, func, *args, **kwargs):
-            pass
-
-        def results(self):
-            return [agent_events]
-
-        async def aresults(self):
-            return self.results()
-
-    with patch(
-        "ragas.integrations.ag_ui.Executor",
-        MockExecutor,
-    ):
-        result = await evaluate_ag_ui_agent(
-            endpoint_url="http://localhost:8000/agent",
-            dataset=dataset,
-            metrics=[],
-        )
-
-    # Verify that agent responses were appended to conversation
-    assert len(sample.user_input) > 1  # Should have original + agent responses
-
-    # Check that we have AIMessage and ToolMessage appended
-    ai_messages = [msg for msg in sample.user_input if isinstance(msg, AIMessage)]
-    tool_messages = [msg for msg in sample.user_input if isinstance(msg, ToolMessage)]
-
-    assert len(ai_messages) >= 1  # At least one AI message
-    assert len(tool_messages) >= 1  # At least one tool message
-
-    # Verify tool calls in AIMessage (tool calls completed before message, so attached to it)
-    assert ai_messages[0].tool_calls is not None
-    assert len(ai_messages[0].tool_calls) > 0
-    assert ai_messages[0].tool_calls[0].name == "get-weather"
-
-    # Check result type
-    assert isinstance(result, EvaluationResult)
-
-
-@pytest.mark.asyncio
-async def test_evaluate_multi_turn_with_existing_conversation():
-    """Test multi-turn evaluation with pre-existing conversation."""
-    from unittest.mock import patch
-
-    from ragas.dataset_schema import (
-        EvaluationDataset,
-        EvaluationResult,
-        MultiTurnSample,
-    )
-    from ragas.integrations.ag_ui import evaluate_ag_ui_agent
-    from ragas.messages import ToolCall
-
-    # Create sample with existing conversation
-    sample = MultiTurnSample(
-        user_input=[
-            HumanMessage(content="Hello"),
-            AIMessage(content="Hi there!"),
-            HumanMessage(content="What's the weather in SF?"),
-        ],
-        reference_tool_calls=[ToolCall(name="get-weather", args={"location": "SF"})],
-    )
-
-    original_length = len(sample.user_input)
-    dataset = EvaluationDataset(samples=[sample])
-
-    # Mock agent events
-    agent_events = [
-        TextMessageStartEvent(message_id="msg-1", role="assistant"),
-        TextMessageContentEvent(message_id="msg-1", delta="Let me check the weather"),
-        TextMessageEndEvent(message_id="msg-1"),
-        ToolCallStartEvent(
-            tool_call_id="tc-1",
-            tool_call_name="get-weather",
-            parent_message_id="msg-1",
-        ),
-        ToolCallArgsEvent(tool_call_id="tc-1", delta='{"location": "SF"}'),
-        ToolCallEndEvent(tool_call_id="tc-1"),
-    ]
-
-    class MockExecutor:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def submit(self, func, *args, **kwargs):
-            pass
-
-        def results(self):
-            return [agent_events]
-
-    with patch(
-        "ragas.integrations.ag_ui.Executor",
-        MockExecutor,
-    ):
-        result = await evaluate_ag_ui_agent(
-            endpoint_url="http://localhost:8000/agent",
-            dataset=dataset,
-            metrics=[],
-        )
-
-    # Verify conversation was extended, not replaced
-    assert len(sample.user_input) > original_length
-
-    # First 3 messages should be unchanged
-    assert isinstance(sample.user_input[0], HumanMessage)
-    assert sample.user_input[0].content == "Hello"
-    assert isinstance(sample.user_input[1], AIMessage)
-    assert sample.user_input[1].content == "Hi there!"
-    assert isinstance(sample.user_input[2], HumanMessage)
-    assert sample.user_input[2].content == "What's the weather in SF?"
-
-    # New messages should be appended
-    new_messages = sample.user_input[original_length:]
-    assert len(new_messages) > 0
-    assert any(isinstance(msg, AIMessage) for msg in new_messages)
-
-    # Check result type
-    assert isinstance(result, EvaluationResult)
-
-
-@pytest.mark.asyncio
-async def test_evaluate_multi_turn_failed_query():
-    """Test multi-turn evaluation handles failed queries correctly."""
-    import math
-    from unittest.mock import patch
-
-    from ragas.dataset_schema import (
-        EvaluationDataset,
-        EvaluationResult,
-        MultiTurnSample,
-    )
-    from ragas.integrations.ag_ui import evaluate_ag_ui_agent
-
-    # Create multi-turn sample
-    sample = MultiTurnSample(
-        user_input=[HumanMessage(content="Test query")],
-        reference_tool_calls=[],
-    )
-
-    original_length = len(sample.user_input)
-    dataset = EvaluationDataset(samples=[sample])
-
-    class MockExecutor:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def submit(self, func, *args, **kwargs):
-            pass
-
-        def results(self):
-            # Return NaN to simulate failure
-            return [math.nan]
-
-        async def aresults(self):
-            return self.results()
-
-    with patch(
-        "ragas.integrations.ag_ui.Executor",
-        MockExecutor,
-    ):
-        result = await evaluate_ag_ui_agent(
-            endpoint_url="http://localhost:8000/agent",
-            dataset=dataset,
-            metrics=[],
-        )
-
-    # Conversation should remain unchanged after failure
-    assert len(sample.user_input) == original_length
-    assert isinstance(sample.user_input[0], HumanMessage)
-    assert sample.user_input[0].content == "Test query"
-
-    # Check result type
-    assert isinstance(result, EvaluationResult)
+    # Should be callable
+    assert callable(experiment_fn)
+    # Should have arun method
+    assert hasattr(experiment_fn, "arun")
+    # Should match ExperimentProtocol
+    assert isinstance(experiment_fn, ExperimentProtocol)
 
 
 @pytest.mark.skipif(
     not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
 )
 @pytest.mark.asyncio
-async def test_evaluate_ag_ui_agent_trace_structure():
-    """Test that evaluation creates proper trace structure for debugging."""
-    from unittest.mock import patch
-
-    from ragas.callbacks import ChainType
-    from ragas.dataset_schema import (
-        EvaluationDataset,
-        EvaluationResult,
-        SingleTurnSample,
-    )
-    from ragas.integrations.ag_ui import evaluate_ag_ui_agent
-
-    # Create dataset with 2 samples
-    dataset = EvaluationDataset(
-        samples=[
-            SingleTurnSample(user_input="Query 1", reference="Ref 1"),
-            SingleTurnSample(user_input="Query 2", reference="Ref 2"),
-        ]
-    )
+async def test_create_ag_ui_experiment_processes_row():
+    """Test that experiment function processes rows correctly."""
+    from ragas.integrations.ag_ui import create_ag_ui_experiment
 
     # Mock events
     events = [
         RunStartedEvent(run_id="run-1", thread_id="thread-1"),
         TextMessageStartEvent(message_id="msg-1", role="assistant"),
-        TextMessageContentEvent(message_id="msg-1", delta="Response"),
+        TextMessageContentEvent(message_id="msg-1", delta="Hello! I'm here to help."),
         TextMessageEndEvent(message_id="msg-1"),
         RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
     ]
 
-    class MockExecutor:
-        def __init__(self, *args, **kwargs):
-            pass
+    async def mock_call_endpoint(endpoint_url, user_input, **kwargs):
+        return events
 
-        def submit(self, func, *args, **kwargs):
-            pass
+    experiment_fn = create_ag_ui_experiment(
+        endpoint_url="http://localhost:8000/agent",
+        metrics=[],
+    )
 
-        def results(self):
-            return [events, events]
-
-    with patch("ragas.integrations.ag_ui.Executor", MockExecutor):
-        result = await evaluate_ag_ui_agent(
-            endpoint_url="http://localhost:8000/agent",
-            dataset=dataset,
-            metrics=[],  # No metrics for this test
+    # Call the experiment function directly with a row
+    with patch(
+        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
+        side_effect=mock_call_endpoint,
+    ):
+        result = await experiment_fn(
+            {"user_input": "Hello", "reference": "Test reference"}
         )
 
-    # Verify result type
-    assert isinstance(result, EvaluationResult)
+    # Check result structure
+    assert "user_input" in result
+    assert "response" in result
+    assert "reference" in result
+    assert result["user_input"] == "Hello"
+    assert result["response"] == "Hello! I'm here to help."
+    assert result["reference"] == "Test reference"
 
-    # Verify trace structure exists
-    assert hasattr(result, "ragas_traces")
-    traces = result.ragas_traces
 
-    # Should have 3 traces: 1 evaluation + 2 rows (no metrics)
-    assert len(traces) == 3
+@pytest.mark.skipif(
+    not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
+)
+@pytest.mark.asyncio
+async def test_create_ag_ui_experiment_extracts_tool_results():
+    """Test that experiment function extracts tool results into retrieved_contexts."""
+    from ragas.integrations.ag_ui import create_ag_ui_experiment
 
-    # Find root evaluation trace
-    root_traces = [t for t in traces.values() if t.parent_run_id is None]
-    assert len(root_traces) == 1
-    root = root_traces[0]
+    # Mock events with tool call
+    events = [
+        RunStartedEvent(run_id="run-1", thread_id="thread-1"),
+        TextMessageStartEvent(message_id="msg-1", role="assistant"),
+        TextMessageContentEvent(message_id="msg-1", delta="Let me check"),
+        ToolCallStartEvent(tool_call_id="tc-1", tool_call_name="get_weather"),
+        ToolCallArgsEvent(tool_call_id="tc-1", delta='{"location": "SF"}'),
+        ToolCallEndEvent(tool_call_id="tc-1"),
+        TextMessageEndEvent(message_id="msg-1"),
+        ToolCallResultEvent(
+            tool_call_id="tc-1",
+            message_id="result-1",
+            content="Sunny, 72F",
+        ),
+        RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
+    ]
 
-    # Verify root trace properties
-    assert root.name == "ag_ui_evaluation"
-    assert root.metadata["type"] == ChainType.EVALUATION.value
-    assert "endpoint_url" in root.inputs
-    assert len(root.children) == 2  # 2 row runs
+    async def mock_call_endpoint(endpoint_url, user_input, **kwargs):
+        return events
 
-    # Verify row traces
-    for row_id in root.children:
-        row_trace = traces[row_id]
-        assert row_trace.parent_run_id == root.run_id
-        assert row_trace.name.startswith("row ")
-        assert row_trace.metadata["type"] == ChainType.ROW.value
-        assert "row_index" in row_trace.metadata
+    experiment_fn = create_ag_ui_experiment(
+        endpoint_url="http://localhost:8000/agent",
+        metrics=[],
+    )
+
+    with patch(
+        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
+        side_effect=mock_call_endpoint,
+    ):
+        result = await experiment_fn(
+            {"user_input": "What's the weather?", "reference": "Weather info"}
+        )
+
+    # Check that tool results were extracted to retrieved_contexts
+    assert "retrieved_contexts" in result
+    assert len(result["retrieved_contexts"]) > 0
+    # Tool result content should be in contexts
+    assert "Sunny, 72F" in result["retrieved_contexts"][0]
+
+
+@pytest.mark.skipif(
+    not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
+)
+@pytest.mark.asyncio
+async def test_create_ag_ui_experiment_handles_empty_user_input():
+    """Test that experiment function handles empty user_input with graceful failure."""
+    from ragas.integrations.ag_ui import (
+        MISSING_RESPONSE_PLACEHOLDER,
+        create_ag_ui_experiment,
+    )
+
+    # Mock endpoint that returns empty response
+    async def mock_call_endpoint(endpoint_url, user_input, **kwargs):
+        # Return minimal events with no content
+        return [
+            RunStartedEvent(run_id="run-1", thread_id="thread-1"),
+            RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
+        ]
+
+    experiment_fn = create_ag_ui_experiment(
+        endpoint_url="http://localhost:8000/agent",
+        metrics=[],
+    )
+
+    with patch(
+        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
+        side_effect=mock_call_endpoint,
+    ):
+        result = await experiment_fn({"user_input": "", "reference": "Test"})
+
+    # With empty user_input but successful endpoint call, response is the placeholder
+    assert result["response"] == MISSING_RESPONSE_PLACEHOLDER
+    assert result["user_input"] == ""
+
+
+@pytest.mark.skipif(
+    not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
+)
+@pytest.mark.asyncio
+async def test_create_ag_ui_experiment_handles_none_user_input():
+    """Test that experiment function handles None user_input."""
+    from ragas.integrations.ag_ui import (
+        MISSING_RESPONSE_PLACEHOLDER,
+        create_ag_ui_experiment,
+    )
+
+    experiment_fn = create_ag_ui_experiment(
+        endpoint_url="http://localhost:8000/agent",
+        metrics=[],
+    )
+
+    # Call with None user_input (no mocking - should return immediately)
+    result = await experiment_fn({"reference": "Test"})
+
+    # Should return placeholder response when user_input is missing
+    assert result["response"] == MISSING_RESPONSE_PLACEHOLDER
+    assert result.get("user_input") is None
+
+
+@pytest.mark.skipif(
+    not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
+)
+@pytest.mark.asyncio
+async def test_create_ag_ui_experiment_handles_multi_turn_input():
+    """Test that experiment function handles multi-turn conversation input."""
+    from ragas.integrations.ag_ui import create_ag_ui_experiment
+
+    # Mock events for agent response
+    events = [
+        RunStartedEvent(run_id="run-1", thread_id="thread-1"),
+        TextMessageStartEvent(message_id="msg-1", role="assistant"),
+        TextMessageContentEvent(message_id="msg-1", delta="It's sunny!"),
+        TextMessageEndEvent(message_id="msg-1"),
+        RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
+    ]
+
+    async def mock_call_endpoint(endpoint_url, user_input, **kwargs):
+        return events
+
+    experiment_fn = create_ag_ui_experiment(
+        endpoint_url="http://localhost:8000/agent",
+        metrics=[],
+    )
+
+    # Multi-turn input as list of messages
+    conversation = [
+        HumanMessage(content="Hello"),
+        AIMessage(content="Hi there!"),
+        HumanMessage(content="What's the weather?"),
+    ]
+
+    with patch(
+        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
+        side_effect=mock_call_endpoint,
+    ):
+        result = await experiment_fn(
+            {"user_input": conversation, "reference": "Weather info"}
+        )
+
+    # Response should be extracted from agent events
+    assert result["response"] == "It's sunny!"
+    # Original conversation is preserved in result
+    assert "user_input" in result
+    # Note: result["user_input"] is the original input; the extended conversation
+    # is used internally for multi-turn sample creation and metric scoring
+    assert len(result["user_input"]) == len(conversation)
+
+
+@pytest.mark.skipif(
+    not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
+)
+@pytest.mark.asyncio
+async def test_create_ag_ui_experiment_with_extra_headers():
+    """Test that extra headers are passed to the endpoint."""
+    from ragas.integrations.ag_ui import create_ag_ui_experiment
+
+    captured_kwargs = {}
+
+    async def mock_call_endpoint(endpoint_url, user_input, **kwargs):
+        captured_kwargs.update(kwargs)
+        return [
+            RunStartedEvent(run_id="run-1", thread_id="thread-1"),
+            TextMessageStartEvent(message_id="msg-1", role="assistant"),
+            TextMessageContentEvent(message_id="msg-1", delta="Response"),
+            TextMessageEndEvent(message_id="msg-1"),
+            RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
+        ]
+
+    experiment_fn = create_ag_ui_experiment(
+        endpoint_url="http://localhost:8000/agent",
+        metrics=[],
+        extra_headers={"Authorization": "Bearer test-token"},
+    )
+
+    with patch(
+        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
+        side_effect=mock_call_endpoint,
+    ):
+        await experiment_fn({"user_input": "Test", "reference": "Ref"})
+
+    # Check that extra headers were passed
+    assert "extra_headers" in captured_kwargs
+    assert captured_kwargs["extra_headers"]["Authorization"] == "Bearer test-token"
+
+
+@pytest.mark.skipif(
+    not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
+)
+@pytest.mark.asyncio
+async def test_create_ag_ui_experiment_handles_endpoint_failure():
+    """Test that experiment function handles endpoint failures gracefully."""
+    from ragas.integrations.ag_ui import (
+        MISSING_CONTEXT_PLACEHOLDER,
+        MISSING_RESPONSE_PLACEHOLDER,
+        create_ag_ui_experiment,
+    )
+
+    async def mock_call_endpoint_failure(endpoint_url, user_input, **kwargs):
+        raise Exception("Connection refused")
+
+    experiment_fn = create_ag_ui_experiment(
+        endpoint_url="http://localhost:8000/agent",
+        metrics=[],
+    )
+
+    with patch(
+        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
+        side_effect=mock_call_endpoint_failure,
+    ):
+        # Should return result with placeholder values instead of raising
+        result = await experiment_fn({"user_input": "Test", "reference": "Ref"})
+
+    # Verify graceful failure handling
+    assert result["response"] == MISSING_RESPONSE_PLACEHOLDER
+    assert result["retrieved_contexts"] == [MISSING_CONTEXT_PLACEHOLDER]
+    assert result["user_input"] == "Test"
+    assert result["reference"] == "Ref"

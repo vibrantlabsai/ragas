@@ -1,8 +1,10 @@
 """
-AG-UI Agent Evaluation Script
+AG-UI Agent Experiment Script
 
-This script demonstrates how to evaluate agents built with the AG-UI protocol
-using Ragas metrics. It includes two evaluation scenarios:
+This script demonstrates how to run experiments on agents built with the AG-UI protocol
+using Ragas metrics with the modern @experiment decorator pattern.
+
+It includes two experiment scenarios:
 
 1. Scientist Biographies (Single-turn) - Tests factual correctness and answer relevancy
 2. Weather Tool Usage (Multi-turn) - Tests tool calling accuracy and agent goal achievement
@@ -11,44 +13,36 @@ Metrics used:
 - FactualCorrectness: Measures factual accuracy of responses
 - AnswerRelevancy: Measures how relevant the response is to the question
 - ToolCallF1: Rule-based metric for tool call accuracy
-- AgentGoalAccuracyWithReference: LLM-based metric evaluating whether the agent achieved the user's goal
+- AgentGoalAccuracyWithReference: LLM-based metric for whether the agent achieved the user's goal
 
 Prerequisites:
 - An AG-UI compatible agent running at the specified endpoint URL
 - See https://docs.ag-ui.com/quickstart/applications for agent setup
 
 Usage:
-    python evals.py --endpoint-url http://localhost:8000/agentic_chat
-    python evals.py --endpoint-url http://localhost:8000/chat --skip-tool-eval
-    python evals.py --endpoint-url http://localhost:8000 --skip-factual
+    python experiments.py --endpoint-url http://localhost:8000/agentic_chat
+    python experiments.py --endpoint-url http://localhost:8000/chat --skip-tool-experiment
+    python experiments.py --endpoint-url http://localhost:8000 --skip-factual
 """
 
 import argparse
 import asyncio
-import csv
-import json
 import logging
-from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI, OpenAI
-from ragas.dataset_schema import (
-    EvaluationDataset,
-    MultiTurnSample,
-    SingleTurnSample,
-)
+
+from ragas.dataset import Dataset
 from ragas.embeddings.base import embedding_factory
-from ragas.integrations.ag_ui import evaluate_ag_ui_agent
+from ragas.integrations.ag_ui import create_ag_ui_experiment
 from ragas.llms import llm_factory
-from ragas.messages import HumanMessage, ToolCall
 from ragas.metrics import (
     AgentGoalAccuracyWithReference,
     DiscreteMetric,
     ToolCallF1,
 )
 from ragas.metrics.collections import AnswerRelevancy, FactualCorrectness
-from ragas.run_config import RunConfig
 
 # Configure logging
 logging.basicConfig(
@@ -63,61 +57,44 @@ load_dotenv(REPO_ROOT / ".env")
 TEST_DATA_DIR = SCRIPT_DIR / "test_data"
 
 
-def load_scientist_dataset() -> EvaluationDataset:
+def load_scientist_dataset() -> Dataset:
     """
     Load the scientist biographies dataset from CSV.
 
     Returns:
-        EvaluationDataset with SingleTurnSample entries for testing factual correctness.
+        Dataset with entries for testing factual correctness.
     """
     csv_path = TEST_DATA_DIR / "scientist_biographies.csv"
     logger.info(f"Loading scientist biographies dataset from {csv_path}")
 
-    samples = []
-    with open(csv_path, "r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            sample = SingleTurnSample(
-                user_input=row["user_input"], reference=row["reference"]
-            )
-            samples.append(sample)
+    dataset = Dataset.load(
+        name="scientist_biographies",
+        backend="local/csv",
+        root_dir=str(TEST_DATA_DIR),
+    )
 
-    logger.info(f"Loaded {len(samples)} scientist biography samples")
-    return EvaluationDataset(samples=samples)
+    logger.info(f"Loaded {len(dataset)} scientist biography samples")
+    return dataset
 
 
-def load_weather_dataset() -> EvaluationDataset:
+def load_weather_dataset() -> Dataset:
     """
     Load the weather tool call dataset from CSV.
 
     Returns:
-        EvaluationDataset with MultiTurnSample entries for testing tool call accuracy
-        and agent goal accuracy.
+        Dataset with entries for testing tool call accuracy and agent goal accuracy.
     """
     csv_path = TEST_DATA_DIR / "weather_tool_calls.csv"
     logger.info(f"Loading weather tool call dataset from {csv_path}")
 
-    samples = []
-    with open(csv_path, "r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            # Parse the reference_tool_calls JSON
-            tool_calls_data = json.loads(row["reference_tool_calls"])
-            tool_calls = [
-                ToolCall(name=tc["name"], args=tc["args"]) for tc in tool_calls_data
-            ]
+    dataset = Dataset.load(
+        name="weather_tool_calls",
+        backend="local/csv",
+        root_dir=str(TEST_DATA_DIR),
+    )
 
-            # Create MultiTurnSample with user_input as a list of HumanMessage
-            # Include reference for AgentGoalAccuracyWithReference metric
-            sample = MultiTurnSample(
-                user_input=[HumanMessage(content=row["user_input"])],
-                reference_tool_calls=tool_calls,
-                reference=row.get("reference"),  # Expected outcome for goal accuracy
-            )
-            samples.append(sample)
-
-    logger.info(f"Loaded {len(samples)} weather tool call samples")
-    return EvaluationDataset(samples=samples)
+    logger.info(f"Loaded {len(dataset)} weather tool call samples")
+    return dataset
 
 
 def create_evaluator_components(model_name: str):
@@ -136,42 +113,32 @@ def create_evaluator_components(model_name: str):
     return evaluator_llm, evaluator_embeddings
 
 
-async def evaluate_scientist_biographies(
+async def run_scientist_experiment(
     endpoint_url: str, evaluator_model: str
 ) -> tuple:
     """
-    Evaluate the agent's ability to provide factually correct information
-    about scientists.
+    Run an experiment to test the agent's ability to provide factually correct
+    information about scientists using the @experiment pattern.
 
     Args:
         endpoint_url: The AG-UI endpoint URL
         evaluator_model: The evaluator LLM model name
 
     Returns:
-        Tuple of (result, dataframe) where result is the EvaluationResult
+        Tuple of (experiment_result, dataframe) where experiment_result is the Experiment
         and dataframe is the pandas DataFrame with results.
     """
     logger.info("=" * 80)
-    logger.info("Starting Scientist Biographies Evaluation")
+    logger.info("Starting Scientist Biographies Experiment")
     logger.info("=" * 80)
 
     # Load dataset
     dataset = load_scientist_dataset()
 
-    # Define metrics using the modern collections portfolio
-    evaluator_llm, evaluator_embeddings = create_evaluator_components(
-        evaluator_model
-    )
+    # Create evaluator components
+    evaluator_llm, evaluator_embeddings = create_evaluator_components(evaluator_model)
 
-    conciseness_metric = DiscreteMetric(
-        name="conciseness",
-        allowed_values=["verbose", "concise"],
-        prompt=(
-            "Is the response concise and efficiently conveys information?\n\n"
-            "Response: {response}\n\n"
-            "Answer with only 'verbose' or 'concise'."
-        ),
-    )
+    # Define metrics using the modern collections portfolio
     metrics = [
         FactualCorrectness(
             llm=evaluator_llm, mode="f1", atomicity="high", coverage="high"
@@ -181,20 +148,31 @@ async def evaluate_scientist_biographies(
         ),
     ]
 
-    # Run evaluation
-    logger.info(f"Evaluating against endpoint: {endpoint_url}")
-    run_config = RunConfig(max_workers=10, timeout=300)
-    result = await evaluate_ag_ui_agent(
+    # Create experiment function configured for this evaluation
+    experiment_fn = create_ag_ui_experiment(
         endpoint_url=endpoint_url,
-        dataset=dataset,
         metrics=metrics,
         evaluator_llm=evaluator_llm,
-        run_config=run_config,
+        timeout=300.0,
     )
 
-    # Convert to DataFrame and clean up
+    # Run evaluation using @experiment pattern
+    logger.info(f"Evaluating against endpoint: {endpoint_url}")
+    result = await experiment_fn.arun(dataset, name="scientist_biographies_eval")
+
+    # Convert to DataFrame for analysis
     df = result.to_pandas()
-    df = df.drop(columns=["retrieved_contexts"], errors="ignore")
+
+    # Optionally add conciseness metric post-hoc
+    conciseness_metric = DiscreteMetric(
+        name="conciseness",
+        allowed_values=["verbose", "concise"],
+        prompt=(
+            "Is the response concise and efficiently conveys information?\n\n"
+            "Response: {response}\n\n"
+            "Answer with only 'verbose' or 'concise'."
+        ),
+    )
 
     if "response" in df.columns:
         conciseness_scores = []
@@ -208,7 +186,7 @@ async def evaluate_scientist_biographies(
 
     # Print summary
     logger.info("\n" + "=" * 80)
-    logger.info("Scientist Biographies Evaluation Results")
+    logger.info("Scientist Biographies Experiment Results")
     logger.info("=" * 80)
     logger.info(f"\nDataFrame shape: {df.shape}")
     logger.info(f"\n{df.to_string()}")
@@ -232,21 +210,21 @@ async def evaluate_scientist_biographies(
     return result, df
 
 
-async def evaluate_weather_tool_use(endpoint_url: str, evaluator_model: str) -> tuple:
+async def run_tool_experiment(endpoint_url: str, evaluator_model: str) -> tuple:
     """
-    Evaluate the agent's ability to correctly call the weather tool and achieve
-    the user's goal.
+    Run an experiment to test the agent's ability to correctly call the weather tool
+    and achieve the user's goal using the @experiment pattern.
 
     Args:
         endpoint_url: The AG-UI endpoint URL
         evaluator_model: The evaluator LLM model name
 
     Returns:
-        Tuple of (result, dataframe) where result is the EvaluationResult
+        Tuple of (experiment_result, dataframe) where experiment_result is the Experiment
         and dataframe is the pandas DataFrame with results.
     """
     logger.info("\n" + "=" * 80)
-    logger.info("Starting Weather Tool Usage Evaluation")
+    logger.info("Starting Weather Tool Usage Experiment")
     logger.info("=" * 80)
 
     # Load dataset
@@ -264,28 +242,24 @@ async def evaluate_weather_tool_use(endpoint_url: str, evaluator_model: str) -> 
         AgentGoalAccuracyWithReference(llm=evaluator_llm),
     ]
 
-    # Run evaluation
-    logger.info(f"Evaluating against endpoint: {endpoint_url}")
-    run_config = RunConfig(max_workers=10, timeout=300)
-    result = await evaluate_ag_ui_agent(
+    # Create experiment function configured for this evaluation
+    experiment_fn = create_ag_ui_experiment(
         endpoint_url=endpoint_url,
-        dataset=dataset,
         metrics=metrics,
         evaluator_llm=evaluator_llm,
-        run_config=run_config,
+        timeout=300.0,
     )
 
-    # Convert to DataFrame and clean up
+    # Run evaluation using @experiment pattern
+    logger.info(f"Evaluating against endpoint: {endpoint_url}")
+    result = await experiment_fn.arun(dataset, name="weather_tool_calls_eval")
+
+    # Convert to DataFrame for analysis
     df = result.to_pandas()
-    columns_to_drop = [
-        col for col in ["retrieved_contexts"] if col in df.columns
-    ]
-    if columns_to_drop:
-        df = df.drop(columns=columns_to_drop)
 
     # Print summary
     logger.info("\n" + "=" * 80)
-    logger.info("Weather Tool Usage Evaluation Results")
+    logger.info("Weather Tool Usage Experiment Results")
     logger.info("=" * 80)
     logger.info(f"\nDataFrame shape: {df.shape}")
     logger.info(f"\n{df.to_string()}")
@@ -310,31 +284,11 @@ async def evaluate_weather_tool_use(endpoint_url: str, evaluator_model: str) -> 
     return result, df
 
 
-def save_results(df, scenario_name: str, output_dir: Path = None):
-    """
-    Save evaluation results to a timestamped CSV file.
-
-    Args:
-        df: The pandas DataFrame with evaluation results
-        scenario_name: Name of the evaluation scenario
-        output_dir: Directory to save results (defaults to script directory)
-    """
-    if output_dir is None:
-        output_dir = SCRIPT_DIR
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{scenario_name}_results_{timestamp}.csv"
-    filepath = output_dir / filename
-
-    df.to_csv(filepath, index=False)
-    logger.info(f"\nResults saved to: {filepath}")
-
-
 async def main():
     """Main execution function."""
     # Parse command line arguments
     parser = argparse.ArgumentParser(
-        description="Evaluate AG-UI agents using Ragas metrics"
+        description="Run AG-UI agent experiments using Ragas metrics with @experiment pattern"
     )
     parser.add_argument(
         "--endpoint-url",
@@ -346,31 +300,25 @@ async def main():
         "--evaluator-model",
         type=str,
         default="gpt-4o-mini",
-        help="OpenAI model to use for evaluation (default: gpt-4o-mini)",
+        help="OpenAI model to use for experiments (default: gpt-4o-mini)",
     )
     parser.add_argument(
         "--skip-factual",
         action="store_true",
-        help="Skip the factual correctness evaluation",
+        help="Skip the factual correctness experiment",
     )
     parser.add_argument(
-        "--skip-tool-eval",
+        "--skip-tool-experiment",
         action="store_true",
-        help="Skip the tool call evaluation",
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=None,
-        help="Directory to save results (default: script directory)",
+        help="Skip the tool call experiment",
     )
 
     args = parser.parse_args()
 
-    # Sanity check the embedding endpoint before evaluation
+    # Sanity check the embedding endpoint before experiments
     async def sanity_check():
         sanity_client = AsyncOpenAI()
-        logger.info("Running embeddings sanity check before evaluation")
+        logger.info("Running embeddings sanity check before experiments")
         try:
             await sanity_client.embeddings.create(
                 input="Sanity check",
@@ -383,26 +331,26 @@ async def main():
 
     await sanity_check()
 
-    # Run evaluations
+    # Run experiments
     try:
         if not args.skip_factual:
-            result, df = await evaluate_scientist_biographies(
+            result, df = await run_scientist_experiment(
                 args.endpoint_url, args.evaluator_model
             )
-            save_results(df, "scientist_biographies", args.output_dir)
+            logger.info(f"\nResults saved to: {result.name}")
 
-        if not args.skip_tool_eval:
-            result, df = await evaluate_weather_tool_use(
+        if not args.skip_tool_experiment:
+            result, df = await run_tool_experiment(
                 args.endpoint_url, args.evaluator_model
             )
-            save_results(df, "weather_tool_calls", args.output_dir)
+            logger.info(f"\nResults saved to: {result.name}")
 
         logger.info("\n" + "=" * 80)
-        logger.info("All evaluations completed successfully!")
+        logger.info("All experiments completed successfully!")
         logger.info("=" * 80)
 
     except Exception as e:
-        logger.error(f"\nEvaluation failed with error: {e}")
+        logger.error(f"\nExperiment failed with error: {e}")
         logger.error(
             "\nPlease ensure your AG-UI agent is running at the specified endpoint."
         )

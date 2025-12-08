@@ -1,8 +1,8 @@
 # AG-UI
 
-[AG-UI](https://docs.ag-ui.com/) is an event-based protocol for streaming agent updates to user interfaces. The protocol standardizes message, tool-call, and state events, which makes it easy to plug different agent runtimes into visual frontends. The `ragas.integrations.ag_ui` module helps you transform those event streams into Ragas message objects and evaluate live AG-UI endpoints with the same metrics used across the rest of the Ragas ecosystem.
+[AG-UI](https://docs.ag-ui.com/) is an event-based protocol for streaming agent updates to user interfaces. The protocol standardizes message, tool-call, and state events, which makes it easy to plug different agent runtimes into visual frontends. The `ragas.integrations.ag_ui` module helps you transform those event streams into Ragas message objects and run experiments against live AG-UI endpoints using the modern `@experiment` decorator pattern.
 
-This guide assumes you already have an AG-UI compatible agent running (for example, one built with Google ADK, PydanticAI, or CrewAI) and that you are familiar with creating evaluation datasets in Ragas.
+This guide assumes you already have an AG-UI compatible agent running (for example, one built with Google ADK, PydanticAI, or CrewAI) and that you are familiar with creating datasets in Ragas.
 
 ## Install the integration
 
@@ -31,64 +31,84 @@ load_dotenv()
 nest_asyncio.apply()
 ```
 
-## Build an evaluation dataset
+## Build an experiment dataset
 
-`EvaluationDataset` can contain single-turn or multi-turn samples. With AG-UI you can evaluate either pattern—single questions with free-form responses, or longer conversations that can include tool calls.
+`Dataset` can contain single-turn or multi-turn samples. With AG-UI you can test either pattern—single questions with free-form responses, or longer conversations that include tool calls.
 
 ### Single-turn samples
 
-Use `SingleTurnSample` when you only need the final answer text.
+Use `Dataset.from_pandas()` with `user_input` and `reference` columns when you only need to grade the final answer text.
 
 ```python
-from ragas.dataset_schema import EvaluationDataset, SingleTurnSample
+import pandas as pd
+from ragas.dataset import Dataset
 
-scientist_questions = EvaluationDataset(
-    samples=[
-        SingleTurnSample(
-            user_input="Who originated the theory of relativity?",
-            reference="Albert Einstein originated the theory of relativity."
-        ),
-        SingleTurnSample(
-            user_input="Who discovered penicillin and when?",
-            reference="Alexander Fleming discovered penicillin in 1928."
-        ),
-    ]
+scientist_questions = Dataset.from_pandas(
+    pd.DataFrame([
+        {
+            "user_input": "Who originated the theory of relativity?",
+            "reference": "Albert Einstein originated the theory of relativity.",
+        },
+        {
+            "user_input": "Who discovered penicillin and when?",
+            "reference": "Alexander Fleming discovered penicillin in 1928.",
+        },
+    ]),
+    name="scientist_questions",
+    backend="inmemory",
 )
 ```
 
 ### Multi-turn samples with tool expectations
 
-When you want to grade intermediate agent behavior—like whether it calls tools correctly and achieves the user's goal—switch to `MultiTurnSample`. Provide an initial conversation history, expected tool calls, and optionally a reference outcome for goal accuracy evaluation.
+When you want to grade intermediate agent behavior—like whether it calls tools correctly and achieves the user's goal—use conversation lists as `user_input`. Provide expected tool calls as JSON and optionally a reference outcome for goal accuracy evaluation.
 
 ```python
-from ragas.dataset_schema import EvaluationDataset, MultiTurnSample
-from ragas.messages import HumanMessage, ToolCall
+import json
+import pandas as pd
+from ragas.dataset import Dataset
+from ragas.messages import HumanMessage
 
-weather_queries = EvaluationDataset(
-    samples=[
-        MultiTurnSample(
-            user_input=[HumanMessage(content="What's the weather in Paris?")],
-            reference_tool_calls=[
-                ToolCall(name="get_weather", args={"location": "Paris"})
-            ],
+weather_queries = Dataset.from_pandas(
+    pd.DataFrame([
+        {
+            "user_input": [HumanMessage(content="What's the weather in Paris?")],
+            "reference_tool_calls": json.dumps([
+                {"name": "get_weather", "args": {"location": "Paris"}}
+            ]),
             # Expected outcome for AgentGoalAccuracyWithReference
-            # Use outcome-focused language that matches what the LLM extracts as end_state
-            reference="The user received the current weather conditions for Paris.",
-        ),
-        MultiTurnSample(
-            user_input=[HumanMessage(content="Is it raining in London right now?")],
-            reference_tool_calls=[
-                ToolCall(name="get_weather", args={"location": "London"})
-            ],
-            reference="The user received the current weather conditions for London.",
-        ),
-    ]
+            "reference": "The user received the current weather conditions for Paris.",
+        },
+        {
+            "user_input": [HumanMessage(content="Is it raining in London right now?")],
+            "reference_tool_calls": json.dumps([
+                {"name": "get_weather", "args": {"location": "London"}}
+            ]),
+            "reference": "The user received the current weather conditions for London.",
+        },
+    ]),
+    name="weather_queries",
+    backend="inmemory",
+)
+```
+
+### Loading from CSV
+
+For larger datasets, store your test cases in CSV files and load them with the Dataset API:
+
+```python
+from ragas.dataset import Dataset
+
+dataset = Dataset.load(
+    name="scientist_biographies",
+    backend="local/csv",
+    root_dir="./test_data",
 )
 ```
 
 ## Choose metrics and evaluator model
 
-The integration works with any Ragas metric. To unlock the modern collections portfolio (and mix in custom checks), build an Instructor-compatible LLM for the evaluator prompts and use a synchronous OpenAI client for embeddings that still rely on blocking calls.
+The integration works with any Ragas metric. To unlock the modern collections portfolio (and mix in custom checks), build an Instructor-compatible LLM for the evaluator prompts and use a synchronous OpenAI client for embeddings.
 
 ```python
 from openai import AsyncOpenAI, OpenAI
@@ -134,67 +154,72 @@ tool_metrics = [
 ]
 ```
 
-## Evaluate a live AG-UI endpoint
+## Run experiments against a live AG-UI endpoint
 
-`evaluate_ag_ui_agent` calls your FastAPI endpoint, captures the AG-UI Server-Sent Events (SSE) stream, converts those events into Ragas messages, and runs the metrics you selected.
+`create_ag_ui_experiment` is a factory function that returns an experiment function configured for your AG-UI endpoint. The returned function implements the `@experiment` decorator pattern and can be run against datasets using `.arun()`.
 
 > ⚠️ The endpoint must expose the AG-UI SSE stream. Common paths include `/chat`, `/agent`, or `/agentic_chat`.
 
-### Evaluate factual responses
+### Test factual responses
 
 In Jupyter or IPython, use top-level `await` (after `nest_asyncio.apply()`) instead of `asyncio.run` to avoid the "event loop is already running" error. For scripts you can keep `asyncio.run`.
 
 ```python
-import asyncio
-from ragas.integrations.ag_ui import evaluate_ag_ui_agent
+from ragas.integrations.ag_ui import create_ag_ui_experiment
 
-async def run_factual_eval():
-    result = await evaluate_ag_ui_agent(
-        endpoint_url="http://localhost:8000/agentic_chat",
-        dataset=scientist_questions,
-        metrics=qa_metrics,
-        evaluator_llm=evaluator_llm,
-        metadata=True,  # optional, keeps run/thread metadata on messages
-    )
-    return result
+# Create an experiment function configured for Q&A evaluation
+factual_experiment = create_ag_ui_experiment(
+    endpoint_url="http://localhost:8000/agentic_chat",
+    metrics=qa_metrics,
+    evaluator_llm=evaluator_llm,
+    metadata=True,  # optional, keeps run/thread metadata on messages
+)
 
+# Run the experiment against the dataset
 # In Jupyter/IPython (after calling nest_asyncio.apply())
-factual_result = await run_factual_eval()
+factual_result = await factual_experiment.arun(
+    scientist_questions,
+    name="scientist_qa_eval"
+)
 
 # In a standalone script, use:
-# factual_result = asyncio.run(run_factual_eval())
+# factual_result = asyncio.run(factual_experiment.arun(scientist_questions, name="scientist_qa_eval"))
+
 factual_result.to_pandas()
 ```
 
-The resulting dataframe includes per-sample scores, raw agent responses, and any retrieved contexts (if provided by the agent). You can save it with `result.save()` or export to CSV through pandas.
+The resulting dataframe includes per-sample scores, raw agent responses, and any retrieved contexts (tool results). Results are automatically saved by the experiment framework, and you can export to CSV through pandas.
 
-### Evaluate tool usage
+### Test tool usage
 
-The same function supports multi-turn datasets. Agent responses (AI messages and tool outputs) are appended to the existing conversation before scoring.
+The same pattern supports multi-turn datasets. Agent responses (AI messages and tool outputs) are used to score tool call accuracy and goal achievement.
 
 ```python
-async def run_tool_eval():
-    result = await evaluate_ag_ui_agent(
-        endpoint_url="http://localhost:8000/agentic_chat",
-        dataset=weather_queries,
-        metrics=tool_metrics,
-        evaluator_llm=evaluator_llm,
-    )
-    return result
+# Create an experiment function configured for tool usage evaluation
+tool_experiment = create_ag_ui_experiment(
+    endpoint_url="http://localhost:8000/agentic_chat",
+    metrics=tool_metrics,
+    evaluator_llm=evaluator_llm,
+)
 
+# Run the experiment
 # In Jupyter/IPython
-tool_result = await run_tool_eval()
+tool_result = await tool_experiment.arun(
+    weather_queries,
+    name="weather_tool_eval"
+)
 
 # Or in a script
-# tool_result = asyncio.run(run_tool_eval())
+# tool_result = asyncio.run(tool_experiment.arun(weather_queries, name="weather_tool_eval"))
+
 tool_result.to_pandas()
 ```
 
-If a request fails, the executor logs the error and marks the corresponding sample with `NaN` scores so you can retry or inspect the endpoint logs.
+If a request fails, the experiment logs the error and returns placeholder values for that sample so the experiment can continue with remaining samples.
 
 ## Working directly with AG-UI events
 
-Sometimes you may want to collect event logs separately—perhaps from a recorded run or a staging environment—and evaluate them offline. The conversion helpers expose the same parsing logic used by `evaluate_ag_ui_agent`.
+Sometimes you may want to collect event logs separately—perhaps from a recorded run or a staging environment—and evaluate them offline. The conversion helpers expose the same parsing logic used by the experiment function.
 
 ```python
 from ragas.integrations.ag_ui import convert_to_ragas_messages
@@ -228,13 +253,20 @@ snapshot = MessagesSnapshotEvent(
 ragas_messages = convert_messages_snapshot(snapshot)
 ```
 
-The converted messages can be plugged into `EvaluationDataset` objects or passed directly to lower-level Ragas evaluation APIs if you need custom workflows.
+The converted messages can be used to build custom evaluation workflows or passed directly to metric scoring functions.
 
-## Tips for production evaluations
+## Tips for production experiments
 
-- **Batch size**: use the `batch_size` argument to control parallel requests to your agent.
 - **Custom headers**: pass authentication tokens or tenant IDs via `extra_headers`.
 - **Timeouts**: tune the `timeout` parameter if your agent performs long-running tool calls.
-- **Metadata debugging**: set `metadata=True` to keep AG-UI run, thread, and message IDs on every `RagasMessage` for easier traceability.
+- **Metadata debugging**: set `metadata=True` to keep AG-UI run, thread, and message IDs on every message for easier traceability.
+- **Experiment naming**: use descriptive `name` arguments to `.arun()` for easy identification of results.
 
-Once you are satisfied with your scoring setup, consider wrapping the snippets in a script or notebook. An example walkthrough notebook is available at `docs/howtos/integrations/ag_ui.ipynb`.
+For a complete production example, see `examples/ragas_examples/ag_ui_agent_experiments/experiments.py` which provides:
+
+- CLI arguments for endpoint configuration
+- CSV-based test datasets
+- Proper logging and error handling
+- Timestamped result output
+
+An interactive walkthrough notebook is also available at `howtos/integrations/ag_ui.ipynb`.
