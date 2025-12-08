@@ -39,16 +39,18 @@ Create dataset entries with `user_input` and `reference` using `Dataset.from_pan
 
 ```python
 scientist_questions = Dataset.from_pandas(
-    pd.DataFrame([
-        {
-            "user_input": "Who originated the theory of relativity?",
-            "reference": "Albert Einstein originated the theory of relativity.",
-        },
-        {
-            "user_input": "Who discovered penicillin and when?",
-            "reference": "Alexander Fleming discovered penicillin in 1928.",
-        },
-    ]),
+    pd.DataFrame(
+        [
+            {
+                "user_input": "Who originated the theory of relativity?",
+                "reference": "Albert Einstein originated the theory of relativity.",
+            },
+            {
+                "user_input": "Who discovered penicillin and when?",
+                "reference": "Alexander Fleming discovered penicillin in 1928.",
+            },
+        ]
+    ),
     name="scientist_questions",
     backend="inmemory",
 )
@@ -65,23 +67,27 @@ For tool-usage and goal accuracy metrics, provide:
 
 ```python
 weather_queries = Dataset.from_pandas(
-    pd.DataFrame([
-        {
-            "user_input": [HumanMessage(content="What's the weather in Paris?")],
-            "reference_tool_calls": json.dumps([
-                {"name": "get_weather", "args": {"location": "Paris"}}
-            ]),
-            # Expected outcome - phrased to match what LLM extracts as end_state
-            "reference": "The AI provided the current weather conditions for Paris.",
-        },
-        {
-            "user_input": [HumanMessage(content="Is it raining in London right now?")],
-            "reference_tool_calls": json.dumps([
-                {"name": "get_weather", "args": {"location": "London"}}
-            ]),
-            "reference": "The AI provided the current weather conditions for London.",
-        },
-    ]),
+    pd.DataFrame(
+        [
+            {
+                "user_input": [HumanMessage(content="What's the weather in Paris?")],
+                "reference_tool_calls": json.dumps(
+                    [{"name": "get_weather", "args": {"location": "Paris"}}]
+                ),
+                # Expected outcome - phrased to match what LLM extracts as end_state
+                "reference": "The AI provided the current weather conditions for Paris.",
+            },
+            {
+                "user_input": [
+                    HumanMessage(content="Is it raining in London right now?")
+                ],
+                "reference_tool_calls": json.dumps(
+                    [{"name": "get_weather", "args": {"location": "London"}}]
+                ),
+                "reference": "The AI provided the current weather conditions for London.",
+            },
+        ]
+    ),
     name="weather_queries",
     backend="inmemory",
 )
@@ -180,11 +186,10 @@ if RUN_FACTUAL_EXPERIMENT:
         evaluator_llm=evaluator_llm,
         metadata=True,
     )
-    
+
     # Run the experiment against the dataset
     factual_result = await factual_experiment.arun(
-        scientist_questions,
-        name="scientist_qa_experiment"
+        scientist_questions, name="scientist_qa_experiment"
     )
     display(factual_result.to_pandas())
 ```
@@ -198,11 +203,10 @@ if RUN_TOOL_EXPERIMENT:
         metrics=tool_metrics,
         evaluator_llm=evaluator_llm,
     )
-    
+
     # Run the experiment against the dataset
     tool_result = await tool_experiment.arun(
-        weather_queries,
-        name="weather_tool_experiment"
+        weather_queries, name="weather_tool_experiment"
     )
     display(tool_result.to_pandas())
 ```

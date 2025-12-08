@@ -293,8 +293,8 @@ async def main():
     parser.add_argument(
         "--endpoint-url",
         type=str,
-        default="http://localhost:8000/agentic_chat",
-        help="AG-UI endpoint URL (default: http://localhost:8000/agentic_chat)",
+        default="http://localhost:8000",
+        help="AG-UI endpoint URL (default: http://localhost:8000)",
     )
     parser.add_argument(
         "--evaluator-model",
