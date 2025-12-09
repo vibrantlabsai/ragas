@@ -125,20 +125,23 @@ nav:
             - Evaluate and Improve a RAG App: howtos/applications/evaluate-and-improve-rag.md
       - Integrations:
           - howtos/integrations/index.md
-          - Arize: howtos/integrations/_arize.md
-          - Amazon Bedrock: howtos/integrations/amazon_bedrock.md
-          - Google Gemini: howtos/integrations/gemini.md
-          - Haystack: howtos/integrations/haystack.md
-          - Griptape: howtos/integrations/griptape.md
-          - LangChain: howtos/integrations/langchain.md
-          - OCI Gen AI: howtos/integrations/oci_genai.md
-          - LangGraph: howtos/integrations/_langgraph_agent_evaluation.md
-          - LangSmith: howtos/integrations/langsmith.md
-          - LlamaIndex RAG: howtos/integrations/_llamaindex.md
-          - LlamaIndex Agents: howtos/integrations/llamaindex_agents.md
-          - LlamaStack: howtos/integrations/llama_stack.md
-          - R2R: howtos/integrations/r2r.md
-          - Swarm: howtos/integrations/swarm_agent_evaluation.md
+          - Observability:
+              - Arize: howtos/integrations/_arize.md
+              - LangSmith: howtos/integrations/langsmith.md
+          - LLM Providers:
+              - Amazon Bedrock: howtos/integrations/amazon_bedrock.md
+              - Google Gemini: howtos/integrations/gemini.md
+              - OCI Gen AI: howtos/integrations/oci_genai.md
+          - Frameworks:
+              - Griptape: howtos/integrations/griptape.md
+              - Haystack: howtos/integrations/haystack.md
+              - LangChain: howtos/integrations/langchain.md
+              - LangGraph: howtos/integrations/_langgraph_agent_evaluation.md
+              - LlamaIndex: howtos/integrations/_llamaindex.md
+              - LlamaIndex Agents: howtos/integrations/llamaindex_agents.md
+              - LlamaStack: howtos/integrations/llama_stack.md
+              - R2R: howtos/integrations/r2r.md
+              - Swarm: howtos/integrations/swarm_agent_evaluation.md
       - Migrations:
           - From v0.1 to v0.2: howtos/migrations/migrate_from_v01_to_v02.md
           - From v0.3 to v0.4: howtos/migrations/migrate_from_v03_to_v04.md
