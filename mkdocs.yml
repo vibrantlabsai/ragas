@@ -254,7 +254,7 @@ extra:
 plugins:
   - social:
       enabled: !ENV [MKDOCS_CI, true]
-  - with-pdf:
+  - to-pdf:
       author: RAGAS Team
       copyright: RAGAS Contributors
       cover_title: RAGAS Documentation
