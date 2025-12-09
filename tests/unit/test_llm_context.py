@@ -2,8 +2,7 @@
 """Test llm_context feature with calculation-based Pell Grant questions"""
 import os
 from dotenv import load_dotenv
-from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
-#from langchain_community.document_loaders import PyMuPDFLoader
+from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from ragas.testset import TestsetGenerator
@@ -15,25 +14,77 @@ from ragas.run_config import RunConfig
 load_dotenv()
 
 def main():
-    # Load PDFs
-    path = "TESTS/UNIT/TEST_SDG_LLM_CONTEXT/"
-    loader = DirectoryLoader(path, glob="*.pdf", loader_cls=PyPDFLoader ) # PyMuPDFLoader
-    docs = loader.load()
-    print(f"Loaded {len(docs)} pages from Pell Grant PDF")
+    # Create documents from hardcoded text (no PDF needed!)
+    pell_grant_text = """
+    Federal Pell Grant Program Overview
+    
+    The Federal Pell Grant is a need-based grant for undergraduate students. The maximum Pell Grant for the 2023-2024 award year is $7,395. The minimum Pell Grant is $750.
+    
+    Scheduled Award Calculation:
+    The Scheduled Award is calculated using the Student Aid Index (SAI) and Cost of Attendance (COA). 
+    Formula: Scheduled Award = min(max_pell, Pell_COA - SAI)
+    Where Pell_COA is the institution's cost of attendance for Pell purposes.
+    
+    Example 1: If a student's SAI is $1,004 and the Pell COA is $6,493, and the maximum Pell is $7,500:
+    Scheduled Award = min($7,500, $6,493 - $1,004) = min($7,500, $5,489) = $5,489
+    
+    Enrollment Intensity:
+    Full-time enrollment is typically 12 credit hours or more per semester. Part-time enrollment affects the actual disbursement amount.
+    Formula: Actual Disbursement = Scheduled Award × Enrollment Intensity Percentage
+    
+    Example 2: If a student has a Scheduled Award of $6,200 and is enrolled at 75% intensity (9 credit hours):
+    Actual Disbursement = $6,200 × 0.75 = $4,650
+    
+    Lifetime Eligibility Used (LEU):
+    Students can receive Pell Grants for up to 600% of their Scheduled Award across their lifetime (equivalent to 6 years of full-time enrollment).
+    Each semester's usage is calculated as: (Actual Disbursement / Scheduled Award) × 100%
+    
+    Example 3: If a student receives $3,000 from a Scheduled Award of $6,000:
+    LEU used = ($3,000 / $6,000) × 100% = 50%
+    If their previous LEU was 450%, remaining LEU = 600% - 450% - 50% = 100%
+    
+    Consortium Agreements:
+    When students take courses at multiple institutions, credit hours are combined to determine enrollment intensity.
+    Semester hours are the standard. Quarter hours are converted: Quarter Hours × 0.667 = Semester Hours
+    
+    Example 4: A student takes 6 semester hours at home school and 4 quarter hours at another school:
+    Converted quarter hours = 4 × 0.667 = 2.67 semester hours
+    Total = 6 + 2.67 = 8.67 semester hours
+    
+    Recalculation Upon Withdrawal:
+    If a student withdraws, the Pell Grant may need to be recalculated based on the percentage of the payment period completed.
+    Formula: Earned Amount = Scheduled Award × Percentage Completed
+    Amount to Return = Disbursed Amount - Earned Amount
+    
+    Example 5: Student withdraws after completing 40% of term with $4,800 Scheduled Award:
+    Earned = $4,800 × 0.40 = $1,920
+    If $4,800 was disbursed: Return = $4,800 - $1,920 = $2,880
+    
+    Minimum Award Rule:
+    The minimum Pell Grant award is $750. If calculations result in less than $750, the student receives $0.
+    
+    Rounding Rules:
+    All Pell Grant disbursements must be rounded down to whole dollars. No cents are allowed in Pell payments.
+    
+    Example 6: If calculation results in $3,456.78, the disbursement is $3,456.
+    """
+    
+    # Use single document to minimize async complexity
+    docs = [
+        Document(page_content=pell_grant_text, metadata={"source": "pell_grant_doc", "page": 1})
+    ]
+    
+    print(f"Created {len(docs)} document from Pell Grant text")
 
     # Setup models
     generator_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o", temperature=0.1))
     generator_embeddings = LangchainEmbeddingsWrapper(OpenAIEmbeddings())
 
-    # Create personas for financial aid context
+    # Create minimal personas (only 1 to reduce concurrent API calls)
     personas = [
         Persona(
             name="Financial Aid Officer",
             role_description="A financial aid officer who needs to calculate Pell Grant awards accurately using specific formulas and numerical examples"
-        ),
-        Persona(
-            name="Student Aid Counselor",
-            role_description="A counselor helping students understand their Pell Grant eligibility with real numerical scenarios"
         )
     ]
 
@@ -87,40 +138,42 @@ Answers should show the calculation steps and final numerical result.
         OverlapScoreBuilder(),
     ]
 
-    # Use up to 10 docs for better coverage
-    num_docs = min(10, len(docs))
+    # Use all docs
+    num_docs = len(docs)
 
-    # Set run_config to limit concurrency
-    run_config = RunConfig(max_workers=3, max_wait=60)
+    # IMPORTANT: Using minimal settings to avoid Python 3.11 async event loop bug
+    # - 1 persona (not 2)
+    # - 1 document (not 3)
+    # - testset_size=1 (not 2)
+    # - max_workers=1 (not 3)
+    run_config = RunConfig(max_workers=1, max_wait=120)
 
     dataset_with_context = generator_with_context.generate_with_langchain_docs(
         docs[:num_docs],
-        testset_size=4,  # Generate 4 calculation-based questions
+        testset_size=1,  # Generate 1 calculation-based question (minimal to avoid async issues)
         transforms=minimal_transforms,
         run_config=run_config
     )
 
     print(f"\n✅ Generated {len(dataset_with_context)} queries WITH llm_context!")
 
+    # Convert to dataframe
+    df_with_context = dataset_with_context.to_pandas()
+    
     # Display samples
     print("\n" + "=" * 80)
-    print("📊 SAMPLE QUESTIONS (WITH LLM CONTEXT):")
+    print("📊 QUESTIONS WITH LLM CONTEXT (calculation-based):")
     print("=" * 80)
 
-    for i, sample in enumerate(dataset_with_context.samples[:4], 1):
+    for i, sample in enumerate(dataset_with_context.samples, 1):
         eval_sample = sample.eval_sample
         print(f"\n[{i}] Synthesizer: {sample.synthesizer_name}")
         print(f"Question: {eval_sample.user_input}")
-        print(f"Answer: {eval_sample.reference[:300]}...")
+        print(f"Answer: {eval_sample.reference}")
         print("-" * 80)
-
-    # Save to CSV
-    df = dataset_with_context.to_pandas()
-    output_file = "SDG_with_LLM_CONTEXT.csv"
-    df.to_csv(output_file, index=False)
-
-    print(f"\n💾 Saved to: {output_file}")
-    print(f"\n✨ Notice: Questions include specific numbers and require calculations!")
+    
+    print("\n📊 DataFrame Columns:", df_with_context.columns.tolist())
+    print(f"📊 DataFrame Shape: {df_with_context.shape}")
 
     # Compare: Generate WITHOUT llm_context for comparison
     print("\n" + "=" * 80)
@@ -136,40 +189,41 @@ Answers should show the calculation steps and final numerical result.
 
     dataset_no_context = generator_no_context.generate_with_langchain_docs(
         docs[:num_docs],
-        testset_size=4,
+        testset_size=1,  # Generate 1 generic question (minimal to avoid async issues)
         transforms=minimal_transforms,
         run_config=run_config
     )
 
     print(f"\n✅ Generated {len(dataset_no_context)} queries WITHOUT llm_context!")
 
+    # Convert to dataframe
+    df_no_context = dataset_no_context.to_pandas()
+    
     # Display samples
     print("\n" + "=" * 80)
-    print("📊 SAMPLE QUESTIONS (WITHOUT LLM CONTEXT):")
+    print("📊 QUESTIONS WITHOUT LLM CONTEXT (generic):")
     print("=" * 80)
 
-    for i, sample in enumerate(dataset_no_context.samples[:4], 1):
+    for i, sample in enumerate(dataset_no_context.samples, 1):
         eval_sample = sample.eval_sample
         print(f"\n[{i}] Synthesizer: {sample.synthesizer_name}")
         print(f"Question: {eval_sample.user_input}")
-        print(f"Answer: {eval_sample.reference[:300]}...")
+        print(f"Answer: {eval_sample.reference}")
         print("-" * 80)
+    
+    print("\n📊 DataFrame Columns:", df_no_context.columns.tolist())
+    print(f"📊 DataFrame Shape: {df_no_context.shape}")
 
-    # Save to CSV
-    df_no_context = dataset_no_context.to_pandas()
-    output_file_no_context = "SDG_without_LLM_CONTEXT.csv"
-    df_no_context.to_csv(output_file_no_context, index=False)
-
-    print(f"\n💾 Saved to: {output_file_no_context}")
-
-    # Summary
+    # Summary Comparison
     print("\n" + "=" * 80)
     print("✅ COMPARISON COMPLETE!")
     print("=" * 80)
-    print(f"\n📁 Output Files:")
-    print(f"   WITH llm_context:    {output_file}")
-    print(f"   WITHOUT llm_context: {output_file_no_context}")
-    print(f"\n💡 Compare the two files to see how llm_context guides question generation!")
+    print(f"\n📊 Summary:")
+    print(f"   WITH llm_context:    {len(df_with_context)} questions (calculation-based)")
+    print(f"   WITHOUT llm_context: {len(df_no_context)} questions (generic)")
+    print(f"\n💡 Notice how llm_context guides the LLM to generate calculation-based questions!")
+    print(f"   Questions WITH context include specific numbers and require calculations.")
+    print(f"   Questions WITHOUT context are more generic and factual.")
 
 if __name__ == "__main__":
     main()
