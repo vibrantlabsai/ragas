@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """Test llm_context feature with calculation-based Pell Grant questions"""
-import os
+
 from dotenv import load_dotenv
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
+from ragas.embeddings import LangchainEmbeddingsWrapper
+from ragas.llms import LangchainLLMWrapper
+from ragas.run_config import RunConfig
 from ragas.testset import TestsetGenerator
 from ragas.testset.persona import Persona
-from ragas.llms import LangchainLLMWrapper
-from ragas.embeddings import LangchainEmbeddingsWrapper
-from ragas.run_config import RunConfig
 
 load_dotenv()
+
 
 def main():
     # Create documents from hardcoded text (no PDF needed!)
@@ -68,12 +69,15 @@ def main():
     
     Example 6: If calculation results in $3,456.78, the disbursement is $3,456.
     """
-    
+
     # Use single document to minimize async complexity
     docs = [
-        Document(page_content=pell_grant_text, metadata={"source": "pell_grant_doc", "page": 1})
+        Document(
+            page_content=pell_grant_text,
+            metadata={"source": "pell_grant_doc", "page": 1},
+        )
     ]
-    
+
     print(f"Created {len(docs)} document from Pell Grant text")
 
     # Setup models
@@ -84,7 +88,7 @@ def main():
     personas = [
         Persona(
             name="Financial Aid Officer",
-            role_description="A financial aid officer who needs to calculate Pell Grant awards accurately using specific formulas and numerical examples"
+            role_description="A financial aid officer who needs to calculate Pell Grant awards accurately using specific formulas and numerical examples",
         )
     ]
 
@@ -124,11 +128,15 @@ Answers should show the calculation steps and final numerical result.
         llm=generator_llm,
         embedding_model=generator_embeddings,
         persona_list=personas,
-        llm_context=llm_context  # 🆕 WITH CONTEXT for calculation questions!
+        llm_context=llm_context,  # 🆕 WITH CONTEXT for calculation questions!
     )
 
     # Minimal transforms (workaround for ragas headline bug)
-    from ragas.testset.transforms import EmbeddingExtractor, CosineSimilarityBuilder, OverlapScoreBuilder
+    from ragas.testset.transforms import (
+        CosineSimilarityBuilder,
+        EmbeddingExtractor,
+        OverlapScoreBuilder,
+    )
     from ragas.testset.transforms.extractors.llm_based import NERExtractor
 
     minimal_transforms = [
@@ -152,14 +160,14 @@ Answers should show the calculation steps and final numerical result.
         docs[:num_docs],
         testset_size=1,  # Generate 1 calculation-based question (minimal to avoid async issues)
         transforms=minimal_transforms,
-        run_config=run_config
+        run_config=run_config,
     )
 
     print(f"\n✅ Generated {len(dataset_with_context)} queries WITH llm_context!")
 
     # Convert to dataframe
     df_with_context = dataset_with_context.to_pandas()
-    
+
     # Display samples
     print("\n" + "=" * 80)
     print("📊 QUESTIONS WITH LLM CONTEXT (calculation-based):")
@@ -171,7 +179,7 @@ Answers should show the calculation steps and final numerical result.
         print(f"Question: {eval_sample.user_input}")
         print(f"Answer: {eval_sample.reference}")
         print("-" * 80)
-    
+
     print("\n📊 DataFrame Columns:", df_with_context.columns.tolist())
     print(f"📊 DataFrame Shape: {df_with_context.shape}")
 
@@ -183,7 +191,7 @@ Answers should show the calculation steps and final numerical result.
     generator_no_context = TestsetGenerator(
         llm=generator_llm,
         embedding_model=generator_embeddings,
-        persona_list=personas
+        persona_list=personas,
         # NO llm_context!
     )
 
@@ -191,14 +199,14 @@ Answers should show the calculation steps and final numerical result.
         docs[:num_docs],
         testset_size=1,  # Generate 1 generic question (minimal to avoid async issues)
         transforms=minimal_transforms,
-        run_config=run_config
+        run_config=run_config,
     )
 
     print(f"\n✅ Generated {len(dataset_no_context)} queries WITHOUT llm_context!")
 
     # Convert to dataframe
     df_no_context = dataset_no_context.to_pandas()
-    
+
     # Display samples
     print("\n" + "=" * 80)
     print("📊 QUESTIONS WITHOUT LLM CONTEXT (generic):")
@@ -210,7 +218,7 @@ Answers should show the calculation steps and final numerical result.
         print(f"Question: {eval_sample.user_input}")
         print(f"Answer: {eval_sample.reference}")
         print("-" * 80)
-    
+
     print("\n📊 DataFrame Columns:", df_no_context.columns.tolist())
     print(f"📊 DataFrame Shape: {df_no_context.shape}")
 
@@ -218,12 +226,19 @@ Answers should show the calculation steps and final numerical result.
     print("\n" + "=" * 80)
     print("✅ COMPARISON COMPLETE!")
     print("=" * 80)
-    print(f"\n📊 Summary:")
-    print(f"   WITH llm_context:    {len(df_with_context)} questions (calculation-based)")
+    print("\n📊 Summary:")
+    print(
+        f"   WITH llm_context:    {len(df_with_context)} questions (calculation-based)"
+    )
     print(f"   WITHOUT llm_context: {len(df_no_context)} questions (generic)")
-    print(f"\n💡 Notice how llm_context guides the LLM to generate calculation-based questions!")
-    print(f"   Questions WITH context include specific numbers and require calculations.")
-    print(f"   Questions WITHOUT context are more generic and factual.")
+    print(
+        "\n💡 Notice how llm_context guides the LLM to generate calculation-based questions!"
+    )
+    print(
+        "   Questions WITH context include specific numbers and require calculations."
+    )
+    print("   Questions WITHOUT context are more generic and factual.")
+
 
 if __name__ == "__main__":
     main()
