@@ -9,6 +9,11 @@ from ragas.metrics.collections._string import (
     NonLLMStringSimilarity,
     StringPresence,
 )
+from ragas.metrics.collections.agent_goal_accuracy import (
+    AgentGoalAccuracy,
+    AgentGoalAccuracyWithoutReference,
+    AgentGoalAccuracyWithReference,
+)
 from ragas.metrics.collections.answer_accuracy import AnswerAccuracy
 from ragas.metrics.collections.answer_correctness import AnswerCorrectness
 from ragas.metrics.collections.answer_relevancy import AnswerRelevancy
@@ -29,9 +34,11 @@ from ragas.metrics.collections.response_groundedness import ResponseGroundedness
 from ragas.metrics.collections.summary_score import SummaryScore
 from ragas.metrics.collections.tool_call_accuracy import ToolCallAccuracy
 from ragas.metrics.collections.tool_call_f1 import ToolCallF1
+from ragas.metrics.collections.topic_adherence import TopicAdherence
 
 __all__ = [
     "BaseMetric",  # Base class
+    # RAG metrics
     "AnswerAccuracy",
     "AnswerCorrectness",
     "AnswerRelevancy",
@@ -54,6 +61,11 @@ __all__ = [
     "SemanticSimilarity",
     "StringPresence",
     "SummaryScore",
+    # Agent & Tool metrics
+    "AgentGoalAccuracy",
+    "AgentGoalAccuracyWithReference",
+    "AgentGoalAccuracyWithoutReference",
     "ToolCallAccuracy",
     "ToolCallF1",
+    "TopicAdherence",
 ]

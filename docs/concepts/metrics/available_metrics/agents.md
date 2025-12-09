@@ -7,7 +7,7 @@ Agentic or tool use workflows can be evaluated in multiple dimensions. Here are 
 
 AI systems deployed in real-world applications are expected to adhere to domains of interest while interacting with users but LLMs sometimes may answer general queries by ignoring this limitation. The topic adherence metric evaluates the ability of the AI to stay on predefined domains during the interactions. This metric is particularly important in conversational AI systems, where the AI is expected to only provide assistance to queries related to predefined domains.
 
-`TopicAdherenceScore` requires a predefined set of topics that the AI system is expected to adhere to which is provided using `reference_topics` along with `user_input`. The metric can compute precision, recall, and F1 score for topic adherence, defined as
+`TopicAdherence` requires a predefined set of topics that the AI system is expected to adhere to which is provided using `reference_topics` along with `user_input`. The metric can compute precision, recall, and F1 score for topic adherence, defined as
 
 $$
 \text{Precision } = {|\text{Queries that are answered and are adheres to any present reference topics}| \over |\text{Queries that are answered and are adheres to any present reference topics}| + |\text{Queries that are answered and do not adheres to any present reference topics}|}
@@ -25,20 +25,18 @@ $$
 
 ```python
 import asyncio
-
-from ragas.dataset_schema import  SingleTurnSample, MultiTurnSample, EvaluationDataset
-from ragas.messages import HumanMessage,AIMessage,ToolMessage,ToolCall
-from ragas.metrics import TopicAdherenceScore
-from ragas.llms import LangchainLLMWrapper
-from langchain_openai import ChatOpenAI
-
-
-evaluator_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o"))
+from openai import AsyncOpenAI
+from ragas.llms.base import llm_factory
+from ragas.metrics.collections import TopicAdherence
+from ragas.messages import HumanMessage, AIMessage, ToolMessage, ToolCall
 
 
 async def evaluate_topic_adherence():
+    # Setup LLM
+    client = AsyncOpenAI()
+    llm = llm_factory("gpt-4o-mini", client=client)
 
-    sample_input_4 = [
+    user_input = [
         HumanMessage(
             content="Can you provide me with details about Einstein's theory of relativity?"
         ),
@@ -83,40 +81,63 @@ async def evaluate_topic_adherence():
             ],
         ),
         ToolMessage(
-            content="Here’s a popular recipe for a chocolate cake: Ingredients include flour, sugar, cocoa powder, eggs, milk, and butter. Instructions: Mix dry ingredients, add wet ingredients, and bake at 350°F for 30-35 minutes."
+            content="Here's a popular recipe for a chocolate cake: Ingredients include flour, sugar, cocoa powder, eggs, milk, and butter. Instructions: Mix dry ingredients, add wet ingredients, and bake at 350°F for 30-35 minutes."
         ),
         AIMessage(
             content="I found a great recipe for chocolate cake! Would you like the full details, or is that summary enough?"
         ),
     ]
 
-    sample = MultiTurnSample(user_input=sample_input_4, reference_topics=["science"])
-    scorer = TopicAdherenceScore(llm=evaluator_llm, mode="precision")
-    score = await scorer.multi_turn_ascore(sample)
-    print(score)
+    # Evaluate with precision mode
+    metric = TopicAdherence(llm=llm, mode="precision")
+    result = await metric.ascore(
+        user_input=user_input,
+        reference_topics=["science"],
+    )
+    print(f"Topic Adherence (precision): {result.value}")
 
 
 if __name__ == "__main__":
-
     asyncio.run(evaluate_topic_adherence())
-
-
-
 ```
 Output
 ```
-0.6666666666444444
+Topic Adherence (precision): 0.6666666666444444
 ```
 
 
 To change the mode to recall, set the `mode` parameter to `recall`.
 
 ```python
-scorer = TopicAdherenceScore(llm = evaluator_llm, mode="recall")
+metric = TopicAdherence(llm=llm, mode="recall")
 ```
 Output
 ```
 0.99999999995
+```
+
+### Legacy API (Deprecated)
+
+!!! warning "Deprecation Notice"
+    The legacy `TopicAdherenceScore` from `ragas.metrics` is deprecated and will be removed in v1.0. Please migrate to `ragas.metrics.collections.TopicAdherence` which provides the same functionality with a modern API.
+
+The legacy API can still be used but requires `MultiTurnSample`:
+
+```python
+from ragas.dataset_schema import MultiTurnSample
+from ragas.messages import HumanMessage, AIMessage, ToolMessage, ToolCall
+from ragas.metrics import TopicAdherenceScore  # Legacy import
+from ragas.llms import LangchainLLMWrapper
+from langchain_openai import ChatOpenAI
+
+evaluator_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o"))
+
+sample = MultiTurnSample(
+    user_input=[...],  # conversation messages
+    reference_topics=["science"],
+)
+scorer = TopicAdherenceScore(llm=evaluator_llm, mode="precision")
+score = await scorer.multi_turn_ascore(sample)
 ```
 
 
@@ -482,71 +503,70 @@ score = await scorer.multi_turn_ascore(sample)
 ```
 
 
-## Agent Goal accuracy
+## Agent Goal Accuracy
 
 
 Agent goal accuracy is a metric that can be used to evaluate the performance of the LLM in identifying and achieving the goals of the user. This is a binary metric, with 1 indicating that the AI has achieved the goal and 0 indicating that the AI has not achieved the goal.
 
-### With reference
+### With Reference
 
-Calculating `AgentGoalAccuracyWithReference` with reference needs `user_input` and `reference` to evaluate the performance of the LLM in identifying and achieving the goals of the user. The annotated `reference` will be used as ideal outcome. The metric is computed by comparing the `reference` with the goal achieved by the end of workflow.
-
+`AgentGoalAccuracyWithReference` evaluates whether the agent achieved the user's goal by comparing the workflow's end state against a provided reference outcome. The reference represents the expected/ideal outcome.
 
 ```python
 import asyncio
-
-from langchain_openai import ChatOpenAI
-from ragas.dataset_schema import MultiTurnSample
-from ragas.llms import LangchainLLMWrapper
+from openai import AsyncOpenAI
+from ragas.llms.base import llm_factory
+from ragas.metrics.collections import AgentGoalAccuracyWithReference
 from ragas.messages import AIMessage, HumanMessage, ToolCall, ToolMessage
-from ragas.metrics import AgentGoalAccuracyWithReference
-
-evaluator_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o"))
 
 
 async def evaluate_agent_goal_accuracy_with_reference():
-    sample = MultiTurnSample(
-        user_input=[
-            HumanMessage(
-                content="Hey, book a table at the nearest best Chinese restaurant for 8:00pm"
-            ),
-            AIMessage(
-                content="Sure, let me find the best options for you.",
-                tool_calls=[
-                    ToolCall(
-                        name="restaurant_search",
-                        args={"cuisine": "Chinese", "time": "8:00pm"},
-                    )
-                ],
-            ),
-            ToolMessage(
-                content="Found a few options: 1. Golden Dragon, 2. Jade Palace"
-            ),
-            AIMessage(
-                content="I found some great options: Golden Dragon and Jade Palace. Which one would you prefer?"
-            ),
-            HumanMessage(content="Let's go with Golden Dragon."),
-            AIMessage(
-                content="Great choice! I'll book a table for 8:00pm at Golden Dragon.",
-                tool_calls=[
-                    ToolCall(
-                        name="restaurant_book",
-                        args={"name": "Golden Dragon", "time": "8:00pm"},
-                    )
-                ],
-            ),
-            ToolMessage(content="Table booked at Golden Dragon for 8:00pm."),
-            AIMessage(
-                content="Your table at Golden Dragon is booked for 8:00pm. Enjoy your meal!"
-            ),
-            HumanMessage(content="thanks"),
-        ],
+    # Setup LLM
+    client = AsyncOpenAI()
+    llm = llm_factory("gpt-4o-mini", client=client)
+
+    user_input = [
+        HumanMessage(
+            content="Hey, book a table at the nearest best Chinese restaurant for 8:00pm"
+        ),
+        AIMessage(
+            content="Sure, let me find the best options for you.",
+            tool_calls=[
+                ToolCall(
+                    name="restaurant_search",
+                    args={"cuisine": "Chinese", "time": "8:00pm"},
+                )
+            ],
+        ),
+        ToolMessage(
+            content="Found a few options: 1. Golden Dragon, 2. Jade Palace"
+        ),
+        AIMessage(
+            content="I found some great options: Golden Dragon and Jade Palace. Which one would you prefer?"
+        ),
+        HumanMessage(content="Let's go with Golden Dragon."),
+        AIMessage(
+            content="Great choice! I'll book a table for 8:00pm at Golden Dragon.",
+            tool_calls=[
+                ToolCall(
+                    name="restaurant_book",
+                    args={"name": "Golden Dragon", "time": "8:00pm"},
+                )
+            ],
+        ),
+        ToolMessage(content="Table booked at Golden Dragon for 8:00pm."),
+        AIMessage(
+            content="Your table at Golden Dragon is booked for 8:00pm. Enjoy your meal!"
+        ),
+        HumanMessage(content="thanks"),
+    ]
+
+    metric = AgentGoalAccuracyWithReference(llm=llm)
+    result = await metric.ascore(
+        user_input=user_input,
         reference="Table booked at one of the chinese restaurants at 8 pm",
     )
-
-    scorer = AgentGoalAccuracyWithReference(llm=evaluator_llm)
-    score = await scorer.multi_turn_ascore(sample)
-    print(score)
+    print(f"Agent Goal Accuracy: {result.value}")
 
 
 if __name__ == "__main__":
@@ -554,78 +574,95 @@ if __name__ == "__main__":
 ```
 Output
 ```
-1.0
+Agent Goal Accuracy: 1.0
 ```
 
-### Without reference
+### Without Reference
 
-`AgentGoalAccuracyWithoutReference` works in without reference mode, the metric will evaluate the performance of the LLM in identifying and achieving the goals of the user without any reference. Here the desired outcome is inferred from the human interactions in the workflow.
-
-
-### Example
+`AgentGoalAccuracyWithoutReference` evaluates whether the agent achieved the user's goal without requiring a reference. The metric infers both the user's intended goal and the achieved outcome from the conversation, then compares them.
 
 ```python
-
 import asyncio
-
-from langchain_openai import ChatOpenAI
-from ragas.dataset_schema import MultiTurnSample
-from ragas.llms import LangchainLLMWrapper
+from openai import AsyncOpenAI
+from ragas.llms.base import llm_factory
+from ragas.metrics.collections import AgentGoalAccuracyWithoutReference
 from ragas.messages import AIMessage, HumanMessage, ToolCall, ToolMessage
-from ragas.metrics import AgentGoalAccuracyWithoutReference
-
-evaluator_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o"))
 
 
 async def evaluate_agent_goal_accuracy_without_reference():
+    # Setup LLM
+    client = AsyncOpenAI()
+    llm = llm_factory("gpt-4o-mini", client=client)
 
-    sample = MultiTurnSample(
-        user_input=[
-            HumanMessage(
-                content="Hey, book a table at the nearest best Chinese restaurant for 8:00pm"
-            ),
-            AIMessage(
-                content="Sure, let me find the best options for you.",
-                tool_calls=[
-                    ToolCall(
-                        name="restaurant_search",
-                        args={"cuisine": "Chinese", "time": "8:00pm"},
-                    )
-                ],
-            ),
-            ToolMessage(
-                content="Found a few options: 1. Golden Dragon, 2. Jade Palace"
-            ),
-            AIMessage(
-                content="I found some great options: Golden Dragon and Jade Palace. Which one would you prefer?"
-            ),
-            HumanMessage(content="Let's go with Golden Dragon."),
-            AIMessage(
-                content="Great choice! I'll book a table for 8:00pm at Golden Dragon.",
-                tool_calls=[
-                    ToolCall(
-                        name="restaurant_book",
-                        args={"name": "Golden Dragon", "time": "8:00pm"},
-                    )
-                ],
-            ),
-            ToolMessage(content="Table booked at Golden Dragon for 8:00pm."),
-            AIMessage(
-                content="Your table at Golden Dragon is booked for 8:00pm. Enjoy your meal!"
-            ),
-            HumanMessage(content="thanks"),
-        ]
-    )
+    user_input = [
+        HumanMessage(
+            content="Hey, book a table at the nearest best Chinese restaurant for 8:00pm"
+        ),
+        AIMessage(
+            content="Sure, let me find the best options for you.",
+            tool_calls=[
+                ToolCall(
+                    name="restaurant_search",
+                    args={"cuisine": "Chinese", "time": "8:00pm"},
+                )
+            ],
+        ),
+        ToolMessage(
+            content="Found a few options: 1. Golden Dragon, 2. Jade Palace"
+        ),
+        AIMessage(
+            content="I found some great options: Golden Dragon and Jade Palace. Which one would you prefer?"
+        ),
+        HumanMessage(content="Let's go with Golden Dragon."),
+        AIMessage(
+            content="Great choice! I'll book a table for 8:00pm at Golden Dragon.",
+            tool_calls=[
+                ToolCall(
+                    name="restaurant_book",
+                    args={"name": "Golden Dragon", "time": "8:00pm"},
+                )
+            ],
+        ),
+        ToolMessage(content="Table booked at Golden Dragon for 8:00pm."),
+        AIMessage(
+            content="Your table at Golden Dragon is booked for 8:00pm. Enjoy your meal!"
+        ),
+        HumanMessage(content="thanks"),
+    ]
 
-    scorer = AgentGoalAccuracyWithoutReference(llm=evaluator_llm)
-    score = await scorer.multi_turn_ascore(sample)
-    print(score)
+    metric = AgentGoalAccuracyWithoutReference(llm=llm)
+    result = await metric.ascore(user_input=user_input)
+    print(f"Agent Goal Accuracy: {result.value}")
+
 
 if __name__ == "__main__":
     asyncio.run(evaluate_agent_goal_accuracy_without_reference())
-
 ```
 Output
 ```
-1.0
+Agent Goal Accuracy: 1.0
+```
+
+### Legacy API (Deprecated)
+
+!!! warning "Deprecation Notice"
+    The legacy `AgentGoalAccuracyWithReference` and `AgentGoalAccuracyWithoutReference` from `ragas.metrics` are deprecated and will be removed in v1.0. Please migrate to `ragas.metrics.collections` which provides the same functionality with a modern API.
+
+The legacy API can still be used but requires `MultiTurnSample`:
+
+```python
+from ragas.dataset_schema import MultiTurnSample
+from ragas.messages import AIMessage, HumanMessage, ToolCall, ToolMessage
+from ragas.metrics import AgentGoalAccuracyWithReference  # Legacy import
+from ragas.llms import LangchainLLMWrapper
+from langchain_openai import ChatOpenAI
+
+evaluator_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o"))
+
+sample = MultiTurnSample(
+    user_input=[...],  # conversation messages
+    reference="Table booked at one of the chinese restaurants at 8 pm",
+)
+scorer = AgentGoalAccuracyWithReference(llm=evaluator_llm)
+score = await scorer.multi_turn_ascore(sample)
 ```
