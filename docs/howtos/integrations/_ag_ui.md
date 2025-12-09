@@ -25,7 +25,6 @@ from dotenv import load_dotenv
 from IPython.display import display
 
 from ragas.dataset import Dataset
-from ragas.integrations.ag_ui import create_ag_ui_experiment
 from ragas.messages import HumanMessage
 
 load_dotenv()
@@ -164,7 +163,7 @@ tool_metrics = [
 ```
 
 ## Run experiments against a live AG-UI endpoint
-Set the endpoint URL exposed by your agent. The `create_ag_ui_experiment` factory returns an experiment function that can be run against datasets using `.arun()`.
+Set the endpoint URL exposed by your agent. The `run_ag_ui_row()` function calls your endpoint and returns enriched row data. Combine this with the `@experiment` decorator for evaluation pipelines.
 
 Toggle the flags when you are ready to run the experiments. In Jupyter/IPython you can `await` the experiment directly once `nest_asyncio.apply()` has been called.
 
@@ -178,15 +177,43 @@ RUN_TOOL_EXPERIMENT = True
 
 
 ```python
-if RUN_FACTUAL_EXPERIMENT:
-    # Create experiment function configured for Q&A testing
-    factual_experiment = create_ag_ui_experiment(
-        endpoint_url=AG_UI_ENDPOINT,
-        metrics=qa_metrics,
-        evaluator_llm=evaluator_llm,
-        metadata=True,
+from ragas import experiment
+from ragas.integrations.ag_ui import run_ag_ui_row
+
+
+@experiment()
+async def factual_experiment(row):
+    """Single-turn Q&A experiment with factual correctness scoring."""
+    # Call AG-UI endpoint and get enriched row
+    enriched = await run_ag_ui_row(row, AG_UI_ENDPOINT, metadata=True)
+
+    # Score with factual correctness metric
+    fc_result = await qa_metrics[0].ascore(
+        response=enriched["response"],
+        reference=row["reference"],
     )
 
+    # Score with answer relevancy metric
+    ar_result = await qa_metrics[1].ascore(
+        user_input=row["user_input"],
+        response=enriched["response"],
+    )
+
+    # Score with conciseness metric
+    concise_result = await conciseness_metric.ascore(
+        response=enriched["response"],
+        llm=evaluator_llm,
+    )
+
+    return {
+        **enriched,
+        "factual_correctness": fc_result.value,
+        "answer_relevancy": ar_result.value,
+        "conciseness": concise_result.value,
+    }
+
+
+if RUN_FACTUAL_EXPERIMENT:
     # Run the experiment against the dataset
     factual_result = await factual_experiment.arun(
         scientist_questions, name="scientist_qa_experiment"
@@ -196,14 +223,35 @@ if RUN_FACTUAL_EXPERIMENT:
 
 
 ```python
-if RUN_TOOL_EXPERIMENT:
-    # Create experiment function configured for tool usage testing
-    tool_experiment = create_ag_ui_experiment(
-        endpoint_url=AG_UI_ENDPOINT,
-        metrics=tool_metrics,
-        evaluator_llm=evaluator_llm,
+from ragas.integrations.ag_ui import build_sample
+
+
+@experiment()
+async def tool_experiment(row):
+    """Multi-turn experiment with tool call and goal accuracy scoring."""
+    # Call AG-UI endpoint and get enriched row
+    enriched = await run_ag_ui_row(row, AG_UI_ENDPOINT)
+
+    # Build a MultiTurnSample for tool metrics
+    sample = build_sample(
+        user_input=row["user_input"],
+        messages=enriched["messages"],
+        reference=row.get("reference"),
+        reference_tool_calls=row.get("reference_tool_calls"),
     )
 
+    # Score with tool metrics
+    tool_f1 = await tool_metrics[0].multi_turn_ascore(sample)
+    goal_accuracy = await tool_metrics[1].multi_turn_ascore(sample)
+
+    return {
+        **enriched,
+        "tool_call_f1": tool_f1,
+        "agent_goal_accuracy": goal_accuracy,
+    }
+
+
+if RUN_TOOL_EXPERIMENT:
     # Run the experiment against the dataset
     tool_result = await tool_experiment.arun(
         weather_queries, name="weather_tool_experiment"
@@ -211,7 +259,77 @@ if RUN_TOOL_EXPERIMENT:
     display(tool_result.to_pandas())
 ```
 
+## Advanced: Lower-Level Control
+
+The `run_ag_ui_row()` function is the recommended API, but sometimes you need more control. You can use the lower-level `call_ag_ui_endpoint()` function directly.
+
+This approach lets you:
+- Customize event handling
+- Add per-row endpoint configuration  
+- Implement custom message processing
+- Add additional logging or debugging
+
 
 ```python
+from ragas.integrations.ag_ui import (
+    call_ag_ui_endpoint,
+    convert_to_ragas_messages,
+    extract_response,
+)
 
+
+@experiment()
+async def custom_ag_ui_experiment(row):
+    """
+    Custom experiment function with full control over endpoint calls.
+    """
+    # Call the AG-UI endpoint directly (lower-level than run_ag_ui_row)
+    events = await call_ag_ui_endpoint(
+        endpoint_url=AG_UI_ENDPOINT,
+        user_input=row["user_input"],
+        timeout=60.0,
+    )
+
+    # Convert AG-UI events to Ragas messages
+    messages = convert_to_ragas_messages(events, metadata=True)
+
+    # Extract response using helper (or custom logic)
+    response = extract_response(messages)
+
+    # Score with a custom metric
+    score_result = await conciseness_metric.ascore(
+        response=response,
+        llm=evaluator_llm,
+    )
+
+    # Return result with custom fields
+    return {
+        **row,
+        "response": response or "[No response]",
+        "message_count": len(messages),
+        "conciseness": score_result.value,
+    }
 ```
+
+Run the custom experiment against a dataset. The `@experiment` decorator provides `.arun()` for parallel execution and automatic result collection:
+
+
+```python
+RUN_CUSTOM_EXPERIMENT = True
+
+if RUN_CUSTOM_EXPERIMENT:
+    # Run the custom experiment
+    custom_result = await custom_ag_ui_experiment.arun(
+        scientist_questions, name="custom_ag_ui_experiment"
+    )
+    display(custom_result.to_pandas())
+```
+
+### API Comparison
+
+| API Level | Function | When to Use |
+|-----------|----------|-------------|
+| High-level | `run_ag_ui_row()` | Standard experiments - handles endpoint call, conversion, and extraction |
+| Low-level | `call_ag_ui_endpoint()` + `convert_to_ragas_messages()` | Custom event handling, per-row endpoint config, advanced debugging |
+
+Both approaches work with the `@experiment` decorator - choose based on how much control you need.

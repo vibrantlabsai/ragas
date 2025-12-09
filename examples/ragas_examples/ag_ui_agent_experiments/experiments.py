@@ -20,7 +20,7 @@ Prerequisites:
 - See https://docs.ag-ui.com/quickstart/applications for agent setup
 
 Usage:
-    python experiments.py --endpoint-url http://localhost:8000/agentic_chat
+    python experiments.py --endpoint-url http://localhost:8000/chat
     python experiments.py --endpoint-url http://localhost:8000/chat --skip-tool-experiment
     python experiments.py --endpoint-url http://localhost:8000 --skip-factual
 """
@@ -35,7 +35,8 @@ from openai import AsyncOpenAI, OpenAI
 
 from ragas.dataset import Dataset
 from ragas.embeddings.base import embedding_factory
-from ragas.integrations.ag_ui import create_ag_ui_experiment
+from ragas.experiment import experiment
+from ragas.integrations.ag_ui import build_sample, run_ag_ui_row
 from ragas.llms import llm_factory
 from ragas.metrics import (
     AgentGoalAccuracyWithReference,
@@ -139,31 +140,12 @@ async def run_scientist_experiment(
     evaluator_llm, evaluator_embeddings = create_evaluator_components(evaluator_model)
 
     # Define metrics using the modern collections portfolio
-    metrics = [
-        FactualCorrectness(
-            llm=evaluator_llm, mode="f1", atomicity="high", coverage="high"
-        ),
-        AnswerRelevancy(
-            llm=evaluator_llm, embeddings=evaluator_embeddings, strictness=2
-        ),
-    ]
-
-    # Create experiment function configured for this evaluation
-    experiment_fn = create_ag_ui_experiment(
-        endpoint_url=endpoint_url,
-        metrics=metrics,
-        evaluator_llm=evaluator_llm,
-        timeout=300.0,
+    factual_correctness = FactualCorrectness(
+        llm=evaluator_llm, mode="f1", atomicity="high", coverage="high"
     )
-
-    # Run evaluation using @experiment pattern
-    logger.info(f"Evaluating against endpoint: {endpoint_url}")
-    result = await experiment_fn.arun(dataset, name="scientist_biographies_eval")
-
-    # Convert to DataFrame for analysis
-    df = result.to_pandas()
-
-    # Optionally add conciseness metric post-hoc
+    answer_relevancy = AnswerRelevancy(
+        llm=evaluator_llm, embeddings=evaluator_embeddings, strictness=2
+    )
     conciseness_metric = DiscreteMetric(
         name="conciseness",
         allowed_values=["verbose", "concise"],
@@ -174,15 +156,43 @@ async def run_scientist_experiment(
         ),
     )
 
-    if "response" in df.columns:
-        conciseness_scores = []
-        for response_text in df["response"].fillna(""):
-            conciseness_result = await conciseness_metric.ascore(
-                response=response_text,
-                llm=evaluator_llm,
-            )
-            conciseness_scores.append(conciseness_result.value)
-        df["conciseness"] = conciseness_scores
+    @experiment()
+    async def scientist_experiment(row):
+        """Single-turn Q&A experiment with factual correctness scoring."""
+        # Call AG-UI endpoint and get enriched row
+        enriched = await run_ag_ui_row(row, endpoint_url, timeout=300.0)
+
+        # Score with factual correctness metric
+        fc_result = await factual_correctness.ascore(
+            response=enriched["response"],
+            reference=row["reference"],
+        )
+
+        # Score with answer relevancy metric
+        ar_result = await answer_relevancy.ascore(
+            user_input=row["user_input"],
+            response=enriched["response"],
+        )
+
+        # Score with conciseness metric
+        concise_result = await conciseness_metric.ascore(
+            response=enriched["response"],
+            llm=evaluator_llm,
+        )
+
+        return {
+            **enriched,
+            "factual_correctness": fc_result.value,
+            "answer_relevancy": ar_result.value,
+            "conciseness": concise_result.value,
+        }
+
+    # Run evaluation using @experiment pattern
+    logger.info(f"Evaluating against endpoint: {endpoint_url}")
+    result = await scientist_experiment.arun(dataset, name="scientist_biographies_eval")
+
+    # Convert to DataFrame for analysis
+    df = result.to_pandas()
 
     # Print summary
     logger.info("\n" + "=" * 80)
@@ -192,16 +202,16 @@ async def run_scientist_experiment(
     logger.info(f"\n{df.to_string()}")
 
     metric_columns = [
-        "factual_correctness(mode=f1)",
+        "factual_correctness",
         "answer_relevancy",
     ]
     for column in metric_columns:
         if column in df.columns:
             logger.info(f"Average {column}: {df[column].mean():.4f}")
 
-    if "factual_correctness(mode=f1)" in df.columns:
+    if "factual_correctness" in df.columns:
         logger.info(
-            f"Perfect factual scores (1.0): {(df['factual_correctness(mode=f1)'] == 1.0).sum()}/{len(df)}"
+            f"Perfect factual scores (1.0): {(df['factual_correctness'] == 1.0).sum()}/{len(df)}"
         )
     if "conciseness" in df.columns:
         concise_ratio = (df["conciseness"] == "concise").mean()
@@ -237,22 +247,36 @@ async def run_tool_experiment(endpoint_url: str, evaluator_model: str) -> tuple:
     # - ToolCallF1: Rule-based metric for tool call accuracy
     # - AgentGoalAccuracyWithReference: LLM-based metric for goal achievement
     #   Note: This metric has some variance due to LLM non-determinism
-    metrics = [
-        ToolCallF1(),
-        AgentGoalAccuracyWithReference(llm=evaluator_llm),
-    ]
+    tool_call_f1 = ToolCallF1()
+    goal_accuracy = AgentGoalAccuracyWithReference(llm=evaluator_llm)
 
-    # Create experiment function configured for this evaluation
-    experiment_fn = create_ag_ui_experiment(
-        endpoint_url=endpoint_url,
-        metrics=metrics,
-        evaluator_llm=evaluator_llm,
-        timeout=300.0,
-    )
+    @experiment()
+    async def tool_experiment(row):
+        """Multi-turn experiment with tool call and goal accuracy scoring."""
+        # Call AG-UI endpoint and get enriched row
+        enriched = await run_ag_ui_row(row, endpoint_url, timeout=300.0)
+
+        # Build a MultiTurnSample for tool metrics
+        sample = build_sample(
+            user_input=row["user_input"],
+            messages=enriched["messages"],
+            reference=row.get("reference"),
+            reference_tool_calls=row.get("reference_tool_calls"),
+        )
+
+        # Score with tool metrics
+        f1_score = await tool_call_f1.multi_turn_ascore(sample)
+        goal_score = await goal_accuracy.multi_turn_ascore(sample)
+
+        return {
+            **enriched,
+            "tool_call_f1": f1_score,
+            "agent_goal_accuracy": goal_score,
+        }
 
     # Run evaluation using @experiment pattern
     logger.info(f"Evaluating against endpoint: {endpoint_url}")
-    result = await experiment_fn.arun(dataset, name="weather_tool_calls_eval")
+    result = await tool_experiment.arun(dataset, name="weather_tool_calls_eval")
 
     # Convert to DataFrame for analysis
     df = result.to_pandas()

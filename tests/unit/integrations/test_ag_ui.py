@@ -610,7 +610,7 @@ async def test_call_ag_ui_endpoint():
     """Test HTTP client helper for calling AG-UI endpoints."""
     from unittest.mock import AsyncMock, MagicMock
 
-    from ragas.integrations.ag_ui import _call_ag_ui_endpoint
+    from ragas.integrations.ag_ui import call_ag_ui_endpoint
 
     # Mock SSE response data
     sse_lines = [
@@ -645,7 +645,7 @@ async def test_call_ag_ui_endpoint():
     mock_client.stream.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with patch("httpx.AsyncClient", return_value=mock_client):
-        events = await _call_ag_ui_endpoint(
+        events = await call_ag_ui_endpoint(
             endpoint_url="http://localhost:8000/agent",
             user_input="Hello",
         )
@@ -667,7 +667,7 @@ async def test_call_ag_ui_endpoint_with_config():
     """Test HTTP client with thread_id and agent_config."""
     from unittest.mock import AsyncMock, MagicMock
 
-    from ragas.integrations.ag_ui import _call_ag_ui_endpoint
+    from ragas.integrations.ag_ui import call_ag_ui_endpoint
 
     sse_lines = [
         'data: {"type": "RUN_STARTED", "run_id": "run-1", "thread_id": "my-thread", "timestamp": 1234567890}',
@@ -692,7 +692,7 @@ async def test_call_ag_ui_endpoint_with_config():
     mock_client.stream.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with patch("httpx.AsyncClient", return_value=mock_client):
-        events = await _call_ag_ui_endpoint(
+        events = await call_ag_ui_endpoint(
             endpoint_url="http://localhost:8000/agent",
             user_input="Test query",
             thread_id="my-thread",
@@ -712,7 +712,7 @@ async def test_call_ag_ui_endpoint_malformed_json():
     """Test HTTP client handles malformed JSON gracefully."""
     from unittest.mock import AsyncMock, MagicMock
 
-    from ragas.integrations.ag_ui import _call_ag_ui_endpoint
+    from ragas.integrations.ag_ui import call_ag_ui_endpoint
 
     sse_lines = [
         'data: {"type": "RUN_STARTED", "run_id": "run-1", "thread_id": "thread-1", "timestamp": 1234567890}',
@@ -739,7 +739,7 @@ async def test_call_ag_ui_endpoint_malformed_json():
     mock_client.stream.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with patch("httpx.AsyncClient", return_value=mock_client):
-        events = await _call_ag_ui_endpoint(
+        events = await call_ag_ui_endpoint(
             endpoint_url="http://localhost:8000/agent",
             user_input="Test",
         )
@@ -757,7 +757,7 @@ async def test_call_ag_ui_endpoint_malformed_json():
 
 def test_convert_ragas_messages_to_ag_ui():
     """Test converting Ragas messages to AG-UI format."""
-    from ragas.integrations.ag_ui import _convert_ragas_messages_to_ag_ui
+    from ragas.integrations.ag_ui import convert_messages_to_ag_ui
     from ragas.messages import ToolCall
 
     messages = [
@@ -769,7 +769,7 @@ def test_convert_ragas_messages_to_ag_ui():
         HumanMessage(content="Thanks!"),
     ]
 
-    ag_ui_messages = _convert_ragas_messages_to_ag_ui(messages)
+    ag_ui_messages = convert_messages_to_ag_ui(messages)
 
     assert len(ag_ui_messages) == 3
 
@@ -790,34 +790,193 @@ def test_convert_ragas_messages_to_ag_ui():
     assert ag_ui_messages[2].content == "Thanks!"
 
 
-@pytest.mark.skipif(
-    not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
-)
-def test_create_ag_ui_experiment_returns_experiment_protocol():
-    """Test that create_ag_ui_experiment returns an ExperimentProtocol."""
-    from ragas.experiment import ExperimentProtocol
-    from ragas.integrations.ag_ui import create_ag_ui_experiment
+# ---------------------------------------------------------------------------
+# Tests for extraction helpers
+# ---------------------------------------------------------------------------
 
-    experiment_fn = create_ag_ui_experiment(
-        endpoint_url="http://localhost:8000/agent",
-        metrics=[],
+
+def test_extract_response():
+    """Test extract_response extracts AI message content."""
+    from ragas.integrations.ag_ui import extract_response
+
+    messages = [
+        HumanMessage(content="Hello"),
+        AIMessage(content="Hi there! "),
+        AIMessage(content="How can I help?"),
+        ToolMessage(content="Tool result"),
+    ]
+
+    response = extract_response(messages)
+    assert response == "Hi there! How can I help?"
+
+
+def test_extract_response_empty():
+    """Test extract_response returns empty string when no AI content."""
+    from ragas.integrations.ag_ui import extract_response
+
+    messages = [
+        HumanMessage(content="Hello"),
+        ToolMessage(content="Tool result"),
+    ]
+
+    response = extract_response(messages)
+    assert response == ""
+
+
+def test_extract_tool_calls():
+    """Test extract_tool_calls extracts tool calls from AI messages."""
+    from ragas.integrations.ag_ui import extract_tool_calls
+    from ragas.messages import ToolCall
+
+    messages = [
+        AIMessage(
+            content="Let me check",
+            tool_calls=[
+                ToolCall(name="get_weather", args={"location": "SF"}),
+                ToolCall(name="get_time", args={"timezone": "PST"}),
+            ],
+        ),
+        AIMessage(
+            content="More info",
+            tool_calls=[ToolCall(name="search", args={"query": "test"})],
+        ),
+    ]
+
+    tool_calls = extract_tool_calls(messages)
+    assert len(tool_calls) == 3
+    assert tool_calls[0].name == "get_weather"
+    assert tool_calls[1].name == "get_time"
+    assert tool_calls[2].name == "search"
+
+
+def test_extract_tool_calls_empty():
+    """Test extract_tool_calls returns empty list when no tool calls."""
+    from ragas.integrations.ag_ui import extract_tool_calls
+
+    messages = [
+        AIMessage(content="Just a response"),
+        HumanMessage(content="Question"),
+    ]
+
+    tool_calls = extract_tool_calls(messages)
+    assert tool_calls == []
+
+
+def test_extract_contexts():
+    """Test extract_contexts extracts tool message content."""
+    from ragas.integrations.ag_ui import extract_contexts
+
+    messages = [
+        AIMessage(content="Let me check"),
+        ToolMessage(content="Weather: Sunny, 72F"),
+        AIMessage(content="The weather is nice"),
+        ToolMessage(content="Time: 3:00 PM"),
+    ]
+
+    contexts = extract_contexts(messages)
+    assert len(contexts) == 2
+    assert contexts[0] == "Weather: Sunny, 72F"
+    assert contexts[1] == "Time: 3:00 PM"
+
+
+def test_extract_contexts_empty():
+    """Test extract_contexts returns empty list when no tool messages."""
+    from ragas.integrations.ag_ui import extract_contexts
+
+    messages = [
+        AIMessage(content="Response"),
+        HumanMessage(content="Question"),
+    ]
+
+    contexts = extract_contexts(messages)
+    assert contexts == []
+
+
+# ---------------------------------------------------------------------------
+# Tests for build_sample
+# ---------------------------------------------------------------------------
+
+
+def test_build_sample_single_turn():
+    """Test build_sample creates SingleTurnSample for simple input."""
+    from ragas.dataset_schema import SingleTurnSample
+    from ragas.integrations.ag_ui import build_sample
+
+    messages = [
+        AIMessage(content="The answer is 42."),
+    ]
+
+    sample = build_sample(
+        user_input="What is the meaning of life?",
+        messages=messages,
+        reference="42 is the answer.",
     )
 
-    # Should be callable
-    assert callable(experiment_fn)
-    # Should have arun method
-    assert hasattr(experiment_fn, "arun")
-    # Should match ExperimentProtocol
-    assert isinstance(experiment_fn, ExperimentProtocol)
+    assert isinstance(sample, SingleTurnSample)
+    assert sample.user_input == "What is the meaning of life?"
+    assert sample.response == "The answer is 42."
+    assert sample.reference == "42 is the answer."
+
+
+def test_build_sample_multi_turn_with_list_input():
+    """Test build_sample creates MultiTurnSample when user_input is a list."""
+    from ragas.dataset_schema import MultiTurnSample
+    from ragas.integrations.ag_ui import build_sample
+
+    user_input = [
+        HumanMessage(content="Hello"),
+        AIMessage(content="Hi there!"),
+        HumanMessage(content="What's the weather?"),
+    ]
+    messages = [AIMessage(content="It's sunny!")]
+
+    sample = build_sample(
+        user_input=user_input,
+        messages=messages,
+        reference="Weather info",
+    )
+
+    assert isinstance(sample, MultiTurnSample)
+    # Conversation should include original + agent response
+    assert len(sample.user_input) == 4
+
+
+def test_build_sample_multi_turn_with_tool_calls():
+    """Test build_sample creates MultiTurnSample when reference_tool_calls provided."""
+    from ragas.dataset_schema import MultiTurnSample
+    from ragas.integrations.ag_ui import build_sample
+    from ragas.messages import ToolCall
+
+    messages = [
+        AIMessage(
+            content="Checking weather",
+            tool_calls=[ToolCall(name="get_weather", args={"location": "SF"})],
+        ),
+    ]
+    reference_tool_calls = [ToolCall(name="get_weather", args={"location": "SF"})]
+
+    sample = build_sample(
+        user_input="What's the weather in SF?",
+        messages=messages,
+        reference_tool_calls=reference_tool_calls,
+    )
+
+    assert isinstance(sample, MultiTurnSample)
+    assert sample.reference_tool_calls == reference_tool_calls
+
+
+# ---------------------------------------------------------------------------
+# Tests for run_ag_ui_row
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.skipif(
     not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
 )
 @pytest.mark.asyncio
-async def test_create_ag_ui_experiment_processes_row():
-    """Test that experiment function processes rows correctly."""
-    from ragas.integrations.ag_ui import create_ag_ui_experiment
+async def test_run_ag_ui_row_processes_row():
+    """Test that run_ag_ui_row processes rows correctly."""
+    from ragas.integrations.ag_ui import run_ag_ui_row
 
     # Mock events
     events = [
@@ -831,36 +990,35 @@ async def test_create_ag_ui_experiment_processes_row():
     async def mock_call_endpoint(endpoint_url, user_input, **kwargs):
         return events
 
-    experiment_fn = create_ag_ui_experiment(
-        endpoint_url="http://localhost:8000/agent",
-        metrics=[],
-    )
-
-    # Call the experiment function directly with a row
     with patch(
-        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
+        "ragas.integrations.ag_ui.call_ag_ui_endpoint",
         side_effect=mock_call_endpoint,
     ):
-        result = await experiment_fn(
-            {"user_input": "Hello", "reference": "Test reference"}
+        result = await run_ag_ui_row(
+            {"user_input": "Hello", "reference": "Test reference"},
+            endpoint_url="http://localhost:8000/agent",
         )
 
     # Check result structure
     assert "user_input" in result
     assert "response" in result
+    assert "messages" in result
+    assert "tool_calls" in result
+    assert "contexts" in result
     assert "reference" in result
     assert result["user_input"] == "Hello"
     assert result["response"] == "Hello! I'm here to help."
     assert result["reference"] == "Test reference"
+    assert len(result["messages"]) == 1  # One AIMessage
 
 
 @pytest.mark.skipif(
     not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
 )
 @pytest.mark.asyncio
-async def test_create_ag_ui_experiment_extracts_tool_results():
-    """Test that experiment function extracts tool results into retrieved_contexts."""
-    from ragas.integrations.ag_ui import create_ag_ui_experiment
+async def test_run_ag_ui_row_extracts_tool_results():
+    """Test that run_ag_ui_row extracts tool results into contexts."""
+    from ragas.integrations.ag_ui import run_ag_ui_row
 
     # Mock events with tool call
     events = [
@@ -882,36 +1040,32 @@ async def test_create_ag_ui_experiment_extracts_tool_results():
     async def mock_call_endpoint(endpoint_url, user_input, **kwargs):
         return events
 
-    experiment_fn = create_ag_ui_experiment(
-        endpoint_url="http://localhost:8000/agent",
-        metrics=[],
-    )
-
     with patch(
-        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
+        "ragas.integrations.ag_ui.call_ag_ui_endpoint",
         side_effect=mock_call_endpoint,
     ):
-        result = await experiment_fn(
-            {"user_input": "What's the weather?", "reference": "Weather info"}
+        result = await run_ag_ui_row(
+            {"user_input": "What's the weather?", "reference": "Weather info"},
+            endpoint_url="http://localhost:8000/agent",
         )
 
-    # Check that tool results were extracted to retrieved_contexts
-    assert "retrieved_contexts" in result
-    assert len(result["retrieved_contexts"]) > 0
+    # Check that tool results were extracted to contexts
+    assert "contexts" in result
+    assert len(result["contexts"]) > 0
     # Tool result content should be in contexts
-    assert "Sunny, 72F" in result["retrieved_contexts"][0]
+    assert "Sunny, 72F" in result["contexts"][0]
+    # Tool calls should also be extracted
+    assert len(result["tool_calls"]) == 1
+    assert result["tool_calls"][0].name == "get_weather"
 
 
 @pytest.mark.skipif(
     not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
 )
 @pytest.mark.asyncio
-async def test_create_ag_ui_experiment_handles_empty_user_input():
-    """Test that experiment function handles empty user_input with graceful failure."""
-    from ragas.integrations.ag_ui import (
-        MISSING_RESPONSE_PLACEHOLDER,
-        create_ag_ui_experiment,
-    )
+async def test_run_ag_ui_row_handles_empty_user_input():
+    """Test that run_ag_ui_row handles empty user_input."""
+    from ragas.integrations.ag_ui import MISSING_RESPONSE_PLACEHOLDER, run_ag_ui_row
 
     # Mock endpoint that returns empty response
     async def mock_call_endpoint(endpoint_url, user_input, **kwargs):
@@ -921,16 +1075,14 @@ async def test_create_ag_ui_experiment_handles_empty_user_input():
             RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
         ]
 
-    experiment_fn = create_ag_ui_experiment(
-        endpoint_url="http://localhost:8000/agent",
-        metrics=[],
-    )
-
     with patch(
-        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
+        "ragas.integrations.ag_ui.call_ag_ui_endpoint",
         side_effect=mock_call_endpoint,
     ):
-        result = await experiment_fn({"user_input": "", "reference": "Test"})
+        result = await run_ag_ui_row(
+            {"user_input": "", "reference": "Test"},
+            endpoint_url="http://localhost:8000/agent",
+        )
 
     # With empty user_input but successful endpoint call, response is the placeholder
     assert result["response"] == MISSING_RESPONSE_PLACEHOLDER
@@ -941,20 +1093,15 @@ async def test_create_ag_ui_experiment_handles_empty_user_input():
     not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
 )
 @pytest.mark.asyncio
-async def test_create_ag_ui_experiment_handles_none_user_input():
-    """Test that experiment function handles None user_input."""
-    from ragas.integrations.ag_ui import (
-        MISSING_RESPONSE_PLACEHOLDER,
-        create_ag_ui_experiment,
-    )
-
-    experiment_fn = create_ag_ui_experiment(
-        endpoint_url="http://localhost:8000/agent",
-        metrics=[],
-    )
+async def test_run_ag_ui_row_handles_none_user_input():
+    """Test that run_ag_ui_row handles None user_input."""
+    from ragas.integrations.ag_ui import MISSING_RESPONSE_PLACEHOLDER, run_ag_ui_row
 
     # Call with None user_input (no mocking - should return immediately)
-    result = await experiment_fn({"reference": "Test"})
+    result = await run_ag_ui_row(
+        {"reference": "Test"},
+        endpoint_url="http://localhost:8000/agent",
+    )
 
     # Should return placeholder response when user_input is missing
     assert result["response"] == MISSING_RESPONSE_PLACEHOLDER
@@ -965,9 +1112,9 @@ async def test_create_ag_ui_experiment_handles_none_user_input():
     not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
 )
 @pytest.mark.asyncio
-async def test_create_ag_ui_experiment_handles_multi_turn_input():
-    """Test that experiment function handles multi-turn conversation input."""
-    from ragas.integrations.ag_ui import create_ag_ui_experiment
+async def test_run_ag_ui_row_handles_multi_turn_input():
+    """Test that run_ag_ui_row handles multi-turn conversation input."""
+    from ragas.integrations.ag_ui import run_ag_ui_row
 
     # Mock events for agent response
     events = [
@@ -981,11 +1128,6 @@ async def test_create_ag_ui_experiment_handles_multi_turn_input():
     async def mock_call_endpoint(endpoint_url, user_input, **kwargs):
         return events
 
-    experiment_fn = create_ag_ui_experiment(
-        endpoint_url="http://localhost:8000/agent",
-        metrics=[],
-    )
-
     # Multi-turn input as list of messages
     conversation = [
         HumanMessage(content="Hello"),
@@ -994,19 +1136,18 @@ async def test_create_ag_ui_experiment_handles_multi_turn_input():
     ]
 
     with patch(
-        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
+        "ragas.integrations.ag_ui.call_ag_ui_endpoint",
         side_effect=mock_call_endpoint,
     ):
-        result = await experiment_fn(
-            {"user_input": conversation, "reference": "Weather info"}
+        result = await run_ag_ui_row(
+            {"user_input": conversation, "reference": "Weather info"},
+            endpoint_url="http://localhost:8000/agent",
         )
 
     # Response should be extracted from agent events
     assert result["response"] == "It's sunny!"
     # Original conversation is preserved in result
     assert "user_input" in result
-    # Note: result["user_input"] is the original input; the extended conversation
-    # is used internally for multi-turn sample creation and metric scoring
     assert len(result["user_input"]) == len(conversation)
 
 
@@ -1014,9 +1155,9 @@ async def test_create_ag_ui_experiment_handles_multi_turn_input():
     not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
 )
 @pytest.mark.asyncio
-async def test_create_ag_ui_experiment_with_extra_headers():
+async def test_run_ag_ui_row_with_extra_headers():
     """Test that extra headers are passed to the endpoint."""
-    from ragas.integrations.ag_ui import create_ag_ui_experiment
+    from ragas.integrations.ag_ui import run_ag_ui_row
 
     captured_kwargs = {}
 
@@ -1030,17 +1171,15 @@ async def test_create_ag_ui_experiment_with_extra_headers():
             RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
         ]
 
-    experiment_fn = create_ag_ui_experiment(
-        endpoint_url="http://localhost:8000/agent",
-        metrics=[],
-        extra_headers={"Authorization": "Bearer test-token"},
-    )
-
     with patch(
-        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
+        "ragas.integrations.ag_ui.call_ag_ui_endpoint",
         side_effect=mock_call_endpoint,
     ):
-        await experiment_fn({"user_input": "Test", "reference": "Ref"})
+        await run_ag_ui_row(
+            {"user_input": "Test", "reference": "Ref"},
+            endpoint_url="http://localhost:8000/agent",
+            extra_headers={"Authorization": "Bearer test-token"},
+        )
 
     # Check that extra headers were passed
     assert "extra_headers" in captured_kwargs
@@ -1051,31 +1190,31 @@ async def test_create_ag_ui_experiment_with_extra_headers():
     not _has_fastapi_deps(), reason="httpx or ag-ui-protocol not installed"
 )
 @pytest.mark.asyncio
-async def test_create_ag_ui_experiment_handles_endpoint_failure():
-    """Test that experiment function handles endpoint failures gracefully."""
+async def test_run_ag_ui_row_handles_endpoint_failure():
+    """Test that run_ag_ui_row handles endpoint failures gracefully."""
     from ragas.integrations.ag_ui import (
         MISSING_CONTEXT_PLACEHOLDER,
         MISSING_RESPONSE_PLACEHOLDER,
-        create_ag_ui_experiment,
+        run_ag_ui_row,
     )
 
     async def mock_call_endpoint_failure(endpoint_url, user_input, **kwargs):
         raise Exception("Connection refused")
 
-    experiment_fn = create_ag_ui_experiment(
-        endpoint_url="http://localhost:8000/agent",
-        metrics=[],
-    )
-
     with patch(
-        "ragas.integrations.ag_ui._call_ag_ui_endpoint",
+        "ragas.integrations.ag_ui.call_ag_ui_endpoint",
         side_effect=mock_call_endpoint_failure,
     ):
         # Should return result with placeholder values instead of raising
-        result = await experiment_fn({"user_input": "Test", "reference": "Ref"})
+        result = await run_ag_ui_row(
+            {"user_input": "Test", "reference": "Ref"},
+            endpoint_url="http://localhost:8000/agent",
+        )
 
     # Verify graceful failure handling
     assert result["response"] == MISSING_RESPONSE_PLACEHOLDER
-    assert result["retrieved_contexts"] == [MISSING_CONTEXT_PLACEHOLDER]
+    assert result["contexts"] == [MISSING_CONTEXT_PLACEHOLDER]
     assert result["user_input"] == "Test"
     assert result["reference"] == "Ref"
+    assert result["messages"] == []
+    assert result["tool_calls"] == []

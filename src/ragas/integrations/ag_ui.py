@@ -1,21 +1,81 @@
 """
 AG-UI Protocol Integration for Ragas.
 
-This module provides conversion utilities and experiment-based evaluation for AG-UI
-protocol agents. It supports converting AG-UI streaming events to Ragas message
-format and evaluating AG-UI FastAPI endpoints using the @experiment decorator pattern.
+This module provides conversion utilities and row enrichment for AG-UI protocol
+agents. It supports converting AG-UI streaming events to Ragas message format
+and running rows against AG-UI FastAPI endpoints for use with the @experiment
+decorator pattern.
 
 AG-UI is an event-based protocol for agent-to-UI communication that uses typed
 events for streaming text messages, tool calls, and state synchronization. This
 integration supports both streaming events (Start-Content-End triads) and
 convenience chunk events (TextMessageChunk, ToolCallChunk) for complete messages.
 
-Functions:
+Primary API:
+    run_ag_ui_row: Run a single row against an AG-UI endpoint and return enriched data
+
+Conversion Functions:
     convert_to_ragas_messages: Convert AG-UI event sequences to Ragas messages
     convert_messages_snapshot: Convert AG-UI message snapshots to Ragas messages
-    create_ag_ui_experiment: Factory to create @experiment-decorated evaluation function
+    convert_messages_to_ag_ui: Convert Ragas messages to AG-UI message format
+
+Extraction Helpers:
+    extract_response: Extract concatenated AI response text from messages
+    extract_tool_calls: Extract all tool calls from AI messages
+    extract_contexts: Extract tool results/contexts from messages
+
+Sample Building:
+    build_sample: Build SingleTurnSample or MultiTurnSample for metric scoring
+
+Low-Level:
+    call_ag_ui_endpoint: Call an AG-UI endpoint and collect streaming events
+    AGUIEventCollector: Collect and reconstruct messages from streaming events
 
 Examples:
+    Basic evaluation with @experiment::
+
+        from ragas import experiment
+        from ragas.integrations.ag_ui import run_ag_ui_row
+        from ragas.metrics.collections import FactualCorrectness
+
+        @experiment()
+        async def my_experiment(row):
+            # Run row against AG-UI endpoint
+            enriched = await run_ag_ui_row(row, "http://localhost:8000/chat")
+
+            # Score with your own metrics
+            score = await FactualCorrectness(llm=evaluator_llm).ascore(
+                response=enriched["response"],
+                reference=row["reference"],
+            )
+
+            return {**enriched, "factual_correctness": score.value}
+
+        # Framework handles dataset iteration
+        results = await my_experiment.arun(dataset, name="my_eval")
+
+    Tool evaluation with multi-turn samples::
+
+        from ragas import experiment
+        from ragas.integrations.ag_ui import run_ag_ui_row, build_sample
+        from ragas.metrics import ToolCallF1
+
+        @experiment()
+        async def tool_experiment(row):
+            enriched = await run_ag_ui_row(row, "http://localhost:8000/chat")
+
+            # Build sample for tool metrics
+            sample = build_sample(
+                user_input=row["user_input"],
+                messages=enriched["messages"],
+                reference_tool_calls=row.get("reference_tool_calls"),
+            )
+
+            score = await ToolCallF1().multi_turn_ascore(sample)
+            return {**enriched, "tool_call_f1": score}
+
+        results = await tool_experiment.arun(dataset, name="tool_eval")
+
     Convert streaming AG-UI events to Ragas messages::
 
         from ragas.integrations.ag_ui import convert_to_ragas_messages
@@ -26,57 +86,10 @@ Examples:
 
         # Convert to Ragas messages
         ragas_messages = convert_to_ragas_messages(ag_ui_events, metadata=True)
-
-    Evaluate an AG-UI agent endpoint using @experiment pattern::
-
-        from ragas.integrations.ag_ui import create_ag_ui_experiment
-        from ragas.dataset import Dataset
-        from ragas.metrics.collections import FactualCorrectness
-        from ragas.llms import llm_factory
-        from openai import AsyncOpenAI
-
-        client = AsyncOpenAI()
-        evaluator_llm = llm_factory("gpt-4o-mini", client=client)
-
-        # Create experiment function configured for your endpoint
-        experiment_fn = create_ag_ui_experiment(
-            endpoint_url="http://localhost:8000/agent",
-            metrics=[FactualCorrectness(llm=evaluator_llm)],
-            evaluator_llm=evaluator_llm,
-        )
-
-        # Load dataset
-        dataset = Dataset.from_dict({
-            "user_input": ["What's the weather in SF?"],
-            "reference": ["Use the weather API to check SF weather"]
-        })
-
-        # Run experiment - results are automatically saved
-        results = await experiment_fn.arun(dataset, name="ag_ui_eval")
-
-    Evaluate with multi-turn conversations and tool calls::
-
-        from ragas.integrations.ag_ui import create_ag_ui_experiment
-        from ragas.dataset import Dataset
-        from ragas.metrics import ToolCallF1
-
-        experiment_fn = create_ag_ui_experiment(
-            endpoint_url="http://localhost:8000/agent",
-            metrics=[ToolCallF1()],
-        )
-
-        # Multi-turn dataset with reference tool calls
-        dataset = Dataset.from_dict({
-            "user_input": ["What's the weather in SF?"],
-            "reference_tool_calls": ['[{"name": "get-weather", "args": {"location": "SF"}}]']
-        })
-
-        results = await experiment_fn.arun(dataset, name="tool_call_eval")
 """
 
 from __future__ import annotations
 
-import inspect
 import json
 import logging
 import typing as t
@@ -87,128 +100,31 @@ from ragas.dataset_schema import (
     MultiTurnSample,
     SingleTurnSample,
 )
-from ragas.experiment import experiment
 from ragas.messages import AIMessage, HumanMessage, ToolCall, ToolMessage
-
-try:
-    from ragas.metrics.collections.base import BaseMetric as CollectionsBaseMetric
-except (
-    ImportError
-):  # pragma: no cover - collections are part of ragas, but guard just in case
-    CollectionsBaseMetric = t.cast(t.Type[object], None)
-
-from ragas.metrics.base import Metric, MultiTurnMetric, SimpleBaseMetric
-
-if t.TYPE_CHECKING:
-    from ragas.experiment import ExperimentProtocol
-    from ragas.metrics.collections.base import BaseMetric as _CollectionsBaseMetric
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    # Event collection
+    "AGUIEventCollector",
+    # Message conversion
+    "convert_to_ragas_messages",
+    "convert_messages_snapshot",
+    "convert_messages_to_ag_ui",
+    # Endpoint calling
+    "call_ag_ui_endpoint",
+    # Primary API
+    "run_ag_ui_row",
+    # Extraction helpers
+    "extract_response",
+    "extract_tool_calls",
+    "extract_contexts",
+    # Sample building
+    "build_sample",
+]
+
 MISSING_CONTEXT_PLACEHOLDER = "[no retrieved contexts provided by agent]"
 MISSING_RESPONSE_PLACEHOLDER = "[no response generated by agent]"
-
-
-def _is_modern_metric(metric: Any) -> bool:
-    """Return True if the metric is a modern metric (collections or SimpleBaseMetric)."""
-    if CollectionsBaseMetric is not None and isinstance(metric, CollectionsBaseMetric):
-        return True
-    if isinstance(metric, SimpleBaseMetric):
-        return True
-    return False
-
-
-def _get_metric_params(metric: Any) -> t.List[str]:
-    """Extract parameter names that a metric's ascore() method expects."""
-    import re
-
-    # For collections metrics, inspect the ascore signature
-    if CollectionsBaseMetric is not None and isinstance(metric, CollectionsBaseMetric):
-        return [
-            name
-            for name in inspect.signature(metric.ascore).parameters.keys()  # type: ignore[union-attr]
-            if name not in ("self", "kwargs")
-        ]
-
-    # For SimpleLLMMetric (DiscreteMetric, etc.), extract from prompt template
-    if isinstance(metric, SimpleBaseMetric):
-        prompt_str = ""
-        if hasattr(metric, "prompt") and metric.prompt is not None:  # type: ignore[union-attr]
-            prompt_obj = metric.prompt  # type: ignore[union-attr]
-            if hasattr(prompt_obj, "instruction"):
-                prompt_str = prompt_obj.instruction
-            elif isinstance(prompt_obj, str):
-                prompt_str = prompt_obj
-        return re.findall(r"\{(\w+)\}", prompt_str)
-
-    return []
-
-
-def _normalize_metric_value(metric: Any, value: Any) -> t.Tuple[Any, Any]:
-    """
-    Normalize a metric value for EvaluationResult compatibility.
-
-    Returns (score_value, trace_value) where:
-    - score_value: numeric value for EvaluationResult (uses index for discrete metrics)
-    - trace_value: original value for traces (preserves strings for observability)
-    """
-    # If already numeric, use as-is
-    if isinstance(value, (int, float)):
-        return value, value
-
-    # For string values from DiscreteMetric, convert to index
-    if isinstance(value, str):
-        if hasattr(metric, "allowed_values"):
-            allowed = metric.allowed_values
-            if isinstance(allowed, list) and value in allowed:
-                # Use index as numeric score (e.g., ["verbose", "concise"] -> 0.0, 1.0)
-                return float(allowed.index(value)), value
-        # Unknown string, return NaN for score but keep original for trace
-        return float("nan"), value
-
-    # For other types, try to convert to float
-    try:
-        return float(value), value
-    except (TypeError, ValueError):
-        return float("nan"), value
-
-
-async def _score_sample_with_metric(
-    metric: Any,
-    sample: t.Union[SingleTurnSample, MultiTurnSample],
-    evaluator_llm: Optional[Any] = None,
-) -> t.Tuple[Any, Any]:
-    """
-    Score a single sample with a metric.
-
-    Returns (score_value, trace_value) where:
-    - score_value: numeric value for EvaluationResult
-    - trace_value: original value for traces (may be string for discrete metrics)
-    """
-    # Build kwargs from sample attributes based on what the metric needs
-    params = _get_metric_params(metric)
-    kwargs: t.Dict[str, t.Any] = {}
-
-    for param in params:
-        if hasattr(sample, param):
-            kwargs[param] = getattr(sample, param)
-
-    # Determine metric type for proper handling
-    is_collections_metric = CollectionsBaseMetric is not None and isinstance(
-        metric, CollectionsBaseMetric
-    )
-    is_simple_llm_metric = isinstance(metric, SimpleBaseMetric)
-
-    # SimpleBaseMetric (DiscreteMetric, NumericMetric, etc.) needs llm passed at scoring time
-    # Collections metrics already have LLM set at initialization - don't pass llm to them
-    if is_simple_llm_metric and not is_collections_metric and evaluator_llm is not None:
-        kwargs["llm"] = evaluator_llm
-
-    # Call the metric's async score method
-    result = await metric.ascore(**kwargs)  # type: ignore[union-attr]
-
-    # Normalize the value for EvaluationResult compatibility
-    return _normalize_metric_value(metric, result.value)
 
 
 # Lazy imports for ag_ui to avoid hard dependency
@@ -931,7 +847,7 @@ def convert_messages_snapshot(
     return collector.get_messages()
 
 
-def _convert_ragas_messages_to_ag_ui(
+def convert_messages_to_ag_ui(
     messages: List[Union[HumanMessage, AIMessage, ToolMessage]],
 ) -> List[Any]:
     """
@@ -962,7 +878,7 @@ def _convert_ragas_messages_to_ag_ui(
     ...         ToolCall(name="get-weather", args={"location": "SF"})
     ...     ])
     ... ]
-    >>> ag_ui_messages = _convert_ragas_messages_to_ag_ui(messages)
+    >>> ag_ui_messages = convert_messages_to_ag_ui(messages)
     """
     try:
         from ag_ui.core import (
@@ -1021,7 +937,7 @@ def _convert_ragas_messages_to_ag_ui(
     return ag_ui_messages
 
 
-async def _call_ag_ui_endpoint(
+async def call_ag_ui_endpoint(
     endpoint_url: str,
     user_input: Union[str, List[Union[HumanMessage, AIMessage, ToolMessage]]],
     thread_id: Optional[str] = None,
@@ -1104,7 +1020,7 @@ async def _call_ag_ui_endpoint(
         ag_ui_messages = t.cast(List[Any], [UserMessage(id="1", content=user_input)])
     else:
         # Multi-turn: list of Ragas messages
-        ag_ui_messages = _convert_ragas_messages_to_ag_ui(user_input)
+        ag_ui_messages = convert_messages_to_ag_ui(user_input)
 
     # Prepare request payload
     payload = RunAgentInput(
@@ -1156,279 +1072,318 @@ async def _call_ag_ui_endpoint(
     return events
 
 
-def create_ag_ui_experiment(
-    endpoint_url: str,
-    metrics: List[Union[Metric, "_CollectionsBaseMetric", SimpleBaseMetric]],
-    evaluator_llm: Optional[Any] = None,
-    timeout: float = 60.0,
-    metadata: bool = False,
-    extra_headers: Optional[Dict[str, str]] = None,
-) -> "ExperimentProtocol":
-    """
-    Create an @experiment-decorated function for evaluating AG-UI endpoints.
+# ---------------------------------------------------------------------------
+# Extraction Helpers
+# ---------------------------------------------------------------------------
 
-    This factory function returns a configured experiment function that can be
-    run against a Dataset using the modern @experiment pattern. Each row in
-    the dataset is processed by calling the AG-UI endpoint and scoring with
-    the provided metrics.
+
+def extract_response(
+    messages: List[Union[HumanMessage, AIMessage, ToolMessage]],
+) -> str:
+    """
+    Extract concatenated AI response text from messages.
 
     Parameters
     ----------
-    endpoint_url : str
-        URL of the AG-UI FastAPI endpoint (e.g., "http://localhost:8000/agent").
-    metrics : List[Metric or collections.BaseMetric or SimpleBaseMetric]
-        List of Ragas metrics to evaluate (e.g., FactualCorrectness, ToolCallF1).
-    evaluator_llm : Any, optional
-        Optional LLM to use for evaluation metrics that require it (default: None).
-    timeout : float, optional
-        HTTP request timeout in seconds (default: 60.0).
-    metadata : bool, optional
-        Whether to include AG-UI metadata in converted messages (default: False).
-    extra_headers : dict, optional
-        Optional extra HTTP headers to include in requests to the agent endpoint.
+    messages : List[Message]
+        List of Ragas messages (typically from convert_to_ragas_messages).
 
     Returns
     -------
-    ExperimentProtocol
-        An experiment function with an `arun(dataset, name=...)` method.
-        Call `await experiment_fn.arun(dataset)` to run the evaluation.
+    str
+        Concatenated content from all AIMessage instances.
+        Returns empty string if no AI content found.
 
-    Examples
-    --------
-    Basic single-turn evaluation::
+    Example
+    -------
+    >>> messages = convert_to_ragas_messages(events)
+    >>> response = extract_response(messages)
+    """
+    return "".join(
+        m.content for m in messages if isinstance(m, AIMessage) and m.content
+    )
 
-        >>> from ragas.integrations.ag_ui import create_ag_ui_experiment
-        >>> from ragas.dataset import Dataset
-        >>> from ragas.metrics.collections import FactualCorrectness
-        >>> from ragas.llms import llm_factory
-        >>>
-        >>> evaluator_llm = llm_factory("gpt-4o-mini")
-        >>> experiment_fn = create_ag_ui_experiment(
-        ...     endpoint_url="http://localhost:8000/agent",
-        ...     metrics=[FactualCorrectness(llm=evaluator_llm)],
-        ...     evaluator_llm=evaluator_llm,
-        ... )
-        >>>
-        >>> dataset = Dataset.from_dict({
-        ...     "user_input": ["What's the weather in SF?"],
-        ...     "reference": ["Check the weather API for San Francisco"]
-        ... })
-        >>> results = await experiment_fn.arun(dataset, name="weather_eval")
 
-    Multi-turn evaluation with tool call metrics::
+def extract_tool_calls(
+    messages: List[Union[HumanMessage, AIMessage, ToolMessage]],
+) -> List[ToolCall]:
+    """
+    Extract all tool calls from AI messages.
 
-        >>> from ragas.metrics import ToolCallF1
-        >>>
-        >>> experiment_fn = create_ag_ui_experiment(
-        ...     endpoint_url="http://localhost:8000/agent",
-        ...     metrics=[ToolCallF1()],
-        ... )
-        >>>
-        >>> # reference_tool_calls should be JSON string in the dataset
-        >>> dataset = Dataset.from_dict({
-        ...     "user_input": ["What's the weather in SF?"],
-        ...     "reference_tool_calls": ['[{"name": "get-weather", "args": {"location": "SF"}}]']
-        ... })
-        >>> results = await experiment_fn.arun(dataset, name="tool_eval")
+    Parameters
+    ----------
+    messages : List[Message]
+        List of Ragas messages (typically from convert_to_ragas_messages).
 
-    Notes
-    -----
-    - The endpoint must return Server-Sent Events (SSE) with AG-UI protocol events
-    - Results are automatically saved via the experiment backend
-    - Failed endpoint calls are logged and return NaN scores
-    - The returned Experiment object can be converted to pandas with `.to_pandas()`
+    Returns
+    -------
+    List[ToolCall]
+        List of ToolCall objects from all AIMessage instances.
+
+    Example
+    -------
+    >>> messages = convert_to_ragas_messages(events)
+    >>> tool_calls = extract_tool_calls(messages)
+    """
+    tool_calls: List[ToolCall] = []
+    for m in messages:
+        if isinstance(m, AIMessage) and m.tool_calls:
+            tool_calls.extend(m.tool_calls)
+    return tool_calls
+
+
+def extract_contexts(
+    messages: List[Union[HumanMessage, AIMessage, ToolMessage]],
+) -> List[str]:
+    """
+    Extract tool results/contexts from messages.
+
+    Parameters
+    ----------
+    messages : List[Message]
+        List of Ragas messages (typically from convert_to_ragas_messages).
+
+    Returns
+    -------
+    List[str]
+        List of content strings from all ToolMessage instances.
+
+    Example
+    -------
+    >>> messages = convert_to_ragas_messages(events)
+    >>> contexts = extract_contexts(messages)
+    """
+    return [m.content for m in messages if isinstance(m, ToolMessage) and m.content]
+
+
+# ---------------------------------------------------------------------------
+# Sample Building Helper
+# ---------------------------------------------------------------------------
+
+
+def build_sample(
+    user_input: Union[str, List[Union[HumanMessage, AIMessage, ToolMessage]]],
+    messages: List[Union[HumanMessage, AIMessage, ToolMessage]],
+    reference: Optional[str] = None,
+    reference_tool_calls: Optional[Union[str, List[ToolCall]]] = None,
+) -> Union[SingleTurnSample, MultiTurnSample]:
+    """
+    Build appropriate sample type based on inputs.
+
+    Returns MultiTurnSample if:
+    - user_input is a conversation list, OR
+    - reference_tool_calls are provided
+
+    Otherwise returns SingleTurnSample.
+
+    Parameters
+    ----------
+    user_input : str or List[Message]
+        The original user input - either a string or conversation list.
+    messages : List[Message]
+        Agent response messages from convert_to_ragas_messages().
+    reference : str, optional
+        Reference/expected answer for evaluation.
+    reference_tool_calls : str or List[ToolCall], optional
+        Expected tool calls for tool evaluation metrics. Can be a JSON string
+        (e.g., from CSV) or a list of ToolCall dicts.
+
+    Returns
+    -------
+    SingleTurnSample or MultiTurnSample
+        Appropriate sample type for metric scoring.
+
+    Example
+    -------
+    >>> enriched = await run_ag_ui_row(row, endpoint_url)
+    >>> sample = build_sample(
+    ...     user_input=row["user_input"],
+    ...     messages=enriched["messages"],
+    ...     reference=row.get("reference"),
+    ...     reference_tool_calls=row.get("reference_tool_calls"),
+    ... )
+    >>> score = await my_metric.ascore(sample)
+    """
+    # Parse reference_tool_calls if it's a JSON string (e.g., from CSV)
+    parsed_tool_calls: Optional[List[ToolCall]] = None
+    if reference_tool_calls is not None:
+        if isinstance(reference_tool_calls, str):
+            try:
+                parsed_tool_calls = json.loads(reference_tool_calls)
+            except json.JSONDecodeError:
+                logger.warning(
+                    f"Failed to parse reference_tool_calls as JSON: {reference_tool_calls}"
+                )
+                parsed_tool_calls = None
+        else:
+            parsed_tool_calls = reference_tool_calls
+
+    needs_multi_turn = isinstance(user_input, list) or parsed_tool_calls is not None
+
+    if needs_multi_turn:
+        # Build conversation with user input + agent responses
+        conversation: List[Union[HumanMessage, AIMessage, ToolMessage]]
+        if isinstance(user_input, list):
+            conversation = [
+                msg
+                if isinstance(msg, (HumanMessage, AIMessage, ToolMessage))
+                else HumanMessage(content=str(msg))
+                for msg in user_input
+            ]
+        else:
+            conversation = [HumanMessage(content=str(user_input))]
+
+        # Add agent responses to conversation
+        for msg in messages:
+            if isinstance(msg, (AIMessage, ToolMessage)):
+                conversation.append(msg)
+
+        return MultiTurnSample(
+            user_input=conversation,
+            reference=reference,
+            reference_tool_calls=parsed_tool_calls,
+        )
+    else:
+        # Single-turn sample
+        response_text = extract_response(messages)
+        context_list = extract_contexts(messages)
+
+        return SingleTurnSample(
+            user_input=str(user_input),
+            response=response_text or MISSING_RESPONSE_PLACEHOLDER,
+            reference=reference,
+            retrieved_contexts=context_list
+            if context_list
+            else [MISSING_CONTEXT_PLACEHOLDER],
+        )
+
+
+# ---------------------------------------------------------------------------
+# Primary API: run_ag_ui_row
+# ---------------------------------------------------------------------------
+
+
+async def run_ag_ui_row(
+    row: Dict[str, Any],
+    endpoint_url: str,
+    timeout: float = 60.0,
+    metadata: bool = False,
+    extra_headers: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
+    """
+    Run a single row against an AG-UI endpoint and return enriched data.
+
+    This function:
+    1. Calls the AG-UI endpoint with row["user_input"]
+    2. Converts SSE events to Ragas messages
+    3. Extracts response, tool calls, and contexts
+    4. Returns the row enriched with agent output
+
+    Use this function inside an @experiment-decorated function to evaluate
+    AG-UI agents. The framework handles dataset iteration and result collection.
+
+    Parameters
+    ----------
+    row : Dict[str, Any]
+        Input row containing at minimum "user_input" field.
+    endpoint_url : str
+        URL of the AG-UI endpoint (e.g., "http://localhost:8000/chat").
+    timeout : float, optional
+        Request timeout in seconds (default: 60.0).
+    metadata : bool, optional
+        Whether to include AG-UI metadata in messages (default: False).
+    extra_headers : Dict[str, str], optional
+        Additional HTTP headers for the request.
+
+    Returns
+    -------
+    Dict[str, Any]
+        Original row enriched with:
+        - "response": str - Concatenated AI response text
+        - "messages": List[Message] - Full message list
+        - "tool_calls": List[ToolCall] - Extracted tool calls
+        - "contexts": List[str] - Tool results/contexts
+
+    Example
+    -------
+    Basic usage with @experiment::
+
+        from ragas import experiment
+        from ragas.integrations.ag_ui import run_ag_ui_row
+
+        @experiment()
+        async def my_experiment(row):
+            enriched = await run_ag_ui_row(row, "http://localhost:8000/chat")
+            score = await my_metric.ascore(
+                response=enriched["response"],
+                reference=row["reference"],
+            )
+            return {**enriched, "my_score": score.value}
+
+        results = await my_experiment.arun(dataset, name="my_eval")
+
+    With tool evaluation::
+
+        from ragas.integrations.ag_ui import run_ag_ui_row, build_sample
+        from ragas.metrics import ToolCallF1
+
+        @experiment()
+        async def tool_experiment(row):
+            enriched = await run_ag_ui_row(row, "http://localhost:8000/chat")
+            sample = build_sample(
+                user_input=row["user_input"],
+                messages=enriched["messages"],
+                reference_tool_calls=row.get("reference_tool_calls"),
+            )
+            score = await ToolCallF1().multi_turn_ascore(sample)
+            return {**enriched, "tool_call_f1": score}
 
     See Also
     --------
-    convert_to_ragas_messages : Convert AG-UI events to Ragas messages
-    _call_ag_ui_endpoint : HTTP client helper for calling endpoints
+    call_ag_ui_endpoint : Lower-level endpoint caller (returns raw events)
+    convert_to_ragas_messages : Convert events to messages
+    build_sample : Build SingleTurnSample or MultiTurnSample for metrics
     """
+    user_input = row.get("user_input")
 
-    @experiment()
-    async def evaluate_ag_ui_row(row: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Evaluate a single row against the AG-UI endpoint.
+    if user_input is None:
+        logger.error("Row missing required 'user_input' field")
+        return {
+            **row,
+            "response": MISSING_RESPONSE_PLACEHOLDER,
+            "messages": [],
+            "tool_calls": [],
+            "contexts": [MISSING_CONTEXT_PLACEHOLDER],
+        }
 
-        This function is decorated with @experiment and processes each row by:
-        1. Calling the AG-UI endpoint with the user_input
-        2. Converting AG-UI events to Ragas messages
-        3. Scoring with each configured metric
-        4. Returning the results as a dict
+    try:
+        # Call AG-UI endpoint
+        events = await call_ag_ui_endpoint(
+            endpoint_url=endpoint_url,
+            user_input=user_input,
+            thread_id=f"thread-{uuid.uuid4()}",
+            timeout=timeout,
+            extra_headers=extra_headers,
+        )
 
-        Parameters
-        ----------
-        row : Dict[str, Any]
-            A single row from the dataset containing at minimum:
-            - user_input: The query to send to the agent (str or list of messages)
-            Optional fields:
-            - reference: Expected/reference response for evaluation
-            - reference_tool_calls: JSON string of expected tool calls
+        # Convert events to Ragas messages
+        messages = convert_to_ragas_messages(events, metadata=metadata)
 
-        Returns
-        -------
-        Dict[str, Any]
-            Result dict containing:
-            - All original row fields
-            - response: The agent's response text
-            - retrieved_contexts: Any tool/context messages from agent
-            - One key per metric with the score value
-        """
-        # Extract input data from row
-        user_input = row.get("user_input")
-        reference = row.get("reference")
-        reference_tool_calls_raw = row.get("reference_tool_calls")
+        # Extract response, tool calls, and contexts
+        return {
+            **row,
+            "response": extract_response(messages) or MISSING_RESPONSE_PLACEHOLDER,
+            "messages": messages,
+            "tool_calls": extract_tool_calls(messages),
+            "contexts": extract_contexts(messages) or [MISSING_CONTEXT_PLACEHOLDER],
+        }
 
-        # Parse reference_tool_calls if it's a JSON string
-        reference_tool_calls = None
-        if reference_tool_calls_raw:
-            if isinstance(reference_tool_calls_raw, str):
-                try:
-                    parsed = json.loads(reference_tool_calls_raw)
-                    reference_tool_calls = [
-                        ToolCall(name=tc["name"], args=tc.get("args", {}))
-                        for tc in parsed
-                    ]
-                except (json.JSONDecodeError, KeyError) as e:
-                    logger.warning(f"Failed to parse reference_tool_calls: {e}")
-            elif isinstance(reference_tool_calls_raw, list):
-                reference_tool_calls = [
-                    ToolCall(name=tc["name"], args=tc.get("args", {}))
-                    if isinstance(tc, dict)
-                    else tc
-                    for tc in reference_tool_calls_raw
-                ]
-
-        # Initialize result with original row data
-        result: Dict[str, Any] = dict(row)
-
-        # Validate user_input is present
-        if user_input is None:
-            logger.error("Row missing required 'user_input' field")
-            result["response"] = MISSING_RESPONSE_PLACEHOLDER
-            result["retrieved_contexts"] = [MISSING_CONTEXT_PLACEHOLDER]
-            for metric in metrics:
-                result[metric.name] = float("nan")
-            return result
-
-        try:
-            # Call AG-UI endpoint
-            events = await _call_ag_ui_endpoint(
-                endpoint_url=endpoint_url,
-                user_input=user_input,
-                thread_id=f"thread-{uuid.uuid4()}",
-                timeout=timeout,
-                extra_headers=extra_headers,
-            )
-
-            # Convert events to Ragas messages
-            messages = convert_to_ragas_messages(events, metadata=metadata)
-
-            # Extract response and contexts from messages
-            response_text = ""
-            context_list: List[str] = []
-            tool_calls: List[ToolCall] = []
-
-            for msg in messages:
-                if isinstance(msg, AIMessage):
-                    if msg.content:
-                        response_text += msg.content
-                    if msg.tool_calls:
-                        tool_calls.extend(msg.tool_calls)
-                elif isinstance(msg, ToolMessage) and msg.content:
-                    context_list.append(msg.content)
-
-            # Update result with extracted data
-            result["response"] = response_text or MISSING_RESPONSE_PLACEHOLDER
-            result["retrieved_contexts"] = (
-                context_list if context_list else [MISSING_CONTEXT_PLACEHOLDER]
-            )
-
-            # Build sample for metric scoring
-            # Determine if this is multi-turn based on:
-            # 1. user_input is already a list (conversation format)
-            # 2. reference_tool_calls are present (tool evaluation requires multi-turn)
-            # 3. any metric is a MultiTurnMetric (requires multi-turn sample)
-            has_multi_turn_metrics = any(
-                isinstance(m, MultiTurnMetric) for m in metrics
-            )
-            needs_multi_turn = (
-                isinstance(user_input, list)
-                or reference_tool_calls is not None
-                or has_multi_turn_metrics
-            )
-
-            if needs_multi_turn:
-                # For multi-turn, build conversation with user input + agent responses
-                conversation: List[Union[HumanMessage, AIMessage, ToolMessage]]
-                if isinstance(user_input, list):
-                    conversation = [
-                        msg
-                        if isinstance(msg, (HumanMessage, AIMessage, ToolMessage))
-                        else HumanMessage(content=str(msg))
-                        for msg in user_input
-                    ]
-                else:
-                    # Convert string user_input to conversation format
-                    conversation = [HumanMessage(content=str(user_input))]
-
-                # Add agent responses to conversation
-                for msg in messages:
-                    if isinstance(msg, (AIMessage, ToolMessage)):
-                        conversation.append(msg)
-
-                sample: Union[SingleTurnSample, MultiTurnSample] = MultiTurnSample(
-                    user_input=conversation,
-                    reference=reference,
-                    reference_tool_calls=reference_tool_calls,
-                )
-            else:
-                sample = SingleTurnSample(
-                    user_input=str(user_input),
-                    response=response_text or MISSING_RESPONSE_PLACEHOLDER,
-                    reference=reference,
-                    retrieved_contexts=context_list
-                    if context_list
-                    else [MISSING_CONTEXT_PLACEHOLDER],
-                )
-
-            # Score each metric
-            for metric in metrics:
-                try:
-                    if _is_modern_metric(metric):
-                        score_value, _ = await _score_sample_with_metric(
-                            metric, sample, evaluator_llm=evaluator_llm
-                        )
-                    elif isinstance(metric, Metric):
-                        if needs_multi_turn and hasattr(metric, "multi_turn_ascore"):
-                            score_value = await metric.multi_turn_ascore(  # type: ignore[union-attr]
-                                t.cast(MultiTurnSample, sample), callbacks=None
-                            )
-                        elif hasattr(metric, "single_turn_ascore"):
-                            score_value = await metric.single_turn_ascore(  # type: ignore[union-attr]
-                                t.cast(SingleTurnSample, sample), callbacks=None
-                            )
-                        else:
-                            score_value = float("nan")
-                    else:
-                        logger.warning(
-                            f"Unsupported metric type: {type(metric).__name__}"
-                        )
-                        score_value = float("nan")
-
-                    result[metric.name] = score_value
-
-                except Exception as e:
-                    logger.warning(f"Metric {metric.name} failed: {e}")
-                    result[metric.name] = float("nan")
-
-        except Exception as e:
-            logger.error(f"AG-UI endpoint call failed: {e}")
-            result["response"] = MISSING_RESPONSE_PLACEHOLDER
-            result["retrieved_contexts"] = [MISSING_CONTEXT_PLACEHOLDER]
-            # Set all metric scores to NaN on failure
-            for metric in metrics:
-                result[metric.name] = float("nan")
-
-        return result
-
-    return evaluate_ag_ui_row
+    except Exception as e:
+        logger.error(f"AG-UI endpoint call failed: {e}")
+        return {
+            **row,
+            "response": MISSING_RESPONSE_PLACEHOLDER,
+            "messages": [],
+            "tool_calls": [],
+            "contexts": [MISSING_CONTEXT_PLACEHOLDER],
+        }

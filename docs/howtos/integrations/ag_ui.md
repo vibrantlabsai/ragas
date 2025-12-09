@@ -154,26 +154,33 @@ tool_metrics = [
 ]
 ```
 
-## Run experiments against a live AG-UI endpoint
+## Run experiments with @experiment
 
-`create_ag_ui_experiment` is a factory function that returns an experiment function configured for your AG-UI endpoint. The returned function implements the `@experiment` decorator pattern and can be run against datasets using `.arun()`.
+The AG-UI integration provides `run_ag_ui_row()` to call your endpoint and enrich each row with the agent's response. Combine this with the `@experiment` decorator to build evaluation pipelines.
 
 > ⚠️ The endpoint must expose the AG-UI SSE stream. Common paths include `/chat`, `/agent`, or `/agentic_chat`.
 
-### Test factual responses
+### Basic single-turn evaluation
 
 In Jupyter or IPython, use top-level `await` (after `nest_asyncio.apply()`) instead of `asyncio.run` to avoid the "event loop is already running" error. For scripts you can keep `asyncio.run`.
 
 ```python
-from ragas.integrations.ag_ui import create_ag_ui_experiment
+from ragas import experiment
+from ragas.integrations.ag_ui import run_ag_ui_row
+from ragas.metrics.collections import FactualCorrectness
 
-# Create an experiment function configured for Q&A evaluation
-factual_experiment = create_ag_ui_experiment(
-    endpoint_url="http://localhost:8000/agentic_chat",
-    metrics=qa_metrics,
-    evaluator_llm=evaluator_llm,
-    metadata=True,  # optional, keeps run/thread metadata on messages
-)
+@experiment()
+async def factual_experiment(row):
+    # Call AG-UI endpoint and get enriched row
+    enriched = await run_ag_ui_row(row, "http://localhost:8000/chat")
+
+    # Score with metrics
+    score = await FactualCorrectness(llm=evaluator_llm).ascore(
+        response=enriched["response"],
+        reference=row["reference"],
+    )
+
+    return {**enriched, "factual_correctness": score.value}
 
 # Run the experiment against the dataset
 # In Jupyter/IPython (after calling nest_asyncio.apply())
@@ -190,17 +197,37 @@ factual_result.to_pandas()
 
 The resulting dataframe includes per-sample scores, raw agent responses, and any retrieved contexts (tool results). Results are automatically saved by the experiment framework, and you can export to CSV through pandas.
 
-### Test tool usage
+### Multi-turn tool evaluation
 
-The same pattern supports multi-turn datasets. Agent responses (AI messages and tool outputs) are used to score tool call accuracy and goal achievement.
+For multi-turn datasets and tool evaluation, use `build_sample()` to create the appropriate sample type:
 
 ```python
-# Create an experiment function configured for tool usage evaluation
-tool_experiment = create_ag_ui_experiment(
-    endpoint_url="http://localhost:8000/agentic_chat",
-    metrics=tool_metrics,
-    evaluator_llm=evaluator_llm,
-)
+from ragas import experiment
+from ragas.integrations.ag_ui import run_ag_ui_row, build_sample
+from ragas.metrics import ToolCallF1, AgentGoalAccuracyWithReference
+
+@experiment()
+async def tool_experiment(row):
+    # Call AG-UI endpoint and get enriched row
+    enriched = await run_ag_ui_row(row, "http://localhost:8000/chat")
+
+    # Build a MultiTurnSample for tool metrics
+    sample = build_sample(
+        user_input=row["user_input"],
+        messages=enriched["messages"],
+        reference=row.get("reference"),
+        reference_tool_calls=row.get("reference_tool_calls"),
+    )
+
+    # Score with tool metrics
+    tool_f1 = await ToolCallF1().multi_turn_ascore(sample)
+    goal_accuracy = await AgentGoalAccuracyWithReference(llm=evaluator_llm).multi_turn_ascore(sample)
+
+    return {
+        **enriched,
+        "tool_call_f1": tool_f1,
+        "agent_goal_accuracy": goal_accuracy,
+    }
 
 # Run the experiment
 # In Jupyter/IPython
@@ -219,7 +246,7 @@ If a request fails, the experiment logs the error and returns placeholder values
 
 ## Working directly with AG-UI events
 
-Sometimes you may want to collect event logs separately—perhaps from a recorded run or a staging environment—and evaluate them offline. The conversion helpers expose the same parsing logic used by the experiment function.
+Sometimes you may want to collect event logs separately—perhaps from a recorded run or a staging environment—and evaluate them offline. The conversion helpers expose the same parsing logic used by `run_ag_ui_row()`.
 
 ```python
 from ragas.integrations.ag_ui import convert_to_ragas_messages
@@ -255,9 +282,27 @@ ragas_messages = convert_messages_snapshot(snapshot)
 
 The converted messages can be used to build custom evaluation workflows or passed directly to metric scoring functions.
 
+## Extraction helpers
+
+The integration provides helper functions to extract specific data from messages:
+
+```python
+from ragas.integrations.ag_ui import (
+    extract_response,    # Get concatenated AI response text
+    extract_tool_calls,  # Get all tool calls from AI messages
+    extract_contexts,    # Get tool results/contexts
+)
+
+messages = convert_to_ragas_messages(events)
+
+response = extract_response(messages)      # "Hello! The weather is sunny."
+tool_calls = extract_tool_calls(messages)  # [ToolCall(name="get_weather", args={"location": "SF"})]
+contexts = extract_contexts(messages)      # ["Sunny, 72F in San Francisco"]
+```
+
 ## Tips for production experiments
 
-- **Custom headers**: pass authentication tokens or tenant IDs via `extra_headers`.
+- **Custom headers**: pass authentication tokens or tenant IDs via `extra_headers` parameter to `run_ag_ui_row()`.
 - **Timeouts**: tune the `timeout` parameter if your agent performs long-running tool calls.
 - **Metadata debugging**: set `metadata=True` to keep AG-UI run, thread, and message IDs on every message for easier traceability.
 - **Experiment naming**: use descriptive `name` arguments to `.arun()` for easy identification of results.
@@ -270,3 +315,30 @@ For a complete production example, see `examples/ragas_examples/ag_ui_agent_expe
 - Timestamped result output
 
 An interactive walkthrough notebook is also available at `howtos/integrations/ag_ui.ipynb`.
+
+## API Reference
+
+### Primary API
+
+- **`run_ag_ui_row(row, endpoint_url, ...)`** - Run a single row against an AG-UI endpoint and return enriched data with response, messages, tool_calls, and contexts.
+
+### Conversion Functions
+
+- **`convert_to_ragas_messages(events, metadata=False)`** - Convert AG-UI event sequences to Ragas messages
+- **`convert_messages_snapshot(snapshot, metadata=False)`** - Convert AG-UI message snapshots to Ragas messages
+- **`convert_messages_to_ag_ui(messages)`** - Convert Ragas messages to AG-UI format
+
+### Extraction Helpers
+
+- **`extract_response(messages)`** - Extract concatenated AI response text
+- **`extract_tool_calls(messages)`** - Extract all tool calls from AI messages
+- **`extract_contexts(messages)`** - Extract tool results/contexts from messages
+
+### Sample Building
+
+- **`build_sample(user_input, messages, reference=None, reference_tool_calls=None)`** - Build SingleTurnSample or MultiTurnSample based on inputs
+
+### Low-Level
+
+- **`call_ag_ui_endpoint(endpoint_url, user_input, ...)`** - Call an AG-UI endpoint and collect streaming events
+- **`AGUIEventCollector`** - Collect and reconstruct messages from streaming events
