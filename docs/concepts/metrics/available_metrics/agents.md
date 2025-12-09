@@ -337,75 +337,149 @@ While both `ToolCallF1` and `TopicAdherenceScore` uses precision, recall, and F1
 
 Use `ToolCallF1` when you want to track whether the agent correctly **executed tools**. Use `TopicAdherenceScore` when evaluating whether the **content or intention** stays within allowed topics.
 
-### Example: Matching Expected Tool Calls
+### Example: Basic Usage
 
 ```python
-from ragas.metrics import ToolCallF1
-from ragas.dataset_schema import MultiTurnSample
-from ragas.messages import HumanMessage, AIMessage, ToolMessage, ToolCall
+import asyncio
+from ragas.metrics.collections import ToolCallF1
+from ragas.messages import HumanMessage, AIMessage, ToolCall
 
-sample = [
-    HumanMessage(content="What's the weather like in Paris today?"),
-    AIMessage(content="Let me check that for you.", tool_calls=[
-        ToolCall(name="weather_check", args={"location": "Paris"})
-    ]),
-    HumanMessage(content="And the UV index?"),
-    AIMessage(content="Sure, here's the UV index for Paris.", tool_calls=[
-        ToolCall(name="uv_index_lookup", args={"location": "Paris"})
-    ])
-]
-
-sample = MultiTurnSample(
-    user_input=sample,
-    reference_tool_calls=[
-        ToolCall(name="weather_check", args={"location": "Paris"}),
-        ToolCall(name="uv_index_lookup", args={"location": "Paris"})
+async def evaluate_tool_call_f1():
+    # Define the conversation with tool calls
+    user_input = [
+        HumanMessage(content="What's the weather like in Paris today?"),
+        AIMessage(
+            content="Let me check that for you.",
+            tool_calls=[ToolCall(name="weather_check", args={"location": "Paris"})],
+        ),
+        HumanMessage(content="And the UV index?"),
+        AIMessage(
+            content="Sure, here's the UV index for Paris.",
+            tool_calls=[ToolCall(name="uv_index_lookup", args={"location": "Paris"})],
+        ),
     ]
-)
 
-scorer = ToolCallF1()
-await scorer.multi_turn_ascore(sample)
+    # Define expected tool calls
+    reference_tool_calls = [
+        ToolCall(name="weather_check", args={"location": "Paris"}),
+        ToolCall(name="uv_index_lookup", args={"location": "Paris"}),
+    ]
+
+    # Evaluate
+    metric = ToolCallF1()
+    result = await metric.ascore(
+        user_input=user_input,
+        reference_tool_calls=reference_tool_calls,
+    )
+    print(f"Tool Call F1: {result.value}")
+
+if __name__ == "__main__":
+    asyncio.run(evaluate_tool_call_f1())
 ```
 
-Output
-
+Output:
 ```
-1.0
+Tool Call F1: 1.0
 ```
 
 ### Example: Extra Tool Called
 
+When the agent makes an extra tool call not in the reference:
+
 ```python
-sample = [
+user_input = [
     HumanMessage(content="What's the weather like in Paris today?"),
-    AIMessage(content="Let me check that for you.", tool_calls=[
-        ToolCall(name="weather_check", args={"location": "Paris"})
-    ]),
+    AIMessage(
+        content="Let me check that for you.",
+        tool_calls=[ToolCall(name="weather_check", args={"location": "Paris"})],
+    ),
     HumanMessage(content="And the UV index?"),
-    AIMessage(content="Sure, here's the UV index for Paris.", tool_calls=[
-        ToolCall(name="uv_index_lookup", args={"location": "Paris"}),
-        ToolCall(name="air_quality", args={"location": "Paris"})  # extra call
-    ])
+    AIMessage(
+        content="Sure, here's the UV index and air quality for Paris.",
+        tool_calls=[
+            ToolCall(name="uv_index_lookup", args={"location": "Paris"}),
+            ToolCall(name="air_quality", args={"location": "Paris"}),  # extra call
+        ],
+    ),
 ]
 
+reference_tool_calls = [
+    ToolCall(name="weather_check", args={"location": "Paris"}),
+    ToolCall(name="uv_index_lookup", args={"location": "Paris"}),
+]
+
+result = await metric.ascore(
+    user_input=user_input,
+    reference_tool_calls=reference_tool_calls,
+)
+print(f"F1 Score: {result.value}")
+```
+
+Output:
+```
+F1 Score: 0.67
+```
+
+In this case:
+- TP = 2 (weather_check, uv_index_lookup)
+- FP = 1 (air_quality)
+- FN = 0
+- Precision = 2/3 = 0.67, Recall = 2/2 = 1.0, F1 = 0.67
+
+### Scoring Examples
+
+**Perfect match:**
+```python
+# All tools called correctly
+Reference: [weather_check(location="Paris"), uv_index_lookup(location="Paris")]
+Got:       [weather_check(location="Paris"), uv_index_lookup(location="Paris")]
+F1 Score: 1.0
+```
+
+**Missing tool call:**
+```python
+# One expected tool not called
+Reference: [weather_check(...), uv_index_lookup(...)]
+Got:       [weather_check(...)]
+F1 Score: 0.67 (TP=1, FP=0, FN=1)
+```
+
+**Wrong arguments:**
+```python
+# Tool name matches but args differ
+Reference: [weather_check(location="Paris")]
+Got:       [weather_check(location="London")]
+F1 Score: 0.0 (no match, arguments must be exact)
+```
+
+### Legacy API (Deprecated)
+
+!!! warning "Deprecation Notice"
+    The legacy `ToolCallF1` from `ragas.metrics` is deprecated and will be removed in v1.0. Please migrate to `ragas.metrics.collections.ToolCallF1` which provides the same functionality with a modern API.
+
+The legacy API can still be used but requires `MultiTurnSample`:
+
+```python
+from ragas.metrics import ToolCallF1  # Legacy import
+from ragas.dataset_schema import MultiTurnSample
+from ragas.messages import HumanMessage, AIMessage, ToolCall
+
 sample = MultiTurnSample(
-    user_input=sample,
+    user_input=[
+        HumanMessage(content="What's the weather like in Paris today?"),
+        AIMessage(
+            content="Let me check that for you.",
+            tool_calls=[ToolCall(name="weather_check", args={"location": "Paris"})],
+        ),
+    ],
     reference_tool_calls=[
-        ToolCall(name="uv_index_lookup", args={"location": "Paris"}),
-        ToolCall(name="weather_check", args={"location": "Paris"})
-    ]
+        ToolCall(name="weather_check", args={"location": "Paris"}),
+    ],
 )
 
-await scorer.multi_turn_ascore(sample)
+scorer = ToolCallF1()
+score = await scorer.multi_turn_ascore(sample)
 ```
-
-Output
-
-```
-0.67
-```
-
-In this case, the agent calls both correct tools but adds an extra `air_quality` call. The F1-score reflects partial correctness instead of failing the example completely.
 
 
 ## Agent Goal accuracy
