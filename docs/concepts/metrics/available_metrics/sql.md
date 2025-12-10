@@ -58,9 +58,73 @@ scorer = DataCompyScore(mode="column", metric="recall")
 
 Executing SQL queries on the database can be time-consuming and sometimes not feasible. In such cases, we can use non-execution based metrics to evaluate the SQL queries. These metrics compare the SQL queries directly without executing them on the database.
 
-### SQL Query Semantic equivalence
+### SQL Semantic Equivalence
 
-`LLMSQLEquivalence` is a metric that can be used to evaluate the equivalence of `response` query with `reference` query. The metric also needs database schema to be used when comparing queries, this is inputted in `reference_contexts`. This metric is a binary metric, with 1 indicating that the SQL queries are semantically equivalent and 0 indicating that the SQL queries are not semantically equivalent.
+`SQLSemanticEquivalence` is a metric that evaluates whether a generated SQL query is semantically equivalent to a reference query. The metric uses an LLM to analyze both queries in the context of the provided database schema and determine if they would produce the same results.
+
+This is a binary metric:
+- **1.0**: The SQL queries are semantically equivalent
+- **0.0**: The SQL queries are not equivalent
+
+The metric considers the database schema context to make accurate equivalence judgments, accounting for syntactic differences that don't affect semantics (e.g., `active = 1` vs `active = true`).
+
+```python
+from openai import AsyncOpenAI
+from ragas.llms.base import llm_factory
+from ragas.metrics.collections import SQLSemanticEquivalence
+
+# Initialize the LLM
+client = AsyncOpenAI()
+llm = llm_factory("gpt-4o-mini", client=client)
+
+# Create the metric
+metric = SQLSemanticEquivalence(llm=llm)
+
+# Evaluate SQL equivalence
+result = await metric.ascore(
+    response="""
+        SELECT p.product_name, SUM(oi.quantity) AS total_quantity
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.product_id
+        GROUP BY p.product_name;
+    """,
+    reference="""
+        SELECT products.product_name, SUM(order_items.quantity) AS total_quantity
+        FROM order_items
+        INNER JOIN products ON order_items.product_id = products.product_id
+        GROUP BY products.product_name;
+    """,
+    reference_contexts=[
+        """
+        Table order_items:
+        - order_item_id: INT
+        - order_id: INT
+        - product_id: INT
+        - quantity: INT
+        """,
+        """
+        Table products:
+        - product_id: INT
+        - product_name: VARCHAR
+        - price: DECIMAL
+        """
+    ]
+)
+
+print(f"Equivalent: {result.value == 1.0}")
+print(f"Explanation: {result.reason}")
+```
+
+The result includes explanations of both queries and the reasoning for the equivalence determination.
+
+---
+
+### LLMSQLEquivalence (Legacy)
+
+!!! warning "Deprecated"
+    `LLMSQLEquivalence` is deprecated and will be removed in a future version. Please use `SQLSemanticEquivalence` from `ragas.metrics.collections` as shown above.
+
+`LLMSQLEquivalence` is the legacy metric for SQL semantic equivalence evaluation. It uses the `SingleTurnSample` schema and requires setting the LLM separately.
 
 ```python
 from ragas.metrics import LLMSQLEquivalence
