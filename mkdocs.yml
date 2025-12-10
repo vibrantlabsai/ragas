@@ -261,6 +261,7 @@ plugins:
   - social:
       enabled: !ENV [MKDOCS_CI, true]
   - to-pdf:
+      enabled_if_env: ENABLE_PDF_EXPORT
       author: RAGAS Team
       copyright: RAGAS Contributors
       cover_title: RAGAS Documentation
