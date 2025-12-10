@@ -18,6 +18,7 @@ from ragas.metrics.base import (
 )
 from ragas.prompt import PydanticPrompt
 from ragas.run_config import RunConfig
+from ragas.utils import deprecated
 
 if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
@@ -114,20 +115,45 @@ class LLMContextPrecisionWithReference(MetricWithLLM, SingleTurnMetric):
         self, verifications: t.List[Verification]
     ) -> float:
         score = np.nan
+        is_nan_reason = None
 
-        verdict_list = [1 if ver.verdict else 0 for ver in verifications]
-        denominator = sum(verdict_list) + 1e-10
-        numerator = sum(
-            [
-                (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
-                for i in range(len(verdict_list))
-            ]
-        )
-        score = numerator / denominator
-        if np.isnan(score):
+        try:
+            verdict_list = [1 if ver.verdict else 0 for ver in verifications]
+            denominator = sum(verdict_list) + 1e-10
+            
+            # CALCULATION: Numerator calculation step-by-step
+            numerator_terms = []
+            for i in range(len(verdict_list)):
+                prefix_sum = sum(verdict_list[: i + 1])
+                term = (prefix_sum / (i + 1)) * verdict_list[i]
+                numerator_terms.append(term)
+            
+            numerator = sum(numerator_terms)
+            score = numerator / denominator
+            
+            # Only log calculation details if score is 0.0 or NaN (will be checked by caller)
+            if score == 0.0 or (isinstance(score, float) and np.isnan(score)):
+                logger.warning(f"[CONTEXT_PRECISION CALCULATION] Verdict list: {verdict_list}")
+                logger.warning(f"[CONTEXT_PRECISION CALCULATION] Denominator: {denominator}")
+                logger.warning(f"[CONTEXT_PRECISION CALCULATION] Numerator: {numerator}")
+                if np.isnan(score):
+                    logger.warning(f"[CONTEXT_PRECISION CALCULATION] Score is NaN - calculation resulted in NaN")
+                else:
+                    logger.warning(f"[CONTEXT_PRECISION CALCULATION] Score: {numerator} / {denominator} = {score}")
+                    for i in range(len(verdict_list)):
+                        prefix_sum = sum(verdict_list[: i + 1])
+                        term = (prefix_sum / (i + 1)) * verdict_list[i]
+                        logger.warning(f"[CONTEXT_PRECISION CALCULATION] Term {i+1}: prefix_sum={prefix_sum}, divisor={i+1}, verdict={verdict_list[i]}, term={term}")
+        except Exception as e:
+            is_nan_reason = f"Exception in calculation: {e}"
             logger.warning(
                 "Invalid response format. Expected a list of dictionaries with keys 'verdict'"
             )
+            score = np.nan
+        
+        if np.isnan(score) and is_nan_reason:
+            logger.warning(f"[CONTEXT_PRECISION CALCULATION] NaN reason: {is_nan_reason}")
+        
         return score
 
     async def _single_turn_ascore(
@@ -144,8 +170,15 @@ class LLMContextPrecisionWithReference(MetricWithLLM, SingleTurnMetric):
         assert self.llm is not None, "LLM is not set"
 
         user_input, retrieved_contexts, reference = self._get_row_attributes(row)
+        
+        # Store for logging (only if score is 0.0)
+        question_preview = user_input[:200] if user_input else ""
+        answer_preview = reference[:200] if reference else ""
+        contexts_count = len(retrieved_contexts) if retrieved_contexts else 0
+        contexts_preview = [ctx[:200] for ctx in retrieved_contexts[:3]] if retrieved_contexts else []
+        
         responses = []
-        for context in retrieved_contexts:
+        for i, context in enumerate(retrieved_contexts):
             verdicts: t.List[
                 Verification
             ] = await self.context_precision_prompt.generate_multiple(
@@ -161,11 +194,48 @@ class LLMContextPrecisionWithReference(MetricWithLLM, SingleTurnMetric):
             responses.append([result.model_dump() for result in verdicts])
 
         answers = []
-        for response in responses:
+        for i, response in enumerate(responses):
             agg_answer = ensembler.from_discrete([response], "verdict")
             answers.append(Verification(**agg_answer[0]))
 
         score = self._calculate_average_precision(answers)
+        
+        # DETAILED LOGGING ONLY WHEN SCORE IS 0.0 OR NaN
+        if score == 0.0 or (isinstance(score, float) and np.isnan(score)):
+            # INPUT LOGGING
+            logger.warning(f"[CONTEXT_PRECISION INPUT] Question (first 200 chars): {question_preview}")
+            logger.warning(f"[CONTEXT_PRECISION INPUT] Answer (first 200 chars): {answer_preview}")
+            logger.warning(f"[CONTEXT_PRECISION INPUT] Contexts count: {contexts_count}")
+            if contexts_preview:
+                for i, ctx_preview in enumerate(contexts_preview):
+                    logger.warning(f"[CONTEXT_PRECISION INPUT] Context {i+1} (first 200 chars): {ctx_preview}")
+            
+            # CALCULATION LOGGING
+            for i, context in enumerate(retrieved_contexts):
+                context_preview = context[:200] if context else ""
+                logger.warning(f"[CONTEXT_PRECISION CALCULATION] Processing context {i+1}/{contexts_count}: {context_preview}...")
+                
+                # Re-extract verdicts for logging (we already have them in responses)
+                if i < len(responses):
+                    verdicts_data = responses[i]
+                    logger.warning(f"[CONTEXT_PRECISION CALCULATION] Context {i+1} verdicts count: {len(verdicts_data)}")
+                    for j, verdict_data in enumerate(verdicts_data):
+                        reason_preview = verdict_data.get('reason', '')[:150] if verdict_data.get('reason') else ""
+                        verdict_value = verdict_data.get('verdict', 'N/A')
+                        logger.warning(f"[CONTEXT_PRECISION CALCULATION] Context {i+1}, Verdict {j+1}: verdict={verdict_value}, reason='{reason_preview}...'")
+            
+            for i, answer in enumerate(answers):
+                logger.warning(f"[CONTEXT_PRECISION CALCULATION] Context {i+1} aggregated verdict: {answer.verdict}")
+            
+            # OUTPUT LOGGING
+            logger.warning(f"[CONTEXT_PRECISION OUTPUT] Score is {score}")
+            if np.isnan(score):
+                logger.warning(f"[CONTEXT_PRECISION OUTPUT] NaN reason: Invalid response format or calculation error")
+            logger.warning(f"[CONTEXT_PRECISION OUTPUT] Question: {question_preview}")
+            logger.warning(f"[CONTEXT_PRECISION OUTPUT] Answer: {answer_preview}")
+            logger.warning(f"[CONTEXT_PRECISION OUTPUT] Contexts count: {contexts_count}")
+            logger.warning(f"[CONTEXT_PRECISION OUTPUT] All verdicts: {[ans.verdict for ans in answers]}")
+        
         return score
 
 
@@ -316,6 +386,12 @@ class ContextPrecision(LLMContextPrecisionWithReference):
     ) -> float:
         return await super()._single_turn_ascore(sample, callbacks)
 
+    @deprecated(
+        since="0.2", removal="0.3", alternative="LLMContextPrecisionWithReference"
+    )
+    async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> float:
+        return await super()._ascore(row, callbacks)
+
 
 @dataclass
 class ContextUtilization(LLMContextPrecisionWithoutReference):
@@ -325,6 +401,12 @@ class ContextUtilization(LLMContextPrecisionWithoutReference):
         self, sample: SingleTurnSample, callbacks: Callbacks
     ) -> float:
         return await super()._single_turn_ascore(sample, callbacks)
+
+    @deprecated(
+        since="0.2", removal="0.3", alternative="LLMContextPrecisionWithoutReference"
+    )
+    async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> float:
+        return await super()._ascore(row, callbacks)
 
 
 context_precision = ContextPrecision()

@@ -238,62 +238,109 @@ class ContextRelevance(MetricWithLLM, SingleTurnMetric):
         assert sample.user_input is not None, "User input is not set"
         assert sample.retrieved_contexts is not None, "Retrieved Context is not set"
 
-        if (sample.user_input.strip() == "") or (
-            "\n".join(sample.retrieved_contexts).strip() == ""
-        ):
-            return 0.0
-        if sample.user_input.strip() == "\n".join(sample.retrieved_contexts).strip():
-            return 0.0
-        if "\n".join(sample.retrieved_contexts).strip() in sample.user_input.strip():
-            return 0.0
+        # Store input data for logging (only if score is 0.0 or NaN)
+        question = sample.user_input
+        contexts = sample.retrieved_contexts
+        question_preview = question[:200] if question else ""
+        contexts_count = len(contexts) if contexts else 0
+        contexts_preview = [ctx[:200] for ctx in contexts[:3]] if contexts else []
+        contexts_str = "\n".join(contexts) if contexts else ""
 
-        try:
+        # CALCULATION: Edge case detection
+        edge_case_triggered = None
+        if (question.strip() == "") or (contexts_str.strip() == ""):
+            edge_case_triggered = "empty_input_or_context"
+            score = 0.0
+        elif question.strip() == contexts_str.strip():
+            edge_case_triggered = "identical_strings"
+            score = 0.0
+        elif contexts_str.strip() in question.strip():
+            edge_case_triggered = "contexts_substring_of_question"
+            score = 0.0
+        else:
+            # Initialize variables for logging
             score0 = score1 = np.nan
-            for retry in range(self.retry):
-                formatted_prompt = StringPromptValue(
-                    text=self.template_relevance1.format(
-                        query=sample.user_input,
-                        context="\n".join(sample.retrieved_contexts),
+            raw_response0 = None
+            raw_response1 = None
+            score = None  # Will be calculated below
+            
+            try:
+                # CALCULATION: Template 1
+                for retry in range(self.retry):
+                    formatted_prompt = StringPromptValue(
+                        text=self.template_relevance1.format(
+                            query=question,
+                            context=contexts_str,
+                        )
                     )
-                )
-                req = t.cast(BaseRagasLLM, self.llm).agenerate_text(
-                    formatted_prompt,
-                    n=1,
-                    temperature=0.1,
-                )
-                resp = await req
-                score0 = self.process_score(resp.generations[0][0].text)
-                if score0 == score0:
-                    break
-                else:
-                    logger.warning(f"Retry: {retry}")
-
-            for retry in range(self.retry):
-                formatted_prompt = StringPromptValue(
-                    text=self.template_relevance2.format(
-                        query=sample.user_input,
-                        context="\n".join(sample.retrieved_contexts),
+                    req = t.cast(BaseRagasLLM, self.llm).agenerate_text(
+                        formatted_prompt,
+                        n=1,
+                        temperature=0.1,
                     )
-                )
-                req = t.cast(BaseRagasLLM, self.llm).agenerate_text(
-                    formatted_prompt,
-                    n=1,
-                    temperature=0.1,
-                )
-                resp = await req
-                score1 = self.process_score(resp.generations[0][0].text)
-                if score1 == score1:
-                    break
-                else:
-                    logger.warning(f"Retry: {retry}")
+                    resp = await req
+                    raw_response0 = resp.generations[0][0].text
+                    score0 = self.process_score(raw_response0)
+                    if score0 == score0:
+                        break
 
-            score = self.average_scores(score0, score1)
+                # CALCULATION: Template 2
+                for retry in range(self.retry):
+                    formatted_prompt = StringPromptValue(
+                        text=self.template_relevance2.format(
+                            query=question,
+                            context=contexts_str,
+                        )
+                    )
+                    req = t.cast(BaseRagasLLM, self.llm).agenerate_text(
+                        formatted_prompt,
+                        n=1,
+                        temperature=0.1,
+                    )
+                    resp = await req
+                    raw_response1 = resp.generations[0][0].text
+                    score1 = self.process_score(raw_response1)
+                    if score1 == score1:
+                        break
 
-        except Exception as e:
-            print(
-                f"An error occurred: {e}. Skipping a sample by assigning it nan score."
-            )
-            score = np.nan
+                # CALCULATION: Score averaging
+                score = self.average_scores(score0, score1)
+
+            except Exception as e:
+                logger.error(f"[CONTEXT_RELEVANCE OUTPUT] Exception occurred: {e}")
+                print(
+                    f"An error occurred: {e}. Skipping a sample by assigning it nan score."
+                )
+                score = np.nan
+
+        # DETAILED LOGGING ONLY WHEN SCORE IS 0.0 OR NaN
+        if score == 0.0 or (isinstance(score, float) and np.isnan(score)):
+            # INPUT LOGGING
+            logger.warning(f"[CONTEXT_RELEVANCE INPUT] Question (first 200 chars): {question_preview}")
+            logger.warning(f"[CONTEXT_RELEVANCE INPUT] Contexts count: {contexts_count}")
+            if contexts_preview:
+                for i, ctx_preview in enumerate(contexts_preview):
+                    logger.warning(f"[CONTEXT_RELEVANCE INPUT] Context {i+1} (first 200 chars): {ctx_preview}")
+            
+            # CALCULATION LOGGING (only if not edge case)
+            if not edge_case_triggered:
+                if raw_response0:
+                    logger.warning(f"[CONTEXT_RELEVANCE CALCULATION] Template 1, raw_response='{raw_response0[:200]}...', processed_score={score0}")
+                if raw_response1:
+                    logger.warning(f"[CONTEXT_RELEVANCE CALCULATION] Template 2, raw_response='{raw_response1[:200]}...', processed_score={score1}")
+                logger.warning(f"[CONTEXT_RELEVANCE CALCULATION] Score averaging: score0={score0}, score1={score1}, final_score={score}")
+            
+            # OUTPUT LOGGING
+            logger.warning(f"[CONTEXT_RELEVANCE OUTPUT] Score is {score}")
+            if np.isnan(score):
+                logger.warning(f"[CONTEXT_RELEVANCE OUTPUT] NaN reason: Exception occurred or invalid score processing")
+            if edge_case_triggered:
+                logger.warning(f"[CONTEXT_RELEVANCE OUTPUT] Edge case that triggered: {edge_case_triggered}")
+            if raw_response0:
+                logger.warning(f"[CONTEXT_RELEVANCE OUTPUT] Template 1 raw response: {raw_response0[:300]}")
+            if raw_response1:
+                logger.warning(f"[CONTEXT_RELEVANCE OUTPUT] Template 2 raw response: {raw_response1[:300]}")
+            logger.warning(f"[CONTEXT_RELEVANCE OUTPUT] score0={score0}, score1={score1}")
 
         return score
 
@@ -372,61 +419,110 @@ class ResponseGroundedness(MetricWithLLM, SingleTurnMetric):
         assert sample.response is not None, "Response is not set"
         assert sample.retrieved_contexts is not None, "Retrieved Context is not set"
 
-        if (sample.response.strip() == "") or (
-            "\n".join(sample.retrieved_contexts).strip().strip() == ""
-        ):
-            return 0.0
-        if sample.response.strip() == "\n".join(sample.retrieved_contexts).strip():
-            return 1.0
-        if sample.response.strip() in "\n".join(sample.retrieved_contexts).strip():
-            return 1.0
+        # Store input data for logging (only if score is 0.0 or NaN)
+        response = sample.response
+        contexts = sample.retrieved_contexts
+        response_preview = response[:200] if response else ""
+        contexts_count = len(contexts) if contexts else 0
+        contexts_preview = [ctx[:200] for ctx in contexts[:3]] if contexts else []
+        contexts_str = "\n".join(contexts) if contexts else ""
 
-        try:
+        # CALCULATION: Edge case detection
+        edge_case_triggered = None
+        if (response.strip() == "") or (contexts_str.strip() == ""):
+            edge_case_triggered = "empty_response_or_context"
+            score = 0.0
+        elif response.strip() == contexts_str.strip():
+            edge_case_triggered = "identical_strings"
+            score = 1.0  # This is not 0.0, so we don't log it
+            return score
+        elif response.strip() in contexts_str.strip():
+            edge_case_triggered = "response_substring_of_contexts"
+            score = 1.0  # This is not 0.0, so we don't log it
+            return score
+        else:
+            # Initialize variables for logging
             score0 = score1 = np.nan
-            for retry in range(self.retry):
-                formatted_prompt = StringPromptValue(
-                    text=self.template_groundedness1.format(
-                        context="\n".join(sample.retrieved_contexts),
-                        response=sample.response,
+            raw_response0 = None
+            raw_response1 = None
+            score = None  # Will be calculated below
+            
+            try:
+                # CALCULATION: Template 1
+                for retry in range(self.retry):
+                    formatted_prompt = StringPromptValue(
+                        text=self.template_groundedness1.format(
+                            context=contexts_str,
+                            response=response,
+                        )
                     )
-                )
-                req = t.cast(BaseRagasLLM, self.llm).agenerate_text(
-                    formatted_prompt,
-                    n=1,
-                    temperature=0.1,
-                )
-                resp = await req
-                score0 = self.process_score(resp.generations[0][0].text)
-                if score0 == score0:
-                    break
-                else:
-                    logger.warning(f"Retry: {retry}")
-
-            for retry in range(self.retry):
-                formatted_prompt = StringPromptValue(
-                    text=self.template_groundedness2.format(
-                        context="\n".join(sample.retrieved_contexts),
-                        response=sample.response,
+                    req = t.cast(BaseRagasLLM, self.llm).agenerate_text(
+                        formatted_prompt,
+                        n=1,
+                        temperature=0.1,
                     )
-                )
-                req = t.cast(BaseRagasLLM, self.llm).agenerate_text(
-                    formatted_prompt,
-                    n=1,
-                    temperature=0.1,
-                )
-                resp = await req
-                score1 = self.process_score(resp.generations[0][0].text)
-                if score1 == score1:
-                    break
-                else:
-                    logger.warning(f"Retry: {retry}")
+                    resp = await req
+                    raw_response0 = resp.generations[0][0].text
+                    score0 = self.process_score(raw_response0)
+                    if score0 == score0:
+                        break
 
-            score = self.average_scores(score0, score1)
+                # CALCULATION: Template 2
+                for retry in range(self.retry):
+                    formatted_prompt = StringPromptValue(
+                        text=self.template_groundedness2.format(
+                            context=contexts_str,
+                            response=response,
+                        )
+                    )
+                    req = t.cast(BaseRagasLLM, self.llm).agenerate_text(
+                        formatted_prompt,
+                        n=1,
+                        temperature=0.1,
+                    )
+                    resp = await req
+                    raw_response1 = resp.generations[0][0].text
+                    score1 = self.process_score(raw_response1)
+                    if score1 == score1:
+                        break
 
-        except Exception as e:
-            print(
-                f"An error occurred: {e}. Skipping a sample by assigning it nan score."
-            )
-            score = np.nan
+                # CALCULATION: Score averaging
+                score = self.average_scores(score0, score1)
+
+            except Exception as e:
+                logger.error(f"[RESPONSE_GROUNDEDNESS OUTPUT] Exception occurred: {e}")
+                print(
+                    f"An error occurred: {e}. Skipping a sample by assigning it nan score."
+                )
+                score = np.nan
+
+        # DETAILED LOGGING ONLY WHEN SCORE IS 0.0 OR NaN
+        if score == 0.0 or (isinstance(score, float) and np.isnan(score)):
+            # INPUT LOGGING
+            logger.warning(f"[RESPONSE_GROUNDEDNESS INPUT] Response (first 200 chars): {response_preview}")
+            logger.warning(f"[RESPONSE_GROUNDEDNESS INPUT] Contexts count: {contexts_count}")
+            if contexts_preview:
+                for i, ctx_preview in enumerate(contexts_preview):
+                    logger.warning(f"[RESPONSE_GROUNDEDNESS INPUT] Context {i+1} (first 200 chars): {ctx_preview}")
+            
+            # CALCULATION LOGGING (only if not edge case)
+            if not edge_case_triggered:
+                if raw_response0:
+                    logger.warning(f"[RESPONSE_GROUNDEDNESS CALCULATION] Template 1, raw_response='{raw_response0[:200]}...', processed_score={score0}")
+                if raw_response1:
+                    logger.warning(f"[RESPONSE_GROUNDEDNESS CALCULATION] Template 2, raw_response='{raw_response1[:200]}...', processed_score={score1}")
+                logger.warning(f"[RESPONSE_GROUNDEDNESS CALCULATION] Score averaging: score0={score0}, score1={score1}, final_score={score}")
+            
+            # OUTPUT LOGGING
+            logger.warning(f"[RESPONSE_GROUNDEDNESS OUTPUT] Score is {score}")
+            if np.isnan(score):
+                logger.warning(f"[RESPONSE_GROUNDEDNESS OUTPUT] NaN reason: Exception occurred or invalid score processing")
+            if edge_case_triggered:
+                logger.warning(f"[RESPONSE_GROUNDEDNESS OUTPUT] Edge case that triggered: {edge_case_triggered}")
+            if raw_response0:
+                logger.warning(f"[RESPONSE_GROUNDEDNESS OUTPUT] Template 1 raw response: {raw_response0[:300]}")
+            if raw_response1:
+                logger.warning(f"[RESPONSE_GROUNDEDNESS OUTPUT] Template 2 raw response: {raw_response1[:300]}")
+            logger.warning(f"[RESPONSE_GROUNDEDNESS OUTPUT] score0={score0}, score1={score1}")
 
         return score

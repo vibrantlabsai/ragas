@@ -187,6 +187,7 @@ class Faithfulness(MetricWithLLM, SingleTurnMetric):
         num_statements = len(answers.statements)
         if num_statements:
             score = faithful_statements / num_statements
+            logger.debug(f"[FAITHFULNESS _compute_score] faithful_statements={faithful_statements}, num_statements={num_statements}, score={score}")
         else:
             logger.warning("No statements were generated from the answer.")
             score = np.nan
@@ -205,13 +206,67 @@ class Faithfulness(MetricWithLLM, SingleTurnMetric):
         """
         assert self.llm is not None, "LLM is not set"
 
+        # Store input data for logging (only if score is 0.0)
+        question = row.get("user_input", "")
+        answer = row.get("response", "")
+        contexts = row.get("retrieved_contexts", [])
+        question_preview = question[:200] if question else ""
+        answer_preview = answer[:200] if answer else ""
+        contexts_count = len(contexts) if contexts else 0
+        contexts_preview = [ctx[:200] for ctx in contexts[:3]] if contexts else []
+
+        # CALCULATION: Statement generation
         statements = await self._create_statements(row, callbacks)
         statements = statements.statements
+        
         if statements == []:
+            logger.warning(f"[FAITHFULNESS OUTPUT] No statements generated - returning NaN. Question: {question_preview}, Answer: {answer_preview}")
             return np.nan
 
+        # CALCULATION: Verdict creation
         verdicts = await self._create_verdicts(row, statements, callbacks)
-        return self._compute_score(verdicts)
+
+        # CALCULATION: Score computation
+        score = self._compute_score(verdicts)
+        
+        # DETAILED LOGGING ONLY WHEN SCORE IS 0.0 OR NaN
+        if score == 0.0 or (isinstance(score, float) and np.isnan(score)):
+            # INPUT LOGGING
+            logger.warning(f"[FAITHFULNESS INPUT] Question (first 200 chars): {question_preview}")
+            logger.warning(f"[FAITHFULNESS INPUT] Answer (first 200 chars): {answer_preview}")
+            logger.warning(f"[FAITHFULNESS INPUT] Contexts count: {contexts_count}")
+            if contexts_preview:
+                for i, ctx_preview in enumerate(contexts_preview):
+                    logger.warning(f"[FAITHFULNESS INPUT] Context {i+1} (first 200 chars): {ctx_preview}")
+            
+            # CALCULATION LOGGING
+            logger.warning(f"[FAITHFULNESS CALCULATION] Generated statements count: {len(statements)}")
+            if statements:
+                for i, stmt in enumerate(statements):
+                    stmt_preview = stmt[:100] if stmt else ""
+                    logger.warning(f"[FAITHFULNESS CALCULATION] Statement {i+1} (first 100 chars): {stmt_preview}")
+            
+            logger.warning(f"[FAITHFULNESS CALCULATION] Verdicts count: {len(verdicts.statements)}")
+            for i, verdict in enumerate(verdicts.statements):
+                stmt_preview = verdict.statement[:100] if verdict.statement else ""
+                reason_preview = verdict.reason[:150] if verdict.reason else ""
+                logger.warning(f"[FAITHFULNESS CALCULATION] Verdict {i+1}: statement='{stmt_preview}...', verdict={verdict.verdict}, reason='{reason_preview}...'")
+            
+            # OUTPUT LOGGING
+            if np.isnan(score):
+                logger.warning(f"[FAITHFULNESS OUTPUT] Score is NaN - possible reasons: no statements generated, invalid verdict format, or calculation error")
+            else:
+                faithful_statements = sum(1 if answer.verdict else 0 for answer in verdicts.statements)
+                num_statements = len(verdicts.statements)
+                logger.warning(f"[FAITHFULNESS OUTPUT] Score is {score}")
+                logger.warning(f"[FAITHFULNESS OUTPUT] Calculation details: faithful_statements={faithful_statements}, total_statements={num_statements}")
+                if num_statements > 0:
+                    logger.warning(f"[FAITHFULNESS OUTPUT] Division: {faithful_statements} / {num_statements} = {faithful_statements / num_statements}")
+            logger.warning(f"[FAITHFULNESS OUTPUT] Question: {question_preview}")
+            logger.warning(f"[FAITHFULNESS OUTPUT] Answer: {answer_preview}")
+            logger.warning(f"[FAITHFULNESS OUTPUT] Contexts count: {contexts_count}")
+        
+        return score
 
 
 @dataclass
