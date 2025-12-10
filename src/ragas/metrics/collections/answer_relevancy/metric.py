@@ -130,11 +130,13 @@ class AnswerRelevancy(BaseMetric):
         all_noncommittal = np.all(noncommittal_flags)
 
         # Embed the original question
-        question_vec = np.asarray(self.embeddings.embed_text(user_input)).reshape(1, -1)
+        question_vec = np.asarray(
+            await self.embeddings.aembed_text(user_input)
+        ).reshape(1, -1)
 
         # Embed the generated questions
         gen_question_vec = np.asarray(
-            self.embeddings.embed_texts(generated_questions)
+            await self.embeddings.aembed_texts(generated_questions)
         ).reshape(len(generated_questions), -1)
 
         # Calculate cosine similarity
