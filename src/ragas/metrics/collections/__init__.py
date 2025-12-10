@@ -27,8 +27,14 @@ from ragas.metrics.collections.context_precision import (
 )
 from ragas.metrics.collections.context_recall import ContextRecall
 from ragas.metrics.collections.context_relevance import ContextRelevance
+from ragas.metrics.collections.domain_specific_rubrics import (
+    DomainSpecificRubrics,
+    RubricsScoreWithoutReference,
+    RubricsScoreWithReference,
+)
 from ragas.metrics.collections.factual_correctness import FactualCorrectness
 from ragas.metrics.collections.faithfulness import Faithfulness
+from ragas.metrics.collections.instance_specific_rubrics import InstanceSpecificRubrics
 from ragas.metrics.collections.noise_sensitivity import NoiseSensitivity
 from ragas.metrics.collections.response_groundedness import ResponseGroundedness
 from ragas.metrics.collections.summary_score import SummaryScore
@@ -68,4 +74,9 @@ __all__ = [
     "ToolCallAccuracy",
     "ToolCallF1",
     "TopicAdherence",
+    # Rubric metrics
+    "DomainSpecificRubrics",
+    "InstanceSpecificRubrics",
+    "RubricsScoreWithoutReference",
+    "RubricsScoreWithReference",
 ]
