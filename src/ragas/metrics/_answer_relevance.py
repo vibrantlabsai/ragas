@@ -117,14 +117,65 @@ class ResponseRelevancy(MetricWithLLM, MetricWithEmbeddings, SingleTurnMetric):
         question = row["user_input"]
         gen_questions = [answer.question for answer in answers]
         all_noncommittal = np.all([answer.noncommittal for answer in answers])
+        
+        # Store for logging (only if score is 0.0 or NaN)
+        question_preview = question[:200] if question else ""
+        answer_preview = row.get("response", "")[:200] if row.get("response") else ""
+        
+        # Initialize calculation variables (will be set if not NaN)
+        cosine_sim = None
+        mean_similarity = None
+        noncommittal_multiplier = None
+        is_nan_reason = None
+        
         if all(q == "" for q in gen_questions):
+            is_nan_reason = "Invalid JSON response - all generated questions are empty"
             logger.warning(
                 "Invalid JSON response. Expected dictionary with key 'question'"
             )
             score = np.nan
         else:
+            # CALCULATION: Cosine similarity
             cosine_sim = self.calculate_similarity(question, gen_questions)
-            score = cosine_sim.mean() * int(not all_noncommittal)
+            mean_similarity = cosine_sim.mean()
+            noncommittal_multiplier = int(not all_noncommittal)
+            score = mean_similarity * noncommittal_multiplier
+
+        # DETAILED LOGGING ONLY WHEN SCORE IS 0.0 OR NaN
+        if score == 0.0 or (isinstance(score, float) and np.isnan(score)):
+            # INPUT LOGGING
+            logger.warning(f"[ANSWER_RELEVANCY INPUT] Question (first 200 chars): {question_preview}")
+            logger.warning(f"[ANSWER_RELEVANCY INPUT] Answer (first 200 chars): {answer_preview}")
+            logger.warning(f"[ANSWER_RELEVANCY INPUT] Generated questions count: {len(gen_questions)}")
+            
+            # CALCULATION LOGGING
+            for i, (gen_q, answer) in enumerate(zip(gen_questions, answers)):
+                gen_q_preview = gen_q[:150] if gen_q else ""
+                logger.warning(f"[ANSWER_RELEVANCY CALCULATION] Generated question {i+1} (first 150 chars): {gen_q_preview}")
+                logger.warning(f"[ANSWER_RELEVANCY CALCULATION] Noncommittal {i+1}: {answer.noncommittal}")
+            
+            logger.warning(f"[ANSWER_RELEVANCY CALCULATION] All noncommittal: {all_noncommittal}")
+            
+            if np.isnan(score):
+                # NaN case: log the reason
+                logger.warning(f"[ANSWER_RELEVANCY CALCULATION] Score is NaN - Reason: {is_nan_reason}")
+                logger.warning(f"[ANSWER_RELEVANCY CALCULATION] Generated questions were: {gen_questions}")
+            else:
+                # 0.0 case: log calculation details
+                logger.warning(f"[ANSWER_RELEVANCY CALCULATION] Cosine similarities: {cosine_sim}")
+                logger.warning(f"[ANSWER_RELEVANCY CALCULATION] Mean similarity: {mean_similarity}")
+                logger.warning(f"[ANSWER_RELEVANCY CALCULATION] Noncommittal multiplier: {noncommittal_multiplier}")
+                logger.warning(f"[ANSWER_RELEVANCY CALCULATION] Final score calculation: {mean_similarity} * {noncommittal_multiplier} = {score}")
+            
+            # OUTPUT LOGGING
+            logger.warning(f"[ANSWER_RELEVANCY OUTPUT] Score is {score}")
+            if np.isnan(score):
+                logger.warning(f"[ANSWER_RELEVANCY OUTPUT] NaN reason: {is_nan_reason}")
+            logger.warning(f"[ANSWER_RELEVANCY OUTPUT] Question: {question_preview}")
+            logger.warning(f"[ANSWER_RELEVANCY OUTPUT] Generated questions: {gen_questions}")
+            logger.warning(f"[ANSWER_RELEVANCY OUTPUT] All noncommittal: {all_noncommittal}")
+            if not np.isnan(score) and mean_similarity is not None:
+                logger.warning(f"[ANSWER_RELEVANCY OUTPUT] Mean similarity was: {mean_similarity}")
 
         return score
 
