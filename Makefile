@@ -163,5 +163,12 @@ build-docs: ## Build all documentation
 	@echo "Building ragas documentation..."
 	$(Q)MKDOCS_CI=false uv run --group docs mkdocs build
 
+
+build-docs-pdf: ## Build documentation with PDF export
+	@echo "Building documentation with PDF export..."
+	$(Q)MKDOCS_CI=false ENABLE_PDF_EXPORT=1 uv run --group docs mkdocs build
+	@echo "PDF generated at: site/pdf/document.pdf"
+
 serve-docs: ## Build and serve documentation locally
 	$(Q)MKDOCS_CI=false uv run --group docs mkdocs serve --dirtyreload
+
