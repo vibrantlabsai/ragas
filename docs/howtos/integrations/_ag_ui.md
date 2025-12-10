@@ -111,8 +111,13 @@ from openai import AsyncOpenAI, OpenAI
 
 from ragas.embeddings.base import embedding_factory
 from ragas.llms import llm_factory
-from ragas.metrics import AgentGoalAccuracyWithReference, DiscreteMetric, ToolCallF1
-from ragas.metrics.collections import AnswerRelevancy, FactualCorrectness
+from ragas.metrics import DiscreteMetric
+from ragas.metrics.collections import (
+    AgentGoalAccuracyWithReference,
+    AnswerRelevancy,
+    FactualCorrectness,
+    ToolCallF1,
+)
 
 # Async client for evaluator prompts
 async_llm_client = AsyncOpenAI()
@@ -223,7 +228,7 @@ if RUN_FACTUAL_EXPERIMENT:
 
 
 ```python
-from ragas.integrations.ag_ui import build_sample
+from ragas.messages import ToolCall
 
 
 @experiment()
@@ -232,22 +237,27 @@ async def tool_experiment(row):
     # Call AG-UI endpoint and get enriched row
     enriched = await run_ag_ui_row(row, AG_UI_ENDPOINT)
 
-    # Build a MultiTurnSample for tool metrics
-    sample = build_sample(
-        user_input=row["user_input"],
-        messages=enriched["messages"],
-        reference=row.get("reference"),
-        reference_tool_calls=row.get("reference_tool_calls"),
-    )
+    # Parse reference_tool_calls from JSON string (e.g., from CSV)
+    ref_tool_calls_raw = row.get("reference_tool_calls")
+    if isinstance(ref_tool_calls_raw, str):
+        ref_tool_calls = [ToolCall(**tc) for tc in json.loads(ref_tool_calls_raw)]
+    else:
+        ref_tool_calls = ref_tool_calls_raw or []
 
-    # Score with tool metrics
-    tool_f1 = await tool_metrics[0].multi_turn_ascore(sample)
-    goal_accuracy = await tool_metrics[1].multi_turn_ascore(sample)
+    # Score with tool metrics using the modern collections API
+    f1_result = await tool_metrics[0].ascore(
+        user_input=enriched["messages"],
+        reference_tool_calls=ref_tool_calls,
+    )
+    goal_result = await tool_metrics[1].ascore(
+        user_input=enriched["messages"],
+        reference=row.get("reference", ""),
+    )
 
     return {
         **enriched,
-        "tool_call_f1": tool_f1,
-        "agent_goal_accuracy": goal_accuracy,
+        "tool_call_f1": f1_result.value,
+        "agent_goal_accuracy": goal_result.value,
     }
 
 

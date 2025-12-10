@@ -27,6 +27,7 @@ Usage:
 
 import argparse
 import asyncio
+import json
 import logging
 from pathlib import Path
 
@@ -36,14 +37,16 @@ from openai import AsyncOpenAI, OpenAI
 from ragas.dataset import Dataset
 from ragas.embeddings.base import embedding_factory
 from ragas.experiment import experiment
-from ragas.integrations.ag_ui import build_sample, run_ag_ui_row
+from ragas.integrations.ag_ui import run_ag_ui_row
 from ragas.llms import llm_factory
-from ragas.metrics import (
+from ragas.messages import ToolCall
+from ragas.metrics import DiscreteMetric
+from ragas.metrics.collections import (
     AgentGoalAccuracyWithReference,
-    DiscreteMetric,
+    AnswerRelevancy,
+    FactualCorrectness,
     ToolCallF1,
 )
-from ragas.metrics.collections import AnswerRelevancy, FactualCorrectness
 
 # Configure logging
 logging.basicConfig(
@@ -256,22 +259,29 @@ async def run_tool_experiment(endpoint_url: str, evaluator_model: str) -> tuple:
         # Call AG-UI endpoint and get enriched row
         enriched = await run_ag_ui_row(row, endpoint_url, timeout=300.0)
 
-        # Build a MultiTurnSample for tool metrics
-        sample = build_sample(
-            user_input=row["user_input"],
-            messages=enriched["messages"],
-            reference=row.get("reference"),
-            reference_tool_calls=row.get("reference_tool_calls"),
-        )
+        # Parse reference_tool_calls from JSON string (e.g., from CSV)
+        ref_tool_calls_raw = row.get("reference_tool_calls")
+        if isinstance(ref_tool_calls_raw, str):
+            ref_tool_calls = [
+                ToolCall(**tc) for tc in json.loads(ref_tool_calls_raw)
+            ]
+        else:
+            ref_tool_calls = ref_tool_calls_raw or []
 
-        # Score with tool metrics
-        f1_score = await tool_call_f1.multi_turn_ascore(sample)
-        goal_score = await goal_accuracy.multi_turn_ascore(sample)
+        # Score with tool metrics using the modern collections API
+        f1_result = await tool_call_f1.ascore(
+            user_input=enriched["messages"],
+            reference_tool_calls=ref_tool_calls,
+        )
+        goal_result = await goal_accuracy.ascore(
+            user_input=enriched["messages"],
+            reference=row.get("reference", ""),
+        )
 
         return {
             **enriched,
-            "tool_call_f1": f1_score,
-            "agent_goal_accuracy": goal_score,
+            "tool_call_f1": f1_result.value,
+            "agent_goal_accuracy": goal_result.value,
         }
 
     # Run evaluation using @experiment pattern

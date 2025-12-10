@@ -114,8 +114,13 @@ The integration works with any Ragas metric. To unlock the modern collections po
 from openai import AsyncOpenAI, OpenAI
 from ragas.llms import llm_factory
 from ragas.embeddings import embedding_factory
-from ragas.metrics import AgentGoalAccuracyWithReference, DiscreteMetric, ToolCallF1
-from ragas.metrics.collections import AnswerRelevancy, FactualCorrectness
+from ragas.metrics import DiscreteMetric
+from ragas.metrics.collections import (
+    AgentGoalAccuracyWithReference,
+    AnswerRelevancy,
+    FactualCorrectness,
+    ToolCallF1,
+)
 
 async_llm_client = AsyncOpenAI()
 evaluator_llm = llm_factory("gpt-4o-mini", client=async_llm_client)
@@ -199,34 +204,41 @@ The resulting dataframe includes per-sample scores, raw agent responses, and any
 
 ### Multi-turn tool evaluation
 
-For multi-turn datasets and tool evaluation, use `build_sample()` to create the appropriate sample type:
+For multi-turn datasets and tool evaluation, pass the messages and reference tool calls directly to the metrics:
 
 ```python
+import json
 from ragas import experiment
-from ragas.integrations.ag_ui import run_ag_ui_row, build_sample
-from ragas.metrics import ToolCallF1, AgentGoalAccuracyWithReference
+from ragas.integrations.ag_ui import run_ag_ui_row
+from ragas.messages import ToolCall
+from ragas.metrics.collections import AgentGoalAccuracyWithReference, ToolCallF1
 
 @experiment()
 async def tool_experiment(row):
     # Call AG-UI endpoint and get enriched row
     enriched = await run_ag_ui_row(row, "http://localhost:8000/chat")
 
-    # Build a MultiTurnSample for tool metrics
-    sample = build_sample(
-        user_input=row["user_input"],
-        messages=enriched["messages"],
-        reference=row.get("reference"),
-        reference_tool_calls=row.get("reference_tool_calls"),
-    )
+    # Parse reference_tool_calls from JSON string (e.g., from CSV)
+    ref_tool_calls_raw = row.get("reference_tool_calls")
+    if isinstance(ref_tool_calls_raw, str):
+        ref_tool_calls = [ToolCall(**tc) for tc in json.loads(ref_tool_calls_raw)]
+    else:
+        ref_tool_calls = ref_tool_calls_raw or []
 
-    # Score with tool metrics
-    tool_f1 = await ToolCallF1().multi_turn_ascore(sample)
-    goal_accuracy = await AgentGoalAccuracyWithReference(llm=evaluator_llm).multi_turn_ascore(sample)
+    # Score with tool metrics using the modern collections API
+    f1_result = await ToolCallF1().ascore(
+        user_input=enriched["messages"],
+        reference_tool_calls=ref_tool_calls,
+    )
+    goal_result = await AgentGoalAccuracyWithReference(llm=evaluator_llm).ascore(
+        user_input=enriched["messages"],
+        reference=row.get("reference", ""),
+    )
 
     return {
         **enriched,
-        "tool_call_f1": tool_f1,
-        "agent_goal_accuracy": goal_accuracy,
+        "tool_call_f1": f1_result.value,
+        "agent_goal_accuracy": goal_result.value,
     }
 
 # Run the experiment
@@ -333,10 +345,6 @@ An interactive walkthrough notebook is also available at `howtos/integrations/ag
 - **`extract_response(messages)`** - Extract concatenated AI response text
 - **`extract_tool_calls(messages)`** - Extract all tool calls from AI messages
 - **`extract_contexts(messages)`** - Extract tool results/contexts from messages
-
-### Sample Building
-
-- **`build_sample(user_input, messages, reference=None, reference_tool_calls=None)`** - Build SingleTurnSample or MultiTurnSample based on inputs
 
 ### Low-Level
 
