@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "improve-rag"
+version = "0.1.0"
+description = "Improve RAG evaluation example using Ragas - compare naive vs agentic RAG"
+requires-python = ">=3.9"
+dependencies = [
+    "ragas[all]>=0.3.0",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "mlflow>=2.0.0",
+    "langchain>=0.1.0",
+    "langchain-community>=0.0.10",
+    "langchain-text-splitters>=0.0.1",
+    "datasets>=2.0.0",
+    "rank-bm25>=0.2.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+agentic = [
+    "openai-agents>=0.0.1",
+]
+
+[tool.setuptools]
+py-modules = []
+
+[tool.uv]
+managed = true

@@ -19,7 +19,10 @@ from ragas import Dataset, experiment
 from ragas.llms import llm_factory
 from ragas.metrics import DiscreteMetric
 
-from .rag import RAG, BM25Retriever
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+from rag import RAG, BM25Retriever
 
 # Load environment variables
 load_dotenv(".env")
@@ -37,32 +40,32 @@ logging.getLogger("openai._base_client").setLevel(logging.WARNING)
 
 def download_and_save_dataset() -> Path:
     """Download the HuggingFace doc Q&A dataset from GitHub."""
-    dataset_path = Path("datasets/hf_doc_qa_eval.csv")
-    dataset_path.parent.mkdir(exist_ok=True)
-    
+    dataset_path = Path("evals/datasets/hf_doc_qa_eval.csv")
+    dataset_path.parent.mkdir(parents=True, exist_ok=True)
+
     if dataset_path.exists():
         logger.info(f"Dataset already exists at {dataset_path}")
         return dataset_path
-    
+
     logger.info("Downloading HuggingFace doc Q&A evaluation dataset from GitHub...")
-    github_url = "https://raw.githubusercontent.com/vibrantlabsai/ragas/main/examples/ragas_examples/improve_rag/datasets/hf_doc_qa_eval.csv"
-    
+    github_url = "https://raw.githubusercontent.com/explodinggradients/ragas/main/examples/ragas_examples/improve_rag/datasets/hf_doc_qa_eval.csv"
+
     import urllib.request
-    
+
     try:
         urllib.request.urlretrieve(github_url, dataset_path)
         logger.info(f"Dataset downloaded to {dataset_path}")
-        
+
     except Exception as e:
         logger.error(f"Failed to download dataset: {e}")
         raise
-    
+
     return dataset_path
 
 
 def create_ragas_dataset(dataset_path: Path) -> Dataset:
     """Create a Ragas Dataset from the downloaded CSV file."""
-    dataset = Dataset(name="hf_doc_qa_eval", backend="local/csv", root_dir=".")
+    dataset = Dataset(name="hf_doc_qa_eval", backend="local/csv", root_dir="evals")
     
     import pandas as pd
     df = pd.read_csv(dataset_path)
@@ -167,7 +170,7 @@ async def evaluate_rag(row: Dict[str, Any], rag: RAG, llm) -> Dict[str, Any]:
     return result
 
 
-async def run_experiment(mode: str = "naive", model: str = "gpt-5-mini", name: Optional[str] = None):
+async def run_experiment(mode: str = "naive", model: str = "gpt-4o-mini", name: Optional[str] = None):
     """
     Simple function to run RAG evaluation experiment.
     
@@ -206,7 +209,7 @@ async def run_experiment(mode: str = "naive", model: str = "gpt-5-mini", name: O
         dataset, 
         name=name or f"{datetime.now().strftime('%Y%m%d-%H%M%S')}_{'agenticrag' if mode == 'agentic' else 'naiverag'}",
         rag=rag,
-        llm=llm_factory("gpt-5-mini", client=openai_client, temperature=1, top_p=None)
+        llm=llm_factory("gpt-4o-mini", client=openai_client, temperature=1, top_p=None)
     )
     
     # Print basic results
@@ -232,6 +235,6 @@ if __name__ == "__main__":
     else:
         logger.info("Running in NAIVE mode")
     
-    asyncio.run(run_experiment(mode=mode, model="gpt-5-mini"))
+    asyncio.run(run_experiment(mode=mode, model="gpt-4o-mini"))
 
 

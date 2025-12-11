@@ -365,14 +365,67 @@ Output:
 1.0
 ```
 
-# CHRF Score
+## CHRF Score
 
-The `ChrfScore` metric evaluates the similarity between a `response` and a `reference` using **character n-gram F-score**. Unlike BLEU, which emphasizes precision, CHRF accounts for both **precision and recall**, making it more suitable for:
+The `CHRFScore` metric evaluates the similarity between a `response` and a `reference` using **character n-gram F-score**. Unlike BLEU, which emphasizes precision, CHRF accounts for both **precision and recall**, making it more suitable for:
 
 - Morphologically rich languages
 - Responses with paraphrasing or flexible wording
 
 CHRF scores range from 0 to 1, where 1 indicates a perfect match between the generated response and the reference. This is a non-LLM-based metric, relying entirely on deterministic comparisons.
+
+### Example
+
+```python
+from ragas.metrics.collections import CHRFScore
+
+# Create metric (no LLM/embeddings needed)
+scorer = CHRFScore()
+
+# Evaluate
+result = await scorer.ascore(
+    reference="The Eiffel Tower is located in Paris.",
+    response="The Eiffel Tower is located in India."
+)
+print(f"CHRF Score: {result.value}")
+```
+
+Output:
+
+```
+CHRF Score: 0.8048
+```
+
+!!! note "Synchronous Usage"
+    If you prefer synchronous code, you can use the `.score()` method instead of `.ascore()`:
+
+    ```python
+    result = scorer.score(
+        reference="The Eiffel Tower is located in Paris.",
+        response="The Eiffel Tower is located in India."
+    )
+    ```
+
+### Configuration
+
+You can pass additional arguments to the underlying `sacrebleu.corpus_chrf` function using the `kwargs` parameter:
+
+```python
+# Customize character and word order
+scorer = CHRFScore(kwargs={"char_order": 4, "word_order": 2})
+
+# Customize beta (recall weight)
+scorer = CHRFScore(kwargs={"beta": 3})
+```
+
+### Legacy Metrics API
+
+The following examples use the legacy metrics API pattern. For new projects, we recommend using the collections-based API shown above.
+
+!!! warning "Deprecation Timeline"
+    This API will be deprecated in version 0.4 and removed in version 1.0. Please migrate to the collections-based API shown above.
+
+#### Example with SingleTurnSample
 
 ```python
 from ragas.dataset_schema import SingleTurnSample
@@ -386,7 +439,9 @@ sample = SingleTurnSample(
 scorer = ChrfScore()
 await scorer.single_turn_ascore(sample)
 ```
-Output
+
+Output:
+
 ```
 0.8048
 ```
