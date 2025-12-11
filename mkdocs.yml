@@ -122,6 +122,10 @@ nav:
             - Align an LLM as a Judge: howtos/applications/align-llm-as-judge.md
           - RAG Evaluation:
             - Evaluate and Improve a RAG App: howtos/applications/evaluate-and-improve-rag.md
+      - CLI:
+          - howtos/cli/index.md
+          - RAG Evaluation: howtos/cli/rag_eval.md
+          - Improve RAG: howtos/cli/improve_rag.md
       - Integrations:
           - howtos/integrations/index.md
           - Observability:
