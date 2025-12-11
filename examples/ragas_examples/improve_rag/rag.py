@@ -9,10 +9,14 @@ Usage:
 """
 
 import logging
+import os
 from typing import Any, Dict, Optional
 
 import mlflow
 from langchain_core.documents import Document
+
+# Suppress MLflow warnings when server is not running
+logging.getLogger("mlflow.tracing.export.mlflow_v3").setLevel(logging.ERROR)
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.retrievers import BM25Retriever as LangchainBM25Retriever
 from openai import AsyncOpenAI
@@ -81,10 +85,27 @@ class BM25Retriever:
 class RAG:
     """RAG system that can operate in naive or agentic mode."""
 
-    def __init__(self, llm_client: AsyncOpenAI, retriever: BM25Retriever, mode="naive", system_prompt=None, model="gpt-5-mini", default_k=3):
-        # Enable MLflow autolog for OpenAI API calls
-        mlflow.set_tracking_uri("http://127.0.0.1:5000")
-        mlflow.openai.autolog()
+    @staticmethod
+    def _check_mlflow_server(uri: str = "http://127.0.0.1:5000", timeout: float = 0.5) -> bool:
+        """Check if MLflow server is running."""
+        import urllib.request
+        import urllib.error
+        try:
+            urllib.request.urlopen(uri, timeout=timeout)
+            return True
+        except (urllib.error.URLError, OSError):
+            return False
+
+    def __init__(self, llm_client: AsyncOpenAI, retriever: BM25Retriever, mode="naive", system_prompt=None, model="gpt-4o-mini", default_k=3):
+        # Enable MLflow autolog for OpenAI API calls (optional - only if server is running)
+        self._mlflow_enabled = False
+        if os.environ.get("MLFLOW_TRACKING_URI") or self._check_mlflow_server():
+            try:
+                mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000"))
+                mlflow.openai.autolog()
+                self._mlflow_enabled = True
+            except Exception:
+                pass
         
         self.llm_client = llm_client
         self.retriever = retriever
@@ -138,9 +159,9 @@ class RAG:
             messages=[{"role": "user", "content": prompt}]
         )
         
-        # Get the active trace ID
-        trace_id = mlflow.get_last_active_trace_id()
-        
+        # Get the active trace ID (only if MLflow is enabled)
+        trace_id = mlflow.get_last_active_trace_id() if self._mlflow_enabled else None
+
         return {
             "answer": response.choices[0].message.content.strip(),
             "retrieved_documents": [{"content": doc.page_content, "metadata": doc.metadata, "document_id": i} for i, doc in enumerate(docs)],
@@ -154,13 +175,13 @@ class RAG:
             from agents import Runner
         except ImportError:
             raise ImportError("agents package required for agentic mode")
-        
+
         # Let agent handle the retrieval and reasoning
         result = await Runner.run(self._agent, input=question)
-        
-        # Get the active trace ID
-        trace_id = mlflow.get_last_active_trace_id()
-        
+
+        # Get the active trace ID (only if MLflow is enabled)
+        trace_id = mlflow.get_last_active_trace_id() if self._mlflow_enabled else None
+
         # In agentic mode, the agent controls retrieval internally
         # so we don't return specific retrieved documents
         return {
@@ -174,7 +195,7 @@ class RAG:
         """Query the RAG system."""
         if top_k is None:
             top_k = self.default_k
-            
+
         try:
             if self.mode == "naive":
                 return await self._naive_query(question, top_k)
@@ -184,10 +205,10 @@ class RAG:
                 raise ValueError(f"Unknown mode: {self.mode}")
         except Exception as e:
             # Try to get trace ID even in error cases
-            trace_id = mlflow.get_last_active_trace_id()
+            trace_id = mlflow.get_last_active_trace_id() if self._mlflow_enabled else None
             return {
-                "answer": f"Error: {str(e)}", 
-                "retrieved_documents": [], 
+                "answer": f"Error: {str(e)}",
+                "retrieved_documents": [],
                 "num_retrieved": 0,
                 "mlflow_trace_id": trace_id
             }

@@ -483,12 +483,16 @@ def quickstart(
     from pathlib import Path
 
     # Define available templates with descriptions
-    # Currently only rag_eval is available and fully tested
     templates = {
         "rag_eval": {
             "name": "RAG Evaluation",
             "description": "Evaluate a RAG (Retrieval Augmented Generation) system with custom metrics",
             "source_path": "ragas_examples/rag_eval",
+        },
+        "improve_rag": {
+            "name": "Improve RAG",
+            "description": "Compare naive vs agentic RAG using BM25 retrieval and HuggingFace docs",
+            "source_path": "ragas_examples/improve_rag",
         },
         # Coming soon - not yet fully implemented:
         # "agent_evals": {
@@ -667,7 +671,83 @@ def quickstart(
 
         # Create a README.md with setup instructions
         live.update(Spinner("dots", text="Creating documentation...", style="green"))
-        readme_content = f"""# {template_info["name"]}
+
+        # Template-specific README content
+        if template == "improve_rag":
+            readme_content = f"""# {template_info["name"]}
+
+{template_info["description"]}
+
+## Quick Start
+
+### 1. Set Your API Key
+
+```bash
+export OPENAI_API_KEY="your-openai-key"
+```
+
+### 2. Install Dependencies
+
+Using `uv` (recommended):
+
+```bash
+uv sync
+```
+
+Or using `pip`:
+
+```bash
+pip install -e .
+```
+
+### 3. (Optional) Start MLflow for tracing
+
+```bash
+mlflow ui --port 5000
+```
+
+### 4. Run the Evaluation
+
+Naive RAG mode (default):
+
+```bash
+uv run python evals.py
+```
+
+Agentic RAG mode:
+
+```bash
+uv run python evals.py --agentic
+```
+
+## Project Structure
+
+```
+{template}/
+├── README.md           # This file
+├── pyproject.toml      # Project configuration
+├── rag.py              # RAG implementation (naive & agentic modes)
+├── evals.py            # Evaluation workflow
+├── __init__.py         # Makes this a Python package
+└── evals/              # Evaluation-related data
+    ├── datasets/       # Test datasets (hf_doc_qa_eval.csv)
+    ├── experiments/    # Experiment results
+    └── logs/           # Evaluation logs
+```
+
+## Features
+
+- **Naive RAG**: Single retrieval + generation
+- **Agentic RAG**: Agent-controlled retrieval with multiple searches
+- **BM25 Retrieval**: Uses HuggingFace documentation as knowledge base
+- **MLflow Tracing**: Automatic tracing of all LLM calls
+
+## Documentation
+
+Visit https://docs.ragas.io for more information.
+"""
+        else:
+            readme_content = f"""# {template_info["name"]}
 
 {template_info["description"]}
 
@@ -716,20 +796,6 @@ Or using `pip`:
 python evals.py
 ```
 
-### 4. Export Results to CSV
-
-Using `uv`:
-
-```bash
-uv run python export_csv.py
-```
-
-Or using `pip`:
-
-```bash
-python export_csv.py
-```
-
 ## Project Structure
 
 ```
@@ -738,11 +804,10 @@ python export_csv.py
 ├── pyproject.toml      # Project configuration
 ├── rag.py              # Your RAG application code
 ├── evals.py            # Evaluation workflow
-├── export_csv.py       # CSV export utility
 ├── __init__.py         # Makes this a Python package
 └── evals/              # Evaluation-related data
     ├── datasets/       # Test datasets
-    ├── experiments/    # Experiment results (CSVs saved here)
+    ├── experiments/    # Experiment results
     └── logs/           # Evaluation logs and traces
 ```
 
