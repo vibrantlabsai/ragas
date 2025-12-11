@@ -166,7 +166,7 @@ build-docs: ## Build all documentation
 
 build-docs-pdf: ## Build documentation with PDF export
 	@echo "Building documentation with PDF export..."
-	$(Q)MKDOCS_CI=false ENABLE_PDF_EXPORT=1 uv run --group docs mkdocs build
+	$(Q)MKDOCS_CI=false ENABLE_PDF_EXPORT=1 uv run --group docs --group docs-pdf mkdocs build
 	@echo "PDF generated at: site/pdf/document.pdf"
 
 serve-docs: ## Build and serve documentation locally

@@ -172,7 +172,6 @@ dev = [
 ]
 docs = [
     "mkdocs>=1.6.1",
-    "mkdocs-to-pdf>=0.10.1",
     "mkdocs-material",
     "mkdocs-material[imaging]",
     "mkdocstrings[python]",
@@ -183,4 +182,8 @@ docs = [
     "mkdocs-section-index",
     "mkdocs-git-committers-plugin-2",
     "mkdocs-git-revision-date-localized-plugin",
+]
+
+docs-pdf = [
+    "mkdocs-to-pdf>=0.10.1",
 ]
