@@ -75,7 +75,7 @@ class DataCompyScore(BaseMetric):
         """
         try:
             import pandas as pd
-            from datacompy import Compare
+            from datacompy import Compare  # type: ignore[attr-defined]
         except ImportError as e:
             raise ImportError(
                 f"{e.name} is required for DataCompyScore. "
