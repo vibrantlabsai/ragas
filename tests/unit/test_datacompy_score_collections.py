@@ -4,8 +4,17 @@ import math
 
 import pytest
 
-# Skip all tests in this module if datacompy is not installed
-pytest.importorskip("datacompy")
+# Skip all tests in this module if datacompy.core.Compare is not available
+# datacompy >= 0.14 moved Compare to datacompy.core
+try:
+    from datacompy.core import Compare  # noqa: F401
+except ImportError:
+    try:
+        from datacompy import Compare  # noqa: F401
+    except ImportError:
+        pytest.skip(
+            "datacompy with Compare class not available", allow_module_level=True
+        )
 
 from ragas.metrics.collections import DataCompyScore
 
