@@ -27,6 +27,7 @@ from ragas.metrics.collections.context_precision import (
 )
 from ragas.metrics.collections.context_recall import ContextRecall
 from ragas.metrics.collections.context_relevance import ContextRelevance
+from ragas.metrics.collections.datacompy_score import DataCompyScore
 from ragas.metrics.collections.domain_specific_rubrics import (
     DomainSpecificRubrics,
     RubricsScoreWithoutReference,
@@ -80,6 +81,7 @@ __all__ = [
     "InstanceSpecificRubrics",
     "RubricsScoreWithoutReference",
     "RubricsScoreWithReference",
-    # SQL metrics
+    # SQL & Data metrics
+    "DataCompyScore",
     "SQLSemanticEquivalence",
 ]

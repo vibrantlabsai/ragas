@@ -22,6 +22,47 @@ $$
 
 By default, the mode is set to `row`, and metric is F1 score which is the harmonic mean of precision and recall.
 
+```python
+from ragas.metrics.collections import DataCompyScore
+
+data1 = """acct_id,dollar_amt,name,float_fld,date_fld
+10000001234,123.45,George Maharis,14530.1555,2017-01-01
+10000001235,0.45,Michael Bluth,1,2017-01-01
+10000001236,1345,George Bluth,,2017-01-01
+10000001237,123456,Bob Loblaw,345.12,2017-01-01
+10000001238,1.05,Lucille Bluth,,2017-01-01
+10000001238,1.05,Loose Seal Bluth,,2017-01-01
+"""
+
+data2 = """acct_id,dollar_amt,name,float_fld
+10000001234,123.4,George Michael Bluth,14530.155
+10000001235,0.45,Michael Bluth,
+10000001236,1345,George Bluth,1
+10000001237,123456,Robert Loblaw,345.12
+10000001238,1.05,Loose Seal Bluth,111
+"""
+
+metric = DataCompyScore()
+result = await metric.ascore(response=data1, reference=data2)
+print(f"F1 Score: {result.value}")
+print(f"Details: {result.reason}")
+```
+
+To change the mode to column-wise comparison, set the `mode` parameter to `column`.
+
+```python
+metric = DataCompyScore(mode="columns", metric="recall")
+result = await metric.ascore(response=data1, reference=data2)
+```
+
+---
+
+### DataCompyScore (Legacy)
+
+!!! warning "Deprecated"
+    `DataCompyScore` from `ragas.metrics` is deprecated and will be removed in a future version. Please use `DataCompyScore` from `ragas.metrics.collections` as shown above.
+
+The legacy `DataCompyScore` uses the `SingleTurnSample` schema:
 
 ```python
 from ragas.metrics import DataCompyScore
