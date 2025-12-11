@@ -18,6 +18,7 @@ from ragas.metrics.collections.answer_accuracy import AnswerAccuracy
 from ragas.metrics.collections.answer_correctness import AnswerCorrectness
 from ragas.metrics.collections.answer_relevancy import AnswerRelevancy
 from ragas.metrics.collections.base import BaseMetric
+from ragas.metrics.collections.chrf_score import CHRFScore
 from ragas.metrics.collections.context_entity_recall import ContextEntityRecall
 from ragas.metrics.collections.context_precision import (
     ContextPrecision,
@@ -51,6 +52,7 @@ __all__ = [
     "AnswerCorrectness",
     "AnswerRelevancy",
     "BleuScore",
+    "CHRFScore",
     "ContextEntityRecall",
     "ContextRecall",
     "ContextPrecision",

@@ -347,31 +347,33 @@ The following metrics have been successfully migrated to the collections system 
 - **SimpleCriteria** - Use `@discrete_metric()` decorator instead
 - **AnswerSimilarity** - Use `SemanticSimilarity` instead
 
-#### Agent & Tool Metrics (Not Yet Migrated)
-- **ToolCallAccuracy** - Still on old architecture (Pending migration)
-- **ToolCallF1** - Still on old architecture (Pending migration)
-- **TopicAdherence** - Still on old architecture (Pending migration)
-- **AgentGoalAccuracy** - Still on old architecture (Pending migration)
+#### Agent & Tool Metrics (Migrated)
+- **ToolCallAccuracy** - `ragas.metrics.collections.ToolCallAccuracy`
+- **ToolCallF1** - `ragas.metrics.collections.ToolCallF1`
+- **TopicAdherence** - `ragas.metrics.collections.TopicAdherence`
+- **AgentGoalAccuracy** - `ragas.metrics.collections.AgentGoalAccuracy`
 
-#### SQL Metrics (Not Yet Migrated)
-- **DataCompy Score** - Still on old architecture (Pending migration)
-- **SQL Query Equivalence** - Still on old architecture (Pending migration)
+#### SQL & Data Metrics (Migrated)
+- **DataCompy Score** - `ragas.metrics.collections.DataCompyScore`
+- **SQL Query Equivalence** - `ragas.metrics.collections.SQLSemanticEquivalence`
 
-#### General Purpose & Rubric Metrics (Not Yet Migrated)
-- **Domain-Specific Rubrics** - Still on old architecture (Pending migration)
-- **Instance-Specific Rubrics** - Still on old architecture (Pending migration)
+#### Rubric Metrics (Migrated)
+- **DomainSpecificRubrics** - `ragas.metrics.collections.DomainSpecificRubrics`
+- **InstanceSpecificRubrics** - `ragas.metrics.collections.InstanceSpecificRubrics`
+
+#### String & NLP Metrics (Migrated)
+- **CHRF Score** - `ragas.metrics.collections.CHRFScore` (character n-gram F-score)
 
 #### Specialized Metrics (Not Yet Migrated)
 - **Multi-Modal Faithfulness** - Still on old architecture (Pending migration)
 - **Multi-Modal Relevance** - Still on old architecture (Pending migration)
-- **CHRF Score** - Still on old architecture (Pending migration)
 - **Quoted Spans** - Still on old architecture (Pending migration)
 
 !!! note "Migration Status"
 
-    Approximately **43%** of core metrics have been migrated to the collections system (16 out of ~37 metrics).
+    Most core metrics have been migrated to the collections system. Only multi-modal metrics and QuotedSpans remain on the legacy architecture.
 
-    These remaining metrics will be migrated in **v0.4.x** releases. You can still use legacy metrics with the old API, though they will show deprecation warnings.
+    The remaining metrics will be migrated in future **v0.4.x** releases. You can still use legacy metrics with the old API, though they will show deprecation warnings.
 
 ### Step-by-Step Migration
 
