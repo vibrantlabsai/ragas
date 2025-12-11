@@ -50,6 +50,20 @@ class DataCompyScore(BaseMetric):
         **kwargs,
     ):
         super().__init__(name=name, **kwargs)
+
+        # Check for required dependencies at init time
+        try:
+            import pandas as pd
+            from datacompy import Compare  # type: ignore[attr-defined]
+        except ImportError as e:
+            raise ImportError(
+                f"{e.name} is required for DataCompyScore. "
+                f"Please install it using `pip install {e.name}`"
+            )
+
+        self._pd = pd
+        self._Compare = Compare
+
         if mode not in ["rows", "columns"]:
             raise ValueError("mode must be either 'rows' or 'columns'")
         if metric not in ["precision", "recall", "f1"]:
@@ -73,28 +87,19 @@ class DataCompyScore(BaseMetric):
         Returns:
             MetricResult with comparison score (0.0-1.0) or NaN if parsing fails
         """
-        try:
-            import pandas as pd
-            from datacompy import Compare  # type: ignore[attr-defined]
-        except ImportError as e:
-            raise ImportError(
-                f"{e.name} is required for DataCompyScore. "
-                f"Please install it using `pip install {e.name}`"
-            )
-
         if not isinstance(reference, str):
             raise ValueError("reference must be a CSV string")
         if not isinstance(response, str):
             raise ValueError("response must be a CSV string")
 
         try:
-            reference_df = pd.read_csv(StringIO(reference))
-            response_df = pd.read_csv(StringIO(response))
+            reference_df = self._pd.read_csv(StringIO(reference))
+            response_df = self._pd.read_csv(StringIO(response))
         except Exception as e:
             logger.error(f"Error reading CSV: {e}")
             return MetricResult(value=float(np.nan), reason=f"CSV parsing error: {e}")
 
-        compare = Compare(reference_df, response_df, on_index=True)
+        compare = self._Compare(reference_df, response_df, on_index=True)
 
         if self.mode == "rows":
             matching_rows = compare.count_matching_rows()

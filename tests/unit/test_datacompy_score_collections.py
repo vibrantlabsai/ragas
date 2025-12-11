@@ -4,6 +4,9 @@ import math
 
 import pytest
 
+# Skip all tests in this module if datacompy is not installed
+pytest.importorskip("datacompy")
+
 from ragas.metrics.collections import DataCompyScore
 
 
