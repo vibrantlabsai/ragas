@@ -225,6 +225,15 @@ class TopicAdherenceScore(MetricWithLLM, MultiTurnMetric):
             topic_classifications_response.classifications
         )
 
+        expected_len = len(topics)
+        actual_len = len(topic_classifications)
+        if actual_len != expected_len:
+            if actual_len < expected_len:
+                padding = np.zeros(expected_len - actual_len, dtype=bool)
+                topic_classifications = np.concatenate([topic_classifications, padding])
+            else:
+                topic_classifications = topic_classifications[:expected_len]
+
         true_positives = sum(topic_answered_verdict & topic_classifications)
         false_positives = sum(topic_answered_verdict & ~topic_classifications)
         false_negatives = sum(~topic_answered_verdict & topic_classifications)

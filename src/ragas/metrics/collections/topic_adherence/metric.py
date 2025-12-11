@@ -164,7 +164,18 @@ class TopicAdherence(BaseMetric):
         )
         prompt_str = self.topic_classification_prompt.to_string(input_data)
         result = await self.llm.agenerate(prompt_str, TopicClassificationOutput)
-        return self._safe_bool_conversion(result.classifications)
+        classifications = self._safe_bool_conversion(result.classifications)
+
+        expected_len = len(topics)
+        actual_len = len(classifications)
+        if actual_len != expected_len:
+            if actual_len < expected_len:
+                padding = np.zeros(expected_len - actual_len, dtype=bool)
+                classifications = np.concatenate([classifications, padding])
+            else:
+                classifications = classifications[:expected_len]
+
+        return classifications
 
     def _safe_bool_conversion(self, classifications: List) -> np.ndarray:
         """Safely convert classifications to boolean array."""
