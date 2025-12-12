@@ -284,3 +284,114 @@ class TestToolCallF1Collections:
                 user_input=[],
                 reference_tool_calls="not a list",
             )
+
+    @pytest.mark.asyncio
+    async def test_nested_dict_in_args(self, tool_call_f1):
+        """Test handling of nested dicts in tool call args (issue #2506)."""
+        ref_tool_calls = [
+            ToolCall(
+                name="store_data",
+                args={
+                    "title": "Backend Engineer",
+                    "kwargs": {},  # Nested empty dict
+                },
+            ),
+        ]
+
+        user_input = [
+            HumanMessage(content="Store the data"),
+            AIMessage(
+                content="Storing...",
+                tool_calls=[
+                    ToolCall(
+                        name="store_data",
+                        args={
+                            "title": "Backend Engineer",
+                            "kwargs": {},
+                        },
+                    )
+                ],
+            ),
+        ]
+
+        result = await tool_call_f1.ascore(
+            user_input=user_input,
+            reference_tool_calls=ref_tool_calls,
+        )
+        assert result.value == 1.0
+
+    @pytest.mark.asyncio
+    async def test_nested_list_in_args(self, tool_call_f1):
+        """Test handling of nested lists in tool call args."""
+        ref_tool_calls = [
+            ToolCall(
+                name="search",
+                args={
+                    "categories": ["a", "b"],
+                    "filters": {"min": 10, "max": 100},
+                },
+            ),
+        ]
+
+        user_input = [
+            HumanMessage(content="Search"),
+            AIMessage(
+                content="Searching...",
+                tool_calls=[
+                    ToolCall(
+                        name="search",
+                        args={
+                            "categories": ["a", "b"],
+                            "filters": {"min": 10, "max": 100},
+                        },
+                    )
+                ],
+            ),
+        ]
+
+        result = await tool_call_f1.ascore(
+            user_input=user_input,
+            reference_tool_calls=ref_tool_calls,
+        )
+        assert result.value == 1.0
+
+    @pytest.mark.asyncio
+    async def test_deeply_nested_args(self, tool_call_f1):
+        """Test handling of deeply nested structures in tool call args."""
+        ref_tool_calls = [
+            ToolCall(
+                name="complex_tool",
+                args={
+                    "level1": {
+                        "level2": {
+                            "level3": ["x", "y", "z"],
+                        }
+                    }
+                },
+            ),
+        ]
+
+        user_input = [
+            HumanMessage(content="Do something"),
+            AIMessage(
+                content="Processing...",
+                tool_calls=[
+                    ToolCall(
+                        name="complex_tool",
+                        args={
+                            "level1": {
+                                "level2": {
+                                    "level3": ["x", "y", "z"],
+                                }
+                            }
+                        },
+                    )
+                ],
+            ),
+        ]
+
+        result = await tool_call_f1.ascore(
+            user_input=user_input,
+            reference_tool_calls=ref_tool_calls,
+        )
+        assert result.value == 1.0
