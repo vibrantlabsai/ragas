@@ -61,6 +61,7 @@ gdrive = [
 ]
 ai-frameworks = ["haystack-ai"]
 oci = ["oci>=2.160.1"]
+ag-ui = ["ag-ui-protocol>=0.1.9", "httpx>=0.27.0"]
 
 # Minimal dev dependencies for fast development setup (used by make install-minimal)
 dev-minimal = [

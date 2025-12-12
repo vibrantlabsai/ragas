@@ -1,0 +1,6 @@
+user_input,reference_tool_calls,reference
+"What's the weather like in San Francisco?","[{""name"": ""get_weather"", ""args"": {""location"": ""San Francisco""}}]","The user received the current weather conditions for San Francisco."
+"Can you check the weather in Tokyo?","[{""name"": ""get_weather"", ""args"": {""location"": ""Tokyo""}}]","The user received the current weather conditions for Tokyo."
+"What is the temperature like in Paris today?","[{""name"": ""get_weather"", ""args"": {""location"": ""Paris""}}]","The user received the current weather conditions for Paris."
+"Is it sunny in Rome?","[{""name"": ""get_weather"", ""args"": {""location"": ""Rome""}}]","The user received the current weather conditions for Rome."
+"Is it raining in London right now?","[{""name"": ""get_weather"", ""args"": {""location"": ""London""}}]","The user received the current weather conditions for London."

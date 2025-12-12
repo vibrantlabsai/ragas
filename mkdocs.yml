@@ -135,6 +135,7 @@ nav:
               - Google Gemini: howtos/integrations/gemini.md
               - OCI Gen AI: howtos/integrations/oci_genai.md
           - Frameworks:
+              - AG-UI: howtos/integrations/ag_ui.md
               - Griptape: howtos/integrations/griptape.md
               - Haystack: howtos/integrations/haystack.md
               - LangChain: howtos/integrations/langchain.md

@@ -10,6 +10,7 @@ Available integrations:
 - Observability: Helicone, Langsmith, Opik
 - Platforms: Amazon Bedrock, R2R
 - AI Systems: Swarm for multi-agent evaluation
+- Protocols: AG-UI for event-based agent communication
 
 Import tracing integrations:
 ```python
