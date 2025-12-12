@@ -363,15 +363,15 @@ The following metrics have been successfully migrated to the collections system 
 
 #### String & NLP Metrics (Migrated)
 - **CHRF Score** - `ragas.metrics.collections.CHRFScore` (character n-gram F-score)
+- **Quoted Spans Alignment** - `ragas.metrics.collections.QuotedSpansAlignment` (citation verification)
 
 #### Specialized Metrics (Not Yet Migrated)
 - **Multi-Modal Faithfulness** - Still on old architecture (Pending migration)
 - **Multi-Modal Relevance** - Still on old architecture (Pending migration)
-- **Quoted Spans** - Still on old architecture (Pending migration)
 
 !!! note "Migration Status"
 
-    Most core metrics have been migrated to the collections system. Only multi-modal metrics and QuotedSpans remain on the legacy architecture.
+    Most core metrics have been migrated to the collections system. Only multi-modal metrics remain on the legacy architecture.
 
     The remaining metrics will be migrated in future **v0.4.x** releases. You can still use legacy metrics with the old API, though they will show deprecation warnings.
 
