@@ -483,11 +483,18 @@ def _get_instructor_client(client: t.Any, provider: str) -> t.Any:
     Get an instructor-patched client for the specified provider.
 
     Uses provider-specific methods when available, falls back to generic patcher.
+
+    Note: For OpenAI, we use Mode.JSON instead of the default Mode.TOOLS because
+    OpenAI's function calling (TOOLS mode) has issues with Dict type annotations
+    in Pydantic models - it returns empty objects `{}` instead of proper structured
+    data. Mode.JSON works correctly with all Pydantic types including Dict.
+    See: https://github.com/vibrantlabsai/ragas/issues/2490
     """
     provider_lower = provider.lower()
 
     if provider_lower == "openai":
-        return instructor.from_openai(client)
+        # Use JSON mode to avoid issues with Dict types in function calling
+        return instructor.from_openai(client, mode=instructor.Mode.JSON)
     elif provider_lower == "anthropic":
         return instructor.from_anthropic(client)
     elif provider_lower in ("google", "gemini"):
