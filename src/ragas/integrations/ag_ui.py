@@ -1325,7 +1325,7 @@ async def run_ag_ui_row(
     With tool evaluation::
 
         from ragas.integrations.ag_ui import run_ag_ui_row, build_sample
-        from ragas.metrics import ToolCallF1
+        from ragas.metrics.collections import ToolCallF1
 
         @experiment()
         async def tool_experiment(row):
