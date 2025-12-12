@@ -129,7 +129,7 @@ class TestInstructorAdapter:
     def test_instructor_adapter_create_llm(self, monkeypatch):
         """Test creating LLM with InstructorAdapter."""
 
-        def mock_from_openai(client):
+        def mock_from_openai(client, mode=None):
             return MockInstructor(client)
 
         monkeypatch.setattr("instructor.from_openai", mock_from_openai)
@@ -145,7 +145,7 @@ class TestInstructorAdapter:
     def test_instructor_adapter_with_kwargs(self, monkeypatch):
         """Test InstructorAdapter passes through kwargs."""
 
-        def mock_from_openai(client):
+        def mock_from_openai(client, mode=None):
             return MockInstructor(client)
 
         monkeypatch.setattr("instructor.from_openai", mock_from_openai)
@@ -216,7 +216,7 @@ class TestAdapterIntegration:
         """Test llm_factory with explicit adapter selection."""
         from ragas.llms.base import llm_factory
 
-        def mock_from_openai(client):
+        def mock_from_openai(client, mode=None):
             return MockInstructor(client)
 
         monkeypatch.setattr("instructor.from_openai", mock_from_openai)
