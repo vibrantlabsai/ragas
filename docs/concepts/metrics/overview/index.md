@@ -61,7 +61,7 @@ from ragas.metrics import FactualCorrectness
 scorer = FactualCorrectness(llm=evaluation_llm)
 ```
 
-Each LLM based metrics also will have prompts associated with it written using [Prompt Object](./../../components/prompt.md).
+Each LLM based metrics also will have prompts associated with it written using [Prompt Object](./../../components/prompt.md). You can customize these prompts to suit your domain and use-case. Learn more in the [Modifying Prompts in Metrics](../../../howtos/customizations/metrics/modifying-prompts-metrics.md) guide.
 
 
 &nbsp;&nbsp;&nbsp;&nbsp; **Non-LLM-based metrics**: These metrics do not use LLM underneath to do the evaluation. These metrics are deterministic and can be used to evaluate the performance of the AI application without using LLM. These metrics rely on traditional methods to evaluate the performance of the AI application, such as string similarity, BLEU score, etc. Due to the same, these metrics are known to have a lower correlation with human evaluation.
@@ -95,7 +95,7 @@ In Ragas, we categorize metrics based on the type of output they produce. This c
 
 #### 1. Discrete Metrics
 
-These return a single value from a predefined list of categorical classes. There is no implicit ordering among the classes. Common use cases include classifying outputs into categories such as pass/fail or good/okay/bad.
+These return a single value from a predefined list of categorical classes. There is no implicit ordering among the classes. Common use cases include classifying outputs into categories such as pass/fail or good/okay/bad. Discrete metrics accept custom prompts directly, making them ideal for quick custom evaluations.
 
 Example:
 ```python
@@ -105,6 +105,8 @@ from ragas.metrics import discrete_metric
 def my_metric(predicted: str, expected: str) -> str:
     return "pass" if predicted.lower() == expected.lower() else "fail"
 ```
+
+For modifying prompts in existing collection metrics (like Faithfulness, FactualCorrectness), see [Modifying prompts in metrics](../../../howtos/customizations/metrics/modifying-prompts-metrics.md).
 
 #### 2. Numeric Metrics
 

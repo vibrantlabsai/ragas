@@ -69,4 +69,4 @@ See the individual metric documentation for details on their prompts:
 
 ## Customization
 
-For detailed guidance on customizing prompts for metrics, see [Modifying prompts in metrics](../howtos/customizations/metrics/_modifying-prompts-metrics.md).
+For detailed guidance on customizing prompts for metrics, see [Modifying prompts in metrics](../howtos/customizations/metrics/modifying-prompts-metrics.md).

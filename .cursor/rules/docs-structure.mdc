@@ -31,7 +31,12 @@ Follow these conventions when creating or editing documentation:
    • Reference images via `_static/…` paths so they work in both dev and hosted docs.  
    • Custom templates/CSS live in [docs/extra/](mdc:docs/extra/) — avoid editing `material` theme defaults directly.
 
-6. **Do not modify generated or third-party files** in `_static/`, `extra/overrides/`, or `extra/components/` without good reason.
+6. **API References (mkdocstrings)**
+   • Always use public API paths in `[ClassName][ragas.module.ClassName]` references.
+   • Check what's exported in `__init__.py` — if a class isn't in `__all__`, mkdocstrings can't link to it.
+   • Example: Use `[BasePrompt][ragas.prompt.BasePrompt]` not `[BasePrompt][ragas.prompt.base.BasePrompt]` or internal module paths.
+
+7. **Do not modify generated or third-party files** in `_static/`, `extra/overrides/`, or `extra/components/` without good reason.
 
 ---
 
