@@ -723,11 +723,14 @@ class SingleMetricAnnotation(BaseModel):
                 sampled_indices.extend(random.sample(indices, cls_sample_count))
 
             # Handle any rounding discrepancies to ensure exactly `n` samples
-            while len(sampled_indices) < n:
+            if len(sampled_indices) < n:
                 remaining_indices = set(range(len(self.samples))) - set(sampled_indices)
-                if not remaining_indices:
-                    break
-                sampled_indices.append(random.choice(list(remaining_indices)))
+                shortage = n - len(sampled_indices)
+                if remaining_indices and shortage > 0:
+                    additional_samples = random.sample(
+                        list(remaining_indices), min(shortage, len(remaining_indices))
+                    )
+                    sampled_indices.extend(additional_samples)
 
             sampled_samples = [self.samples[i] for i in sampled_indices]
 
@@ -750,11 +753,11 @@ class SingleMetricAnnotation(BaseModel):
         samples = self.samples[:]
         random.shuffle(samples)
 
-        all_batches = [
-            samples[i : i + batch_size]
-            for i in range(0, len(samples), batch_size)
-            if len(samples[i : i + batch_size]) == batch_size or not drop_last_batch
-        ]
+        all_batches = []
+        for i in range(0, len(samples), batch_size):
+            batch = samples[i : i + batch_size]
+            if len(batch) == batch_size or not drop_last_batch:
+                all_batches.append(batch)
 
         return all_batches
 

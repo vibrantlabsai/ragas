@@ -51,11 +51,19 @@ class PersonaGenerationPrompt(PydanticPrompt[StringIO, Persona]):
 
 class PersonaList(BaseModel):
     personas: t.List[Persona]
+    _name_cache: t.Dict[str, Persona] = {}
+
+    def model_post_init(self, __context) -> None:
+        """Build name cache after initialization."""
+        self._name_cache = {persona.name: persona for persona in self.personas}
 
     def __getitem__(self, key: str) -> Persona:
-        for persona in self.personas:
-            if persona.name == key:
-                return persona
+        # Rebuild cache if empty (e.g., after deserialization)
+        if not self._name_cache:
+            self._name_cache = {persona.name: persona for persona in self.personas}
+
+        if key in self._name_cache:
+            return self._name_cache[key]
         raise KeyError(f"No persona found with name '{key}'")
 
 
