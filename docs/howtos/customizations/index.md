@@ -10,8 +10,7 @@ How to customize various aspects of Ragas to suit your needs.
 
 ## Metrics
 - [Modify prompts in metrics](./metrics/_modifying-prompts-metrics.md)
-- [Write your own metrics](./metrics/_write_your_own_metric.md)
-- [Adapt metrics to target language](./metrics/_metrics_language_adaptation.md)
+- [Adapt metrics to target language](./metrics/metrics_language_adaptation.md)
 - [Trace evaluations with Observability tools](metrics/tracing.md)
 
 

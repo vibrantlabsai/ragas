@@ -31,6 +31,9 @@ Before doing anything else, check if the feature works with the new API:
 1. **Check `src/ragas/experiment.py`** - Does experiment() support this feature?
 2. **Check `src/ragas/evaluation.py`** - Is this an evaluate()-only feature?
 3. **Check `src/ragas/metrics/collections/`** - Do collections metrics support this?
+4. **Check if simpler alternatives exist** - Does a newer, simpler API make this guide obsolete? (e.g., decorator-based metrics vs subclassing, built-in features vs manual workarounds). Check concept docs and `src/ragas/metrics/` for modern patterns.
+
+**If a simpler approach exists → recommend deletion** instead of migration. See "When to Recommend Deletion" section.
 
 **If not supported in new API → STOP immediately:**
 - Keep guide as-is
@@ -163,6 +166,20 @@ embeddings = embedding_factory("openai", model="text-embedding-3-small", client=
 - Don't add legacy sections
 - Use root `.env` for testing
 - **Keep test files** in `tests/docs/` - excluded from default pytest runs
+
+## When to Recommend Deletion
+
+If a guide teaches **writing custom metrics by subclassing** (`MetricWithLLM`, `SingleTurnMetric`, etc.), it's likely obsolete. The decorator-based approach is simpler:
+
+```python
+from ragas.metrics import discrete_metric, numeric_metric, ranking_metric
+
+@discrete_metric(name="my_metric", allowed_values=["pass", "fail"])
+def my_metric(response: str, context: str) -> str:
+    return "pass" if condition else "fail"
+```
+
+See `docs/concepts/metrics/overview/index.md` for details. Recommend deletion if decorators cover the use case.
 
 ## Reporting Gaps
 If you identify a gap, use the Slack message template from section 1.2.

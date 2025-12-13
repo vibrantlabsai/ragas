@@ -223,7 +223,7 @@ my_metric = DiscreteMetric(
 ## What's Next?
 
 - **Learn the concepts**: Read the [Evaluate a Simple LLM Application](evals.md) guide for deeper understanding
-- **Custom metrics**: [Write your own metrics](../howtos/customizations/metrics/_write_your_own_metric.md) tailored to your use case
+- **Custom metrics**: [Create your own metrics](../concepts/metrics/overview/index.md#output-types) using simple decorators
 - **Production integration**: [Integrate evaluations into your CI/CD pipeline](../howtos/index.md)
 - **RAG evaluation**: Evaluate [RAG systems](rag_eval.md) with specialized metrics
 - **Agent evaluation**: Explore [AI agent evaluation](../howtos/applications/text2sql.md)

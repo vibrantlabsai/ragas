@@ -72,7 +72,7 @@ def mock_async_client():
 def test_llm_factory_initialization(mock_sync_client, monkeypatch):
     """Test llm_factory initialization."""
 
-    def mock_from_openai(client):
+    def mock_from_openai(client, mode=None):
         return MockInstructor(client)
 
     monkeypatch.setattr("instructor.from_openai", mock_from_openai)
@@ -87,7 +87,7 @@ def test_llm_factory_initialization(mock_sync_client, monkeypatch):
 def test_llm_factory_async_detection(mock_async_client, monkeypatch):
     """Test that llm_factory correctly detects async clients."""
 
-    def mock_from_openai(client):
+    def mock_from_openai(client, mode=None):
         return MockInstructor(client)
 
     monkeypatch.setattr("instructor.from_openai", mock_from_openai)
@@ -100,7 +100,7 @@ def test_llm_factory_async_detection(mock_async_client, monkeypatch):
 def test_llm_factory_with_model_args(mock_sync_client, monkeypatch):
     """Test llm_factory with model arguments."""
 
-    def mock_from_openai(client):
+    def mock_from_openai(client, mode=None):
         return MockInstructor(client)
 
     monkeypatch.setattr("instructor.from_openai", mock_from_openai)
@@ -125,7 +125,7 @@ def test_unsupported_provider(monkeypatch):
 def test_sync_llm_generate(mock_sync_client, monkeypatch):
     """Test sync LLM generation."""
 
-    def mock_from_openai(client):
+    def mock_from_openai(client, mode=None):
         return MockInstructor(client)
 
     monkeypatch.setattr("instructor.from_openai", mock_from_openai)
@@ -142,7 +142,7 @@ def test_sync_llm_generate(mock_sync_client, monkeypatch):
 async def test_async_llm_agenerate(mock_async_client, monkeypatch):
     """Test async LLM generation."""
 
-    def mock_from_openai(client):
+    def mock_from_openai(client, mode=None):
         return MockInstructor(client)
 
     monkeypatch.setattr("instructor.from_openai", mock_from_openai)
@@ -158,7 +158,7 @@ async def test_async_llm_agenerate(mock_async_client, monkeypatch):
 def test_sync_client_agenerate_error(mock_sync_client, monkeypatch):
     """Test that using agenerate with sync client raises TypeError."""
 
-    def mock_from_openai(client):
+    def mock_from_openai(client, mode=None):
         return MockInstructor(client)
 
     monkeypatch.setattr("instructor.from_openai", mock_from_openai)
@@ -178,7 +178,7 @@ def test_provider_support(monkeypatch):
     import instructor
 
     # Mock all provider-specific methods
-    def mock_from_openai(client):
+    def mock_from_openai(client, mode=None):
         return MockInstructor(client)
 
     def mock_from_anthropic(client):
@@ -208,7 +208,7 @@ def test_provider_support(monkeypatch):
 def test_llm_model_args_storage(mock_sync_client, monkeypatch):
     """Test that model arguments are properly stored."""
 
-    def mock_from_openai(client):
+    def mock_from_openai(client, mode=None):
         return MockInstructor(client)
 
     monkeypatch.setattr("instructor.from_openai", mock_from_openai)
