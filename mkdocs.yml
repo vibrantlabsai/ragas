@@ -82,7 +82,7 @@ nav:
           - Evaluation:
               - Evaluation Sample: concepts/components/eval_sample.md
               - Evaluation Dataset: concepts/components/eval_dataset.md
-  
+
   - 🛠️ How-to Guides:
       - howtos/index.md
       - Customizations:

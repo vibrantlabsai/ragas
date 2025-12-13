@@ -163,5 +163,27 @@ build-docs: ## Build all documentation
 	@echo "Building ragas documentation..."
 	$(Q)MKDOCS_CI=false uv run --group docs mkdocs build
 
+
+check-pdf-deps: ## Check if WeasyPrint is properly installed with all dependencies
+	@echo "Checking if WeasyPrint is properly installed..."
+	@uv run --group docs-pdf python -c "import weasyprint; weasyprint.HTML(string='<h1>Test</h1>').write_pdf(target=None)" 2>/dev/null && \
+		echo "WeasyPrint is installed and all dependencies are available" || \
+		(echo ""; \
+		echo "WeasyPrint is not installed or has missing system dependencies"; \
+		echo ""; \
+		echo "Setup Instructions: https://doc.courtbouillon.org/weasyprint/stable/first_steps.html"; \
+		echo "Troubleshooting: https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#troubleshooting"; \
+		echo ""; \
+		exit 1)
+
+
+build-docs-pdf: check-pdf-deps ## Build documentation with PDF export (requires WeasyPrint)
+	@echo "Building documentation with PDF export..."
+	$(Q)MKDOCS_CI=false ENABLE_PDF_EXPORT=1 uv run --group docs --group docs-pdf mkdocs build -f mkdocs-pdf.yml
+	@echo "PDF generated at: site/pdf/document.pdf"
+
+
+
 serve-docs: ## Build and serve documentation locally
 	$(Q)MKDOCS_CI=false uv run --group docs mkdocs serve --dirtyreload
+

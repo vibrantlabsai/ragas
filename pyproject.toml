@@ -182,3 +182,7 @@ docs = [
     "mkdocs-git-committers-plugin-2",
     "mkdocs-git-revision-date-localized-plugin",
 ]
+
+docs-pdf = [
+    "mkdocs-to-pdf>=0.10.1",
+]

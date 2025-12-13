@@ -1,0 +1,43 @@
+# This file inherits settings from mkdocs.yml but adds the PDF plugin.
+# We separate this to avoid forcing 'weasyprint' dependencies on all developers.
+INHERIT: ./mkdocs.yml
+
+plugins:
+  - social:
+      enabled: !ENV [MKDOCS_CI, true]
+
+  # --- PDF PLUGIN (Exclusive to this file) ---
+  - to-pdf:
+      enabled_if_env: ENABLE_PDF_EXPORT
+      author: RAGAS Team
+      copyright: RAGAS Contributors
+      cover_title: RAGAS Documentation
+      cover_subtitle: Evaluation Framework for AI Applications
+      exclude_pages:
+        - 'community/'
+      output_path: pdf/document.pdf
+  # -------------------------------------------
+
+  - search
+  - git-revision-date-localized:
+      enabled: !ENV [MKDOCS_CI, false]
+      enable_creation_date: true
+  - git-committers:
+      enabled: !ENV [MKDOCS_CI, false]
+      repository: vibrantlabsai/ragas
+      branch: main
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            members_order: source
+            separate_signature: true
+            filters: ["!^_"]
+            docstring_options:
+              ignore_init_summary: true
+            merge_init_into_class: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+  - glightbox
