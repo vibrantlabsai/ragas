@@ -22,7 +22,7 @@ if t.TYPE_CHECKING:
 class RelevanceInput(BaseModel):
     user_input: str = Field(description="user input")
     response: str = Field(description="response from AI")
-    retrieved_contexts: list[str] = Field(description="contexts retrieved from the LLM")
+    retrieved_contexts: list[str] = Field(description="contexts retrieved from the knowledge base")
 
     def to_string_list(self):
         return [
@@ -90,15 +90,28 @@ class MultiModalRelevance(MetricWithLLM, SingleTurnMetric):
     relevance_prompt: ImageTextPrompt = MultiModalRelevancePrompt()
 
     async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> float:
-        prompt_input = RelevanceInput(
-            user_input=row["user_input"],
-            response=row["response"],
-            retrieved_contexts=row["retrieved_contexts"],
-        )
-        assert self.llm is not None, "LLM is not set"
-        prompt_response = await self.relevance_prompt.generate(
-            data=prompt_input, llm=self.llm, callbacks=callbacks
-        )
+    
+        try:
+            prompt_input = RelevanceInput(
+                user_input=row["user_input"],
+                response=row["response"],
+                retrieved_contexts=row["retrieved_contexts"],
+            )
+        except Exception as e:
+            return np.nan
+            
+        if self.llm is None:
+            raise ValueError("LLM is not init.")
+
+        try:
+            prompt_response = await self.relevance_prompt.generate(
+                data=prompt_input,
+                llm=self.llm,
+                callbacks=callbacks or [],
+            )
+        except Exception as e:
+            return np.nan
+            
         if prompt_response is None:
             return np.nan
         return float(prompt_response.relevance)
