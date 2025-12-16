@@ -187,7 +187,7 @@ def test_provider_support(monkeypatch):
     def mock_from_gemini(client):
         return MockInstructor(client)
 
-    def mock_from_litellm(client):
+    def mock_from_litellm(client, mode=None):
         return MockInstructor(client)
 
     # Use setattr with the module object directly to avoid attribute existence checks

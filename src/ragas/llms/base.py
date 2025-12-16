@@ -464,17 +464,20 @@ def _patch_client_for_provider(client: t.Any, provider: str) -> t.Any:
 
     provider_enum = provider_map.get(provider, Provider.OPENAI)
 
+    # Use JSON mode to avoid issues with Dict types in function calling
     if hasattr(client, "acompletion"):
         return instructor.AsyncInstructor(
             client=client,
             create=client.messages.create,
             provider=provider_enum,
+            mode=instructor.Mode.JSON,
         )
     else:
         return instructor.Instructor(
             client=client,
             create=client.messages.create,
             provider=provider_enum,
+            mode=instructor.Mode.JSON,
         )
 
 
@@ -500,7 +503,8 @@ def _get_instructor_client(client: t.Any, provider: str) -> t.Any:
     elif provider_lower in ("google", "gemini"):
         return instructor.from_gemini(client)
     elif provider_lower == "litellm":
-        return instructor.from_litellm(client)
+        # Use JSON mode to avoid issues with Dict types in function calling
+        return instructor.from_litellm(client, mode=instructor.Mode.JSON)
     elif provider_lower == "perplexity":
         return instructor.from_perplexity(client)
     else:
