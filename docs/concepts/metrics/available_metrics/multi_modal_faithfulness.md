@@ -4,10 +4,38 @@
 
 The generated answer is regarded as faithful if all the claims made in the answer can be inferred from either the visual or textual context provided. To determine this, the response is directly evaluated against the provided contexts, and the faithfulness score is either 0 or 1.
 
-### Example
+### Example (Recommended - Collections API)
 
 ```python
-from ragas.dataset_schema import SingleTurnSample 
+from openai import AsyncOpenAI
+from ragas.llms.base import llm_factory
+from ragas.metrics.collections import MultiModalFaithfulness
+
+# Setup - use a vision-capable model
+client = AsyncOpenAI()
+llm = llm_factory("gpt-4o", client=client)  # Vision-capable model required
+
+# Create metric instance
+metric = MultiModalFaithfulness(llm=llm)
+
+# Evaluate faithfulness
+result = await metric.ascore(
+    response="The Tesla Model X is an electric SUV.",
+    retrieved_contexts=[
+        "path/to/tesla_image.jpg",  # Image context
+        "Tesla manufactures electric vehicles."  # Text context
+    ]
+)
+print(f"Faithfulness Score: {result.value}")  # 1.0 (faithful) or 0.0 (not faithful)
+```
+
+### Example (Legacy API - Deprecated)
+
+!!! warning "Deprecated"
+    The legacy API is deprecated and will be removed in a future version. Please migrate to the Collections API shown above.
+
+```python
+from ragas.dataset_schema import SingleTurnSample
 from ragas.metrics import MultiModalFaithfulness
 
 sample = SingleTurnSample(
@@ -21,12 +49,12 @@ scorer = MultiModalFaithfulness()
 await scorer.single_turn_ascore(sample)
 ```
 
-### How It’s Calculated 
+### How It's Calculated
 
 !!! example
     **Question**: What about the Tesla Model X?
 
-    **Context (visual)**: 
+    **Context (visual)**:
     - An image of the Tesla Model X (custom_eval/multimodal/images/tesla.jpg)
 
     **High faithfulness answer**: The Tesla Model X is an electric SUV manufactured by Tesla.
@@ -48,3 +76,17 @@ Let's examine how faithfulness was calculated using the low faithfulness answer:
     $$
 
 In this example, the response "Cats are cute" cannot be inferred from the image of the Tesla Model X, so the faithfulness score is 0.
+
+### Supported Context Types
+
+The metric supports multiple types of context inputs:
+
+- **Text contexts**: Plain text strings
+- **Image URLs**: HTTP/HTTPS URLs pointing to images
+- **Local image paths**: File paths to local images (jpg, png, gif, webp, bmp)
+- **Base64 data URIs**: Inline base64-encoded images
+
+### Requirements
+
+- A vision-capable LLM is required (e.g., `gpt-4o`, `gpt-4-vision-preview`, `claude-3-opus`, `gemini-pro-vision`)
+- For the Collections API, use `llm_factory` to create the LLM instance

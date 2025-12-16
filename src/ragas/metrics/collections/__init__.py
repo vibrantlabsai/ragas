@@ -37,6 +37,7 @@ from ragas.metrics.collections.domain_specific_rubrics import (
 from ragas.metrics.collections.factual_correctness import FactualCorrectness
 from ragas.metrics.collections.faithfulness import Faithfulness
 from ragas.metrics.collections.instance_specific_rubrics import InstanceSpecificRubrics
+from ragas.metrics.collections.multi_modal_faithfulness import MultiModalFaithfulness
 from ragas.metrics.collections.noise_sensitivity import NoiseSensitivity
 from ragas.metrics.collections.quoted_spans import QuotedSpansAlignment
 from ragas.metrics.collections.response_groundedness import ResponseGroundedness
@@ -65,6 +66,7 @@ __all__ = [
     "ExactMatch",
     "FactualCorrectness",
     "Faithfulness",
+    "MultiModalFaithfulness",
     "NoiseSensitivity",
     "NonLLMStringSimilarity",
     "QuotedSpansAlignment",
