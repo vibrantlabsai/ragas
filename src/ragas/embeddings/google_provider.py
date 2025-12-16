@@ -12,34 +12,42 @@ class GoogleEmbeddings(BaseRagasEmbedding):
 
     Supports both Vertex AI and Google AI (Gemini) embedding models.
     For Vertex AI, requires google-cloud-aiplatform package.
-    For Google AI, requires google-generativeai package.
+    For Google AI, supports both:
+        - New SDK (google-genai): Recommended, uses genai.Client()
+        - Old SDK (google-generativeai): Deprecated (support ends Aug 2025)
 
     The client parameter is flexible:
-    - For Gemini: Can be None (auto-imports genai), the genai module, or a GenerativeModel instance
+    - For new SDK: genai.Client(api_key="...") instance
+    - For old SDK: None (auto-imports), the genai module, or a GenerativeModel instance
     - For Vertex: Should be the configured vertex client
 
-    Examples:
-        # Gemini - auto-import (simplest)
-        embeddings = GoogleEmbeddings(client=None, model="text-embedding-004")
+    Note: Unlike LLM generation, embeddings work correctly with both SDKs.
+    The known instructor safety settings issue (github.com/567-labs/instructor/issues/1658)
+    only affects LLM generation, not embeddings.
 
-        # Gemini - explicit genai module
+    Examples:
+        # New SDK (google-genai) - recommended
+        from google import genai
+        client = genai.Client(api_key="...")
+        embeddings = GoogleEmbeddings(client=client, model="gemini-embedding-001")
+
+        # Old SDK (google-generativeai) - deprecated
         import google.generativeai as genai
         genai.configure(api_key="...")
         embeddings = GoogleEmbeddings(client=genai, model="text-embedding-004")
 
-        # Gemini - from LLM client (auto-extracts genai module)
-        llm_client = genai.GenerativeModel("gemini-2.0-flash")
-        embeddings = GoogleEmbeddings(client=llm_client, model="text-embedding-004")
+        # Auto-import (tries new SDK first, falls back to old)
+        embeddings = GoogleEmbeddings(model="text-embedding-004")
     """
 
     PROVIDER_NAME = "google"
     REQUIRES_CLIENT = False  # Client is optional for Gemini (can auto-import)
-    DEFAULT_MODEL = "text-embedding-004"
+    DEFAULT_MODEL = "gemini-embedding-001"
 
     def __init__(
         self,
         client: t.Optional[t.Any] = None,
-        model: str = "text-embedding-004",
+        model: str = "gemini-embedding-001",
         use_vertex: bool = False,
         project_id: t.Optional[str] = None,
         location: t.Optional[str] = "us-central1",
@@ -52,6 +60,9 @@ class GoogleEmbeddings(BaseRagasEmbedding):
         self.location = location
         self.kwargs = kwargs
 
+        # Track which SDK is being used (new google-genai vs old google-generativeai)
+        self._use_new_sdk = False
+
         # Resolve the actual client to use
         self.client = self._resolve_client(client, use_vertex)
 
@@ -59,10 +70,9 @@ class GoogleEmbeddings(BaseRagasEmbedding):
         """Resolve the client to use for embeddings.
 
         For Vertex AI: Returns the client as-is (must be provided).
-        For Gemini: Handles three scenarios:
-            1. No client (None) - Auto-imports and returns genai module
-            2. genai module - Returns as-is
-            3. GenerativeModel instance - Extracts and returns genai module
+        For Gemini: Handles multiple scenarios:
+            - New SDK (google-genai): genai.Client() instance
+            - Old SDK: None (auto-imports), genai module, or GenerativeModel instance
 
         Args:
             client: The client provided by the user (can be None for Gemini)
@@ -83,15 +93,21 @@ class GoogleEmbeddings(BaseRagasEmbedding):
                 )
             return client
 
-        # Gemini path - handle different client types
+        # Check if it's the new google-genai SDK Client
+        if client is not None and self._is_new_genai_client(client):
+            self._use_new_sdk = True
+            return client
+
+        # Gemini path - handle different client types for old SDK
         if client is None:
-            # Auto-import genai module
+            # Auto-import genai module (tries new SDK first, then old)
             return self._import_genai_module()
 
-        # Check if client has embed_content method (it's the genai module or similar)
+        # Check if client has embed_content method (it's the old genai module)
         if hasattr(client, "embed_content") and callable(
             getattr(client, "embed_content")
         ):
+            self._use_new_sdk = False
             return client
 
         # Check if it's a GenerativeModel instance - extract genai module from it
@@ -106,6 +122,7 @@ class GoogleEmbeddings(BaseRagasEmbedding):
             # Try to get the module from sys.modules
             genai_module = sys.modules.get(base_module)
             if genai_module and hasattr(genai_module, "embed_content"):
+                self._use_new_sdk = False
                 return genai_module
 
             # If not in sys.modules, try importing it
@@ -114,6 +131,7 @@ class GoogleEmbeddings(BaseRagasEmbedding):
 
                 genai_module = importlib.import_module(base_module)
                 if hasattr(genai_module, "embed_content"):
+                    self._use_new_sdk = False
                     return genai_module
             except ImportError:
                 pass
@@ -121,24 +139,65 @@ class GoogleEmbeddings(BaseRagasEmbedding):
         # If we couldn't resolve it, try importing genai as fallback
         return self._import_genai_module()
 
+    def _is_new_genai_client(self, client: t.Any) -> bool:
+        """Check if client is from the new google-genai SDK.
+
+        New SDK client is genai.Client() with client.models.embed_content() method.
+        """
+        client_module = getattr(client, "__module__", "") or ""
+        client_class = client.__class__.__name__
+
+        # New SDK: google.genai.client.Client
+        if "google.genai" in client_module and "generativeai" not in client_module:
+            # Verify it has the models.embed_content interface
+            if hasattr(client, "models") and hasattr(client.models, "embed_content"):
+                return True
+
+        # Check class name as fallback
+        if client_class == "Client" and hasattr(client, "models"):
+            return True
+
+        return False
+
     def _import_genai_module(self) -> t.Any:
-        """Import and return the google.generativeai module.
+        """Import and return the Google genai module.
+
+        Tries new SDK (google-genai) first, falls back to old SDK (google-generativeai).
 
         Returns:
-            The google.generativeai module
+            The genai Client (new SDK) or module (old SDK)
 
         Raises:
-            ImportError: If google-generativeai is not installed
+            ImportError: If neither google-genai nor google-generativeai is installed
         """
+        # Try new SDK first (google-genai)
         try:
-            import google.generativeai as genai
+            from google import genai  # type: ignore[attr-defined]
 
+            # New SDK requires creating a Client instance
+            client = genai.Client()
+            self._use_new_sdk = True
+            return client
+        except ImportError:
+            pass
+        except Exception:
+            # Client creation might fail without API key, fall back to old SDK
+            pass
+
+        # Fall back to old SDK (google-generativeai)
+        try:
+            import google.generativeai as genai  # type: ignore[import-untyped]
+
+            self._use_new_sdk = False
             return genai
-        except ImportError as e:
-            raise ImportError(
-                "Google AI (Gemini) embeddings require google-generativeai package. "
-                "Install with: pip install google-generativeai"
-            ) from e
+        except ImportError:
+            pass
+
+        raise ImportError(
+            "Google AI (Gemini) embeddings require either:\n"
+            "  - google-genai (recommended): pip install google-genai\n"
+            "  - google-generativeai (deprecated): pip install google-generativeai"
+        )
 
     def embed_text(self, text: str, **kwargs: t.Any) -> t.List[float]:
         """Embed a single text using Google's embedding service."""
@@ -163,12 +222,25 @@ class GoogleEmbeddings(BaseRagasEmbedding):
         return embeddings[0].values
 
     def _embed_text_genai(self, text: str, **kwargs: t.Any) -> t.List[float]:
-        """Embed text using Google AI (Gemini)."""
+        """Embed text using Google AI (Gemini).
+
+        Supports both new SDK (google-genai) and old SDK (google-generativeai).
+        """
         merged_kwargs = {**self.kwargs, **kwargs}
-        result = self.client.embed_content(
-            model=f"models/{self.model}", content=text, **merged_kwargs
-        )
-        return result["embedding"]
+
+        if self._use_new_sdk:
+            # New SDK: client.models.embed_content(model="name", contents="text")
+            result = self.client.models.embed_content(
+                model=self.model, contents=text, **merged_kwargs
+            )
+            # New SDK returns result.embeddings[0].values
+            return list(result.embeddings[0].values)
+        else:
+            # Old SDK: genai.embed_content(model="models/name", content="text")
+            result = self.client.embed_content(
+                model=f"models/{self.model}", content=text, **merged_kwargs
+            )
+            return result["embedding"]
 
     async def aembed_text(self, text: str, **kwargs: t.Any) -> t.List[float]:
         """Asynchronously embed a single text using Google's embedding service.
@@ -210,9 +282,19 @@ class GoogleEmbeddings(BaseRagasEmbedding):
     ) -> t.List[t.List[float]]:
         """Embed multiple texts using Google AI (Gemini).
 
-        Google AI doesn't support batch processing, so we process individually.
+        New SDK (google-genai) supports batch processing.
+        Old SDK (google-generativeai) processes individually.
         """
-        return [self._embed_text_genai(text, **kwargs) for text in texts]
+        if self._use_new_sdk:
+            # New SDK supports batch embedding
+            merged_kwargs = {**self.kwargs, **kwargs}
+            result = self.client.models.embed_content(
+                model=self.model, contents=texts, **merged_kwargs
+            )
+            return [list(emb.values) for emb in result.embeddings]
+        else:
+            # Old SDK doesn't support batch processing
+            return [self._embed_text_genai(text, **kwargs) for text in texts]
 
     async def aembed_texts(
         self, texts: t.List[str], **kwargs: t.Any

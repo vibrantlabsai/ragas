@@ -78,20 +78,43 @@ class TestAdapterRegistry:
             get_adapter("unknown")
 
 
+class MockNewGenAIClient:
+    """Mock client that simulates the new google-genai SDK Client."""
+
+    __module__ = "google.genai.client"
+
+    def __init__(self):
+        self.models = Mock()
+        self.models.generate_content = Mock()
+        self.models.embed_content = Mock()
+
+
 class TestAutoDetectAdapter:
     """Test auto-detection logic for adapters."""
 
-    def test_auto_detect_google_provider_uses_litellm(self):
-        """Test that google provider auto-detects litellm."""
-        client = MockClient()
+    def test_auto_detect_google_provider_old_sdk_uses_litellm(self):
+        """Test that google provider with old SDK auto-detects litellm."""
+        client = MockClient()  # Simulates old GenerativeModel
         adapter_name = auto_detect_adapter(client, "google")
         assert adapter_name == "litellm"
 
-    def test_auto_detect_gemini_provider_uses_litellm(self):
-        """Test that gemini provider auto-detects litellm."""
-        client = MockClient()
+    def test_auto_detect_gemini_provider_old_sdk_uses_litellm(self):
+        """Test that gemini provider with old SDK auto-detects litellm."""
+        client = MockClient()  # Simulates old GenerativeModel
         adapter_name = auto_detect_adapter(client, "gemini")
         assert adapter_name == "litellm"
+
+    def test_auto_detect_google_provider_new_sdk_uses_instructor(self):
+        """Test that google provider with new google-genai SDK uses instructor."""
+        client = MockNewGenAIClient()  # Simulates new genai.Client()
+        adapter_name = auto_detect_adapter(client, "google")
+        assert adapter_name == "instructor"
+
+    def test_auto_detect_gemini_provider_new_sdk_uses_instructor(self):
+        """Test that gemini provider with new google-genai SDK uses instructor."""
+        client = MockNewGenAIClient()  # Simulates new genai.Client()
+        adapter_name = auto_detect_adapter(client, "gemini")
+        assert adapter_name == "instructor"
 
     def test_auto_detect_openai_uses_instructor(self):
         """Test that openai provider defaults to instructor."""

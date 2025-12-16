@@ -478,6 +478,38 @@ def _patch_client_for_provider(client: t.Any, provider: str) -> t.Any:
         )
 
 
+def _is_new_google_genai_client(client: t.Any) -> bool:
+    """
+    Detect if client is from the new google-genai SDK vs old google-generativeai.
+
+    New SDK (google-genai):
+        - Import: from google import genai / import google.genai
+        - Client: genai.Client(api_key="...")
+        - Module: google.genai.client.Client
+
+    Old SDK (google-generativeai):
+        - Import: import google.generativeai as genai
+        - Client: genai.GenerativeModel("model-name")
+        - Module: google.generativeai.generative_models.GenerativeModel
+
+    Note: The old SDK is deprecated (support ends Aug 2025). The new SDK is recommended
+    but has a known upstream instructor issue with safety settings. See:
+    https://github.com/567-labs/instructor/issues/1658
+    """
+    client_module = getattr(client, "__module__", "") or ""
+    client_class = client.__class__.__name__
+
+    # New SDK: google.genai.client.Client or similar
+    if "google.genai" in client_module and "generativeai" not in client_module:
+        return True
+
+    # Check class name as fallback (new SDK uses Client, old uses GenerativeModel)
+    if client_class == "Client" and "genai" in client_module.lower():
+        return True
+
+    return False
+
+
 def _get_instructor_client(client: t.Any, provider: str) -> t.Any:
     """
     Get an instructor-patched client for the specified provider.
@@ -489,6 +521,10 @@ def _get_instructor_client(client: t.Any, provider: str) -> t.Any:
     in Pydantic models - it returns empty objects `{}` instead of proper structured
     data. Mode.JSON works correctly with all Pydantic types including Dict.
     See: https://github.com/vibrantlabsai/ragas/issues/2490
+
+    For Google/Gemini, supports both SDKs:
+    - New SDK (google-genai): Uses instructor.from_genai()
+    - Old SDK (google-generativeai): Uses instructor.from_gemini()
     """
     provider_lower = provider.lower()
 
@@ -498,7 +534,16 @@ def _get_instructor_client(client: t.Any, provider: str) -> t.Any:
     elif provider_lower == "anthropic":
         return instructor.from_anthropic(client)
     elif provider_lower in ("google", "gemini"):
-        return instructor.from_gemini(client)
+        # Detect which Google SDK is being used
+        if _is_new_google_genai_client(client):
+            # New google-genai SDK - uses instructor.from_genai()
+            # WARNING: Known upstream issue with instructor sending invalid safety
+            # settings (HARM_CATEGORY_JAILBREAK). Track: github.com/567-labs/instructor/issues/1658
+            # Workaround: Use OpenAI-compatible endpoint with Gemini base URL instead.
+            return instructor.from_genai(client)
+        else:
+            # Old google-generativeai SDK (deprecated, support ends Aug 2025)
+            return instructor.from_gemini(client)
     elif provider_lower == "litellm":
         return instructor.from_litellm(client)
     elif provider_lower == "perplexity":
@@ -957,6 +1002,7 @@ class InstructorLLM(InstructorBaseRagasLLM):
 
             if self.provider.lower() == "google":
                 result = self.client.create(
+                    model=self.model,
                     messages=messages,
                     response_model=response_model,
                     **provider_kwargs,
@@ -1001,6 +1047,7 @@ class InstructorLLM(InstructorBaseRagasLLM):
 
         if self.provider.lower() == "google":
             result = await self.client.create(
+                model=self.model,
                 messages=messages,
                 response_model=response_model,
                 **provider_kwargs,
