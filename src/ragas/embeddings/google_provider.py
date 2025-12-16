@@ -172,7 +172,7 @@ class GoogleEmbeddings(BaseRagasEmbedding):
         """
         # Try new SDK first (google-genai)
         try:
-            from google import genai
+            from google import genai  # type: ignore[attr-defined]
 
             # New SDK requires creating a Client instance
             client = genai.Client()
@@ -186,7 +186,7 @@ class GoogleEmbeddings(BaseRagasEmbedding):
 
         # Fall back to old SDK (google-generativeai)
         try:
-            import google.generativeai as genai
+            import google.generativeai as genai  # type: ignore[import-untyped]
 
             self._use_new_sdk = False
             return genai
