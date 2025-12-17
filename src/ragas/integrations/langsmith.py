@@ -168,7 +168,7 @@ def evaluate(
     )
 
     # run evaluation with langsmith
-    run = client.run_on_dataset(
+    run = client.run_on_dataset(  # type: ignore[attr-defined]
         dataset_name=dataset_name,
         llm_or_chain_factory=llm_or_chain_factory,
         evaluation=eval_config,
