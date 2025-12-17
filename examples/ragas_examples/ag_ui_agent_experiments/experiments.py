@@ -32,7 +32,7 @@ import logging
 from pathlib import Path
 
 from dotenv import load_dotenv
-from openai import AsyncOpenAI, OpenAI
+from openai import AsyncOpenAI
 
 from ragas.dataset import Dataset
 from ragas.embeddings.base import embedding_factory
@@ -107,7 +107,7 @@ def create_evaluator_components(model_name: str):
     llm_client = AsyncOpenAI()
     evaluator_llm = llm_factory(model_name, client=llm_client, max_tokens=6000)
     setattr(evaluator_llm, "is_async", True)
-    embedding_client = OpenAI()
+    embedding_client = AsyncOpenAI()
     evaluator_embeddings = embedding_factory(
         "openai",
         model="text-embedding-3-small",

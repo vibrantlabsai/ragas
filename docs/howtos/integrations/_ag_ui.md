@@ -107,7 +107,7 @@ For multi-turn agent experiments, we use:
 
 
 ```python
-from openai import AsyncOpenAI, OpenAI
+from openai import AsyncOpenAI
 
 from ragas.embeddings.base import embedding_factory
 from ragas.llms import llm_factory
@@ -123,8 +123,7 @@ from ragas.metrics.collections import (
 async_llm_client = AsyncOpenAI()
 evaluator_llm = llm_factory("gpt-4o-mini", client=async_llm_client)
 
-# Sync client for embeddings (AnswerRelevancy still makes blocking calls)
-embedding_client = OpenAI()
+embedding_client = AsyncOpenAI()
 evaluator_embeddings = embedding_factory(
     "openai",
     model="text-embedding-3-small",
