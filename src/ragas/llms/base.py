@@ -153,6 +153,16 @@ class LangchainLLMWrapper(BaseRagasLLM):
         bypass_temperature: bool = False,
         bypass_n: bool = False,
     ):
+        import warnings
+
+        warnings.warn(
+            "LangchainLLMWrapper is deprecated and will be removed in a future version. "
+            "Use llm_factory instead: "
+            "from openai import OpenAI; from ragas.llms import llm_factory; "
+            "client = OpenAI(api_key='...'); llm = llm_factory('gpt-4o-mini', client=client)",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(cache=cache)
         self.langchain_llm = langchain_llm
         if run_config is None:
@@ -360,6 +370,16 @@ class LlamaIndexLLMWrapper(BaseRagasLLM):
         cache: t.Optional[CacheInterface] = None,
         bypass_temperature: bool = False,
     ):
+        import warnings
+
+        warnings.warn(
+            "LlamaIndexLLMWrapper is deprecated and will be removed in a future version. "
+            "Use llm_factory instead: "
+            "from openai import OpenAI; from ragas.llms import llm_factory; "
+            "client = OpenAI(api_key='...'); llm = llm_factory('gpt-4o-mini', client=client)",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(cache=cache)
         self.llm = llm
         # Certain LLMs (e.g., OpenAI o1 series) do not support temperature

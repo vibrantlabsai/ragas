@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import typing as t
+import warnings
 from uuid import UUID
 
 from datasets import Dataset
@@ -101,6 +102,14 @@ async def aevaluate(
     asyncio.run(main())
     ```
     """
+    warnings.warn(
+        "aevaluate() is deprecated and will be removed in a future version. "
+        "Use the @experiment decorator instead. "
+        "See https://docs.ragas.io/en/latest/concepts/experiment/ for more information.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     column_map = column_map or {}
     callbacks = callbacks or []
     run_config = run_config or RunConfig()
@@ -435,6 +444,13 @@ def evaluate(
     'answer_relevancy': 0.874}
     ```
     """
+    warnings.warn(
+        "evaluate() is deprecated and will be removed in a future version. "
+        "Use the @experiment decorator instead. "
+        "See https://docs.ragas.io/en/latest/concepts/experiment/ for more information.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     # Create async wrapper for aevaluate
     async def _async_wrapper():
