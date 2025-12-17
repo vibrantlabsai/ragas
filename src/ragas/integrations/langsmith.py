@@ -155,12 +155,10 @@ def evaluate(
 
     # make config
     if metrics is None:
-        from ragas.metrics import (
-            answer_relevancy,
-            context_precision,
-            context_recall,
-            faithfulness,
-        )
+        from ragas.metrics._answer_relevance import answer_relevancy
+        from ragas.metrics._context_precision import context_precision
+        from ragas.metrics._context_recall import context_recall
+        from ragas.metrics._faithfulness import faithfulness
 
         metrics = [answer_relevancy, context_precision, faithfulness, context_recall]
 
