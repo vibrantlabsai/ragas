@@ -19,40 +19,25 @@ def is_event_loop_running() -> bool:
         return loop.is_running()
 
 
-def apply_nest_asyncio() -> bool:
+def is_jupyter_environment() -> bool:
     """
-    Apply nest_asyncio if an event loop is running and compatible.
+    Check if code is running in a Jupyter-like environment.
 
     Returns:
-        bool: True if nest_asyncio was applied, False if skipped
+        bool: True if running in Jupyter, False otherwise
     """
-    if not is_event_loop_running():
-        return False
-
     try:
-        import nest_asyncio
+        # Check for IPython/Jupyter kernel
+        from IPython import get_ipython
+
+        ipython = get_ipython()
+        if ipython is None:
+            return False
+
+        # Check if it's a kernel-based IPython (Jupyter)
+        return hasattr(ipython, "kernel")
     except ImportError:
-        raise ImportError(
-            "It seems like your running this in a jupyter-like environment. Please install nest_asyncio with `pip install nest_asyncio` to make it work."
-        )
-
-    try:
-        loop = asyncio.get_running_loop()
-        loop_type = type(loop).__name__
-
-        if "uvloop" in loop_type.lower() or "uvloop" in str(type(loop)):
-            logger.debug(
-                f"Skipping nest_asyncio.apply() for incompatible loop type: {loop_type}"
-            )
-            return False
-
-        nest_asyncio.apply()
-        return True
-    except ValueError as e:
-        if "Can't patch loop of type" in str(e):
-            logger.debug(f"Skipping nest_asyncio.apply(): {e}")
-            return False
-        raise
+        return False
 
 
 def as_completed(
@@ -124,34 +109,59 @@ def run(
         t.Callable[[], t.Coroutine[t.Any, t.Any, t.Any]],
         t.Coroutine[t.Any, t.Any, t.Any],
     ],
-    allow_nest_asyncio: bool = True,
 ) -> t.Any:
     """
-    Run an async function in the current event loop or a new one if not running.
+    Run an async function, handling both Jupyter and standard environments.
+
+    This function automatically detects the execution environment:
+    - In Jupyter notebooks: schedules coroutine on the existing event loop
+    - In standard Python: creates a new event loop with asyncio.run()
 
     Parameters
     ----------
     async_func : Callable or Coroutine
         The async function or coroutine to run
-    allow_nest_asyncio : bool, optional
-        Whether to apply nest_asyncio for Jupyter compatibility. Default is True.
-        Set to False in production environments to avoid event loop patching.
-    """
-    nest_asyncio_applied = False
-    if allow_nest_asyncio:
-        nest_asyncio_applied = apply_nest_asyncio()
 
+    Returns
+    -------
+    Any
+        The result of the async function
+
+    Raises
+    ------
+    RuntimeError
+        If an event loop is running in a non-Jupyter environment
+    """
     coro = async_func() if callable(async_func) else async_func
 
-    if is_event_loop_running() and not nest_asyncio_applied:
-        loop = asyncio.get_running_loop()
-        loop_type = type(loop).__name__
-        raise RuntimeError(
-            f"Cannot execute nested async code with {loop_type}. "
-            f"uvloop does not support nested event loop execution. "
-            f"Please use asyncio's standard event loop in Jupyter environments, "
-            f"or refactor your code to avoid nested async calls."
-        )
+    if is_event_loop_running():
+        # Check if we're in a Jupyter environment
+        if is_jupyter_environment():
+            # In Jupyter, schedule on the existing loop and run until complete
+            import asyncio
+
+            loop = asyncio.get_running_loop()
+            # Create task and ensure it's scheduled
+            task = loop.create_task(coro)
+
+            # Run the loop until the task completes
+            # This is similar to what nest_asyncio did, but more explicit
+            while not task.done():
+                # Process one iteration of the event loop
+                loop._run_once()
+
+            # Return result or raise exception
+            return task.result()
+        else:
+            # In non-Jupyter with running loop, this is an error
+            loop = asyncio.get_running_loop()
+            loop_type = type(loop).__name__
+            raise RuntimeError(
+                f"Cannot execute nested async code with {loop_type}. "
+                f"An event loop is already running in this context. "
+                f"Please use 'await' instead of calling this synchronous wrapper, "
+                f"or refactor your code to avoid nested async calls."
+            )
 
     return asyncio.run(coro)
 
