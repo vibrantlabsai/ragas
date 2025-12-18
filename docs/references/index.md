@@ -7,6 +7,7 @@ This section contains detailed API documentation for all core components of Raga
 - [Prompt](prompt.md) - Core prompt management and templating
 - [LLMs](llms.md) - Language model interfaces and configurations
 - [Embeddings](embeddings.md) - Embedding model interfaces and utilities
+- [Tokenizers](tokenizers.md) - Tokenizer interfaces for text splitting
 - [RunConfig](run_config.md) - Evaluation runtime configuration
 - [Executor](executor.md) - Execution engine for evaluations
 - [Cache](cache.md) - Caching mechanisms for LLM calls

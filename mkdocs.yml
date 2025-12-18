@@ -154,6 +154,7 @@ nav:
       - Prompt: references/prompt.md
       - LLMs: references/llms.md
       - Embeddings: references/embeddings.md
+      - Tokenizers: references/tokenizers.md
       - RunConfig: references/run_config.md
       - Executor: references/executor.md
       - Cache: references/cache.md

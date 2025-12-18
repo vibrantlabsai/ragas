@@ -21,6 +21,7 @@ from tqdm.auto import tqdm
 
 if t.TYPE_CHECKING:
     from ragas.metrics.base import Metric
+    from ragas.tokenizers import BaseTokenizer
 
 DEBUG_ENV_VAR = "RAGAS_DEBUG"
 
@@ -247,11 +248,30 @@ def camel_to_snake(name):
     return pattern.sub("_", name).lower()
 
 
-def num_tokens_from_string(string: str, encoding_name: str = "cl100k_base") -> int:
-    """Returns the number of tokens in a text string."""
+def num_tokens_from_string(
+    string: str,
+    encoding_name: str = "cl100k_base",
+    tokenizer: t.Optional["BaseTokenizer"] = None,
+) -> int:
+    """Returns the number of tokens in a text string.
+
+    Parameters
+    ----------
+    string : str
+        The text to count tokens for.
+    encoding_name : str
+        Tiktoken encoding name (ignored if tokenizer is provided).
+    tokenizer : BaseTokenizer, optional
+        A tokenizer instance. If provided, encoding_name is ignored.
+
+    Returns
+    -------
+    int
+        Number of tokens in the string.
+    """
+    if tokenizer is not None:
+        return tokenizer.count_tokens(string)
     encoding = tiktoken.get_encoding(encoding_name)
-    # to prevent error case when document has special tokens like `<endoftext>`
-    # set empty tuple in disallowed_special to allow all special tokens
     num_tokens = len(encoding.encode(string, disallowed_special=()))
     return num_tokens
 
