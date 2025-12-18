@@ -1,0 +1,314 @@
+name: Sync Version Branches
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  sync:
+    # Only run if PR was merged (not just closed)
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Detect current version from git tags
+        id: detect_version
+        run: |
+          # Get the latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+
+          # Extract major.minor version (e.g., v0.3.5 -> 0.3)
+          CURRENT_VERSION=$(echo "$LATEST_TAG" | grep -oP 'v?\K\d+\.\d+' || echo "0.0")
+          echo "Detected current version: $CURRENT_VERSION"
+
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Extract PR labels and determine target branches
+        id: determine_branches
+        env:
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+          CURRENT_VERSION: ${{ steps.detect_version.outputs.current_version }}
+        run: |
+          echo "PR Labels: $PR_LABELS"
+          echo "Current version: $CURRENT_VERSION"
+
+          # Parse current version to calculate next versions
+          CURRENT_MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+          CURRENT_MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+
+          NEXT_MINOR="${CURRENT_MAJOR}.$((CURRENT_MINOR + 1))"
+          NEXT_MAJOR="$((CURRENT_MAJOR + 1)).0"
+
+          # Initialize target branches array
+          TARGET_BRANCHES=""
+
+          # Parse labels from JSON array
+          LABELS=$(echo "$PR_LABELS" | jq -r '.[]')
+
+          # Check if any labels exist
+          HAS_LABELS=false
+
+          # Process each label
+          while IFS= read -r label; do
+            if [ -n "$label" ]; then
+              HAS_LABELS=true
+
+              case "$label" in
+                major)
+                  TARGET_BRANCHES="${TARGET_BRANCHES} v${NEXT_MAJOR}.x"
+                  echo "✓ Found 'major' label → v${NEXT_MAJOR}.x"
+                  ;;
+                minor)
+                  TARGET_BRANCHES="${TARGET_BRANCHES} v${NEXT_MINOR}.x"
+                  echo "✓ Found 'minor' label → v${NEXT_MINOR}.x"
+                  ;;
+                patch)
+                  TARGET_BRANCHES="${TARGET_BRANCHES} v${CURRENT_VERSION}.x"
+                  echo "✓ Found 'patch' label → v${CURRENT_VERSION}.x"
+                  ;;
+                backport-*)
+                  # Extract branch name from backport-v0.X.x format
+                  BACKPORT_BRANCH="${label#backport-}"
+                  TARGET_BRANCHES="${TARGET_BRANCHES} ${BACKPORT_BRANCH}"
+                  echo "✓ Found '$label' label → ${BACKPORT_BRANCH}"
+                  ;;
+                v[0-9]*.[0-9]*.x|v[0-9]*.x)
+                  # Direct version branch label (e.g., v0.4.x, v1.2.x, v1.x)
+                  TARGET_BRANCHES="${TARGET_BRANCHES} ${label}"
+                  echo "✓ Found version branch label → ${label}"
+                  ;;
+              esac
+            fi
+          done <<< "$LABELS"
+
+          # If no version labels found, default to patch (current version branch)
+          if [ "$HAS_LABELS" = false ] || [ -z "$TARGET_BRANCHES" ]; then
+            TARGET_BRANCHES="v${CURRENT_VERSION}.x"
+            echo "⚠ No version labels found, defaulting to 'patch' → v${CURRENT_VERSION}.x"
+          fi
+
+          # Remove duplicates and trim
+          TARGET_BRANCHES=$(echo "$TARGET_BRANCHES" | tr ' ' '\n' | sort -u | tr '\n' ' ' | xargs)
+
+          echo "target_branches=$TARGET_BRANCHES" >> $GITHUB_OUTPUT
+          echo ""
+          echo "📋 Final target branches: $TARGET_BRANCHES"
+
+      - name: Sync to version branches
+        id: sync
+        env:
+          TARGET_BRANCHES: ${{ steps.determine_branches.outputs.target_branches }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          MERGE_COMMIT: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          echo "🔄 Starting sync process..."
+          echo "Merge commit: $MERGE_COMMIT"
+          echo ""
+
+          SUCCESS_BRANCHES=""
+          FAILED_BRANCHES=""
+          CONFLICT_BRANCHES=""
+
+          for BRANCH in $TARGET_BRANCHES; do
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Processing branch: $BRANCH"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Check if branch exists remotely
+            if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+              echo "✓ Branch $BRANCH exists remotely"
+              git fetch origin "$BRANCH"
+              git checkout "$BRANCH"
+            else
+              echo "⚠ Branch $BRANCH does not exist, creating from main..."
+              git checkout -b "$BRANCH" origin/main
+              git push -u origin "$BRANCH"
+              echo "✓ Created branch $BRANCH"
+            fi
+
+            # Attempt cherry-pick
+            echo ""
+            echo "Attempting to cherry-pick $MERGE_COMMIT to $BRANCH..."
+
+            if git cherry-pick -m 1 "$MERGE_COMMIT"; then
+              echo "✓ Cherry-pick successful"
+
+              # Push to remote
+              if git push origin "$BRANCH"; then
+                echo "✓ Successfully pushed to $BRANCH"
+                SUCCESS_BRANCHES="${SUCCESS_BRANCHES} ${BRANCH}"
+              else
+                echo "✗ Failed to push to $BRANCH"
+                FAILED_BRANCHES="${FAILED_BRANCHES} ${BRANCH}"
+              fi
+            else
+              echo "✗ Cherry-pick failed with conflicts"
+
+              # Abort the cherry-pick
+              git cherry-pick --abort
+
+              # Create a conflict resolution PR
+              CONFLICT_BRANCH="sync-conflict-pr${PR_NUMBER}-to-${BRANCH}"
+
+              echo "Creating conflict resolution branch: $CONFLICT_BRANCH"
+              git checkout -b "$CONFLICT_BRANCH" "$BRANCH"
+
+              # Try cherry-pick again to preserve conflict state
+              git cherry-pick -m 1 "$MERGE_COMMIT" || true
+
+              # Add conflict markers and commit
+              git add -A
+              git commit -m "WIP: Sync PR #${PR_NUMBER} to ${BRANCH} (conflicts)
+
+This is an automatic sync from PR #${PR_NUMBER}: ${PR_TITLE}
+
+The cherry-pick resulted in conflicts that need manual resolution.
+
+Original commit: ${MERGE_COMMIT}
+Target branch: ${BRANCH}
+
+Please resolve conflicts and merge this PR to complete the sync." || true
+
+              # Push conflict branch
+              if git push -u origin "$CONFLICT_BRANCH"; then
+                echo "✓ Pushed conflict resolution branch"
+                CONFLICT_BRANCHES="${CONFLICT_BRANCHES} ${BRANCH}:${CONFLICT_BRANCH}"
+              else
+                echo "✗ Failed to push conflict resolution branch"
+                FAILED_BRANCHES="${FAILED_BRANCHES} ${BRANCH}"
+              fi
+            fi
+
+            # Return to main for next iteration
+            git checkout main
+            echo ""
+          done
+
+          # Save results for comment
+          echo "success_branches=$SUCCESS_BRANCHES" >> $GITHUB_OUTPUT
+          echo "failed_branches=$FAILED_BRANCHES" >> $GITHUB_OUTPUT
+          echo "conflict_branches=$CONFLICT_BRANCHES" >> $GITHUB_OUTPUT
+
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📊 Sync Summary"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✓ Success: $SUCCESS_BRANCHES"
+          echo "⚠ Conflicts: $CONFLICT_BRANCHES"
+          echo "✗ Failed: $FAILED_BRANCHES"
+
+      - name: Create conflict resolution PRs
+        if: steps.sync.outputs.conflict_branches != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CONFLICT_BRANCHES: ${{ steps.sync.outputs.conflict_branches }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "Creating PRs for conflict resolution..."
+
+          for ITEM in $CONFLICT_BRANCHES; do
+            TARGET_BRANCH=$(echo "$ITEM" | cut -d: -f1)
+            CONFLICT_BRANCH=$(echo "$ITEM" | cut -d: -f2)
+
+            echo "Creating PR: $CONFLICT_BRANCH → $TARGET_BRANCH"
+
+            gh pr create \
+              --base "$TARGET_BRANCH" \
+              --head "$CONFLICT_BRANCH" \
+              --title "🔀 Sync PR #${PR_NUMBER} to ${TARGET_BRANCH} (conflicts)" \
+              --body "## ⚠️ Conflict Resolution Needed
+
+This PR is an automatic sync of PR #${PR_NUMBER} to the \`${TARGET_BRANCH}\` branch.
+
+**Original PR**: #${PR_NUMBER} - ${PR_TITLE}
+
+The cherry-pick resulted in merge conflicts that need manual resolution.
+
+### Steps to resolve:
+1. Review the conflicts in this PR
+2. Resolve conflicts locally or via GitHub UI
+3. Merge this PR to complete the sync
+
+### Original commit
+\`${{ github.event.pull_request.merge_commit_sha }}\`
+
+---
+🤖 This PR was created automatically by the version branch sync workflow." \
+              --label "sync-conflict" || echo "Failed to create PR for $TARGET_BRANCH"
+          done
+
+      - name: Comment on original PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          TARGET_BRANCHES: ${{ steps.determine_branches.outputs.target_branches }}
+          SUCCESS_BRANCHES: ${{ steps.sync.outputs.success_branches }}
+          CONFLICT_BRANCHES: ${{ steps.sync.outputs.conflict_branches }}
+          FAILED_BRANCHES: ${{ steps.sync.outputs.failed_branches }}
+        run: |
+          COMMENT="## 🔄 Version Branch Sync Report
+
+**Target branches**: \`$TARGET_BRANCHES\`
+
+"
+
+          if [ -n "$SUCCESS_BRANCHES" ]; then
+            COMMENT="${COMMENT}
+### ✅ Successfully synced
+"
+            for BRANCH in $SUCCESS_BRANCHES; do
+              COMMENT="${COMMENT}- \`${BRANCH}\`
+"
+            done
+          fi
+
+          if [ -n "$CONFLICT_BRANCHES" ]; then
+            COMMENT="${COMMENT}
+### ⚠️ Conflicts detected
+"
+            for ITEM in $CONFLICT_BRANCHES; do
+              TARGET_BRANCH=$(echo "$ITEM" | cut -d: -f1)
+              COMMENT="${COMMENT}- \`${TARGET_BRANCH}\` - Conflict resolution PR created
+"
+            done
+            COMMENT="${COMMENT}
+Please review and resolve conflicts in the generated PRs.
+"
+          fi
+
+          if [ -n "$FAILED_BRANCHES" ]; then
+            COMMENT="${COMMENT}
+### ❌ Failed
+"
+            for BRANCH in $FAILED_BRANCHES; do
+              COMMENT="${COMMENT}- \`${BRANCH}\`
+"
+            done
+          fi
+
+          COMMENT="${COMMENT}
+---
+🤖 Automated by [sync-version-branches workflow](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+
+          gh pr comment "$PR_NUMBER" --body "$COMMENT"
