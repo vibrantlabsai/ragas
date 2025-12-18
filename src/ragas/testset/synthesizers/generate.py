@@ -24,7 +24,12 @@ from ragas.testset.persona import Persona, generate_personas_from_kg
 from ragas.testset.synthesizers import default_query_distribution
 from ragas.testset.synthesizers.testset_schema import Testset, TestsetSample
 from ragas.testset.synthesizers.utils import calculate_split_values
-from ragas.testset.transforms import Transforms, apply_transforms, default_transforms
+from ragas.testset.transforms import (
+    Transforms,
+    apply_transforms,
+    default_transforms,
+    default_transforms_for_prechunked,
+)
 
 if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
@@ -293,6 +298,118 @@ class TestsetGenerator:
             raise_exceptions=raise_exceptions,
             return_executor=False,  # Default value for llamaindex_docs method
         )
+
+    def generate_with_chunks(
+        self,
+        chunks: t.Sequence[t.Union[LCDocument, str]],
+        testset_size: int,
+        transforms: t.Optional[Transforms] = None,
+        transforms_llm: t.Optional[BaseRagasLLM] = None,
+        transforms_embedding_model: t.Optional[BaseRagasEmbeddings] = None,
+        query_distribution: t.Optional[QueryDistribution] = None,
+        run_config: t.Optional[RunConfig] = None,
+        callbacks: t.Optional[Callbacks] = None,
+        token_usage_parser: t.Optional[TokenUsageParser] = None,
+        with_debugging_logs=False,
+        raise_exceptions: bool = True,
+        return_executor: bool = False,
+    ) -> t.Union[Testset, Executor]:
+        """
+        Generates an evaluation dataset based on provided pre-chunked documents.
+
+        This method allows users to skip the internal chunking process by providing
+        documents that are already chunked. The input documents are treated as
+        `NodeType.CHUNK` directly.
+
+        Parameters
+        ----------
+        chunks : Sequence[Union[LCDocument, str]]
+            A sequence of Langchain documents or strings to use as chunks.
+            Strings will be automatically converted to Documents.
+        testset_size : int
+            The number of test samples to generate
+        transforms : Optional[Transforms], optional
+            Custom transforms to apply to the chunks, by default None
+        transforms_llm : Optional[BaseRagasLLM], optional
+            LLM to use for transforms if different from instance LLM, by default None
+        transforms_embedding_model : Optional[BaseRagasEmbeddings], optional
+            Embedding model to use for transforms if different from instance model, by default None
+        query_distribution : Optional[QueryDistribution], optional
+            Distribution of query types to generate, by default None
+        run_config : Optional[RunConfig], optional
+            Configuration for the generation run, by default None
+        callbacks : Optional[Callbacks], optional
+            Callbacks to use during generation, by default None
+        token_usage_parser : Optional[TokenUsageParser], optional
+            Parse the LLMResult object and return a TokenUsage object.
+        with_debugging_logs : bool, optional
+            Whether to include debug logs, by default False
+        raise_exceptions : bool, optional
+            Whether to raise exceptions during generation, by default True
+        return_executor : bool, optional
+            If True, returns the Executor instance instead of running generation.
+
+        Returns
+        -------
+        Testset or Executor
+            If return_executor is False, returns the generated evaluation dataset.
+            If return_executor is True, returns the Executor instance.
+        """
+
+        # force the user to provide an llm and embedding client
+        if not self.llm and not transforms_llm:
+            raise ValueError(
+                """An llm client was not provided.
+                       Provide an LLM on TestsetGenerator instantiation or as an argument for transforms_llm parameter.
+                       Alternatively you can provide your own transforms through the `transforms` parameter."""
+            )
+        if not self.embedding_model and not transforms_embedding_model:
+            raise ValueError(
+                """An embedding client was not provided. Provide an embedding through the transforms_embedding_model parameter. Alternatively you can provide your own transforms through the `transforms` parameter."""
+            )
+
+        if transforms is None:
+            transforms = default_transforms_for_prechunked(
+                llm=transforms_llm or self.llm,
+                embedding_model=transforms_embedding_model or self.embedding_model,
+            )
+
+        # convert the chunks to Ragas nodes
+        nodes = []
+        for chunk in chunks:
+            if isinstance(chunk, str):
+                page_content = chunk
+                metadata = {}
+            else:
+                page_content = chunk.page_content
+                metadata = chunk.metadata
+
+            node = Node(
+                type=NodeType.CHUNK,
+                properties={
+                    "page_content": page_content,
+                    "document_metadata": metadata,
+                },
+            )
+            nodes.append(node)
+
+        kg = KnowledgeGraph(nodes=nodes)
+
+        # apply transforms and update the knowledge graph
+        apply_transforms(kg, transforms, run_config=run_config or RunConfig())
+        self.knowledge_graph = kg
+
+        return self.generate(
+            testset_size=testset_size,
+            query_distribution=query_distribution,
+            run_config=run_config,
+            callbacks=callbacks,
+            token_usage_parser=token_usage_parser,
+            with_debugging_logs=with_debugging_logs,
+            raise_exceptions=raise_exceptions,
+            return_executor=return_executor,
+        )
+
 
     def generate(
         self,

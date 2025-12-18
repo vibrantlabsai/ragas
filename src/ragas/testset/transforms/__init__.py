@@ -5,7 +5,7 @@ from .base import (
     RelationshipBuilder,
     Splitter,
 )
-from .default import default_transforms
+from .default import default_transforms, default_transforms_for_prechunked
 from .engine import Parallel, Transforms, apply_transforms, rollback_transforms
 from .extractors import (
     EmbeddingExtractor,
@@ -37,6 +37,7 @@ __all__ = [
     "apply_transforms",
     "rollback_transforms",
     "default_transforms",
+    "default_transforms_for_prechunked",
     # extractors
     "EmbeddingExtractor",
     "HeadlinesExtractor",

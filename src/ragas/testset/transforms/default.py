@@ -165,3 +165,48 @@ def default_transforms(
         )
 
     return transforms
+
+
+def default_transforms_for_prechunked(
+    llm: t.Union[BaseRagasLLM, "InstructorBaseRagasLLM"],
+    embedding_model: BaseRagasEmbeddings,
+) -> "Transforms":
+    """
+    Creates and returns a default set of transforms for processing a knowledge graph
+    containing pre-chunked documents.
+
+    This ignores the splitting step and directly applies extractors and relationship builders
+    to the chunks.
+    """
+
+    def filter_chunks(node):
+        return node.type == NodeType.CHUNK
+
+    summary_extractor = SummaryExtractor(llm=llm, filter_nodes=filter_chunks)
+    summary_emb_extractor = EmbeddingExtractor(
+        embedding_model=embedding_model,
+        property_name="summary_embedding",
+        embed_property_name="summary",
+        filter_nodes=filter_chunks,
+    )
+
+    theme_extractor = ThemesExtractor(llm=llm, filter_nodes=filter_chunks)
+    ner_extractor = NERExtractor(llm=llm, filter_nodes=filter_chunks)
+
+    cosine_sim_builder = CosineSimilarityBuilder(
+        property_name="summary_embedding",
+        new_property_name="summary_similarity",
+        threshold=0.7,
+        filter_nodes=filter_chunks,
+    )
+
+    ner_overlap_sim = OverlapScoreBuilder(threshold=0.01, filter_nodes=filter_chunks)
+
+    node_filter = CustomNodeFilter(llm=llm, filter_nodes=filter_chunks)
+
+    return [
+        summary_extractor,
+        node_filter,
+        Parallel(summary_emb_extractor, theme_extractor, ner_extractor),
+        Parallel(cosine_sim_builder, ner_overlap_sim),
+    ]
