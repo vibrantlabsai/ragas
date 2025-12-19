@@ -13,13 +13,13 @@ You can pass a list of LangChain `Document` objects. This preserves the metadata
 ```python
 from langchain_core.documents import Document
 from ragas.testset.synthesizers.generate import TestsetGenerator
-from ragas.llms import MockLLM
-from ragas.embeddings import MockEmbeddings
+from ragas.llms import llm_factory
+from ragas.embeddings import OpenAIEmbeddings
 
 # Initialize generator
 generator = TestsetGenerator(
-    llm=MockLLM(), 
-    embedding_model=MockEmbeddings()
+    llm=llm_factory(), 
+    embedding_model=OpenAIEmbeddings()
 )
 
 # Your pre-chunked documents
