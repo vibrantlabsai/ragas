@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import typing as t
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import field
 
@@ -267,15 +268,14 @@ class LangchainEmbeddingsWrapper(BaseRagasEmbeddings):
         run_config: t.Optional[RunConfig] = None,
         cache: t.Optional[CacheInterface] = None,
     ):
-        # TODO: Revisit deprecation warning
-        # warnings.warn(
-        #     "LangchainEmbeddingsWrapper is deprecated and will be removed in a future version. "
-        #     "Use the modern embedding providers instead: "
-        #     "embedding_factory('openai', model='text-embedding-3-small', client=openai_client) "
-        #     "or from ragas.embeddings import OpenAIEmbeddings, GoogleEmbeddings, HuggingFaceEmbeddings",
-        #     DeprecationWarning,
-        #     stacklevel=2,
-        # )
+        warnings.warn(
+            "LangchainEmbeddingsWrapper is deprecated and will be removed in a future version. "
+            "Use the modern embedding providers instead: "
+            "embedding_factory('openai', model='text-embedding-3-small', client=openai_client) "
+            "or from ragas.embeddings import OpenAIEmbeddings, GoogleEmbeddings, HuggingFaceEmbeddings",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(cache=cache)
         self.embeddings = embeddings
         if run_config is None:
@@ -558,15 +558,14 @@ class LlamaIndexEmbeddingsWrapper(BaseRagasEmbeddings):
         run_config: t.Optional[RunConfig] = None,
         cache: t.Optional[CacheInterface] = None,
     ):
-        # TODO: Revisit deprecation warning
-        # warnings.warn(
-        #     "LlamaIndexEmbeddingsWrapper is deprecated and will be removed in a future version. "
-        #     "Use the modern embedding providers instead: "
-        #     "embedding_factory('openai', model='text-embedding-3-small', client=openai_client) "
-        #     "or from ragas.embeddings import OpenAIEmbeddings, GoogleEmbeddings, HuggingFaceEmbeddings",
-        #     DeprecationWarning,
-        #     stacklevel=2,
-        # )
+        warnings.warn(
+            "LlamaIndexEmbeddingsWrapper is deprecated and will be removed in a future version. "
+            "Use the modern embedding providers instead: "
+            "embedding_factory('openai', model='text-embedding-3-small', client=openai_client) "
+            "or from ragas.embeddings import OpenAIEmbeddings, GoogleEmbeddings, HuggingFaceEmbeddings",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(cache=cache)
         self.embeddings = embeddings
         if run_config is None:

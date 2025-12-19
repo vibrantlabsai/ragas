@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import typing as t
+import warnings
 from uuid import UUID
 
 from datasets import Dataset
@@ -29,8 +30,8 @@ from ragas.executor import Executor
 from ragas.integrations.helicone import helicone_config
 from ragas.llms import llm_factory
 from ragas.llms.base import BaseRagasLLM, InstructorBaseRagasLLM, LangchainLLMWrapper
-from ragas.metrics import AspectCritic
 from ragas.metrics._answer_correctness import AnswerCorrectness
+from ragas.metrics._aspect_critic import AspectCritic
 from ragas.metrics.base import (
     Metric,
     MetricWithEmbeddings,
@@ -101,6 +102,14 @@ async def aevaluate(
     asyncio.run(main())
     ```
     """
+    warnings.warn(
+        "aevaluate() is deprecated and will be removed in a future version. "
+        "Use the @experiment decorator instead. "
+        "See https://docs.ragas.io/en/latest/concepts/experiment/ for more information.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     column_map = column_map or {}
     callbacks = callbacks or []
     run_config = run_config or RunConfig()
@@ -127,12 +136,10 @@ async def aevaluate(
 
     # default metrics
     if metrics is None:
-        from ragas.metrics import (
-            answer_relevancy,
-            context_precision,
-            context_recall,
-            faithfulness,
-        )
+        from ragas.metrics._answer_relevance import answer_relevancy
+        from ragas.metrics._context_precision import context_precision
+        from ragas.metrics._context_recall import context_recall
+        from ragas.metrics._faithfulness import faithfulness
 
         metrics = [answer_relevancy, context_precision, faithfulness, context_recall]
 
@@ -437,6 +444,13 @@ def evaluate(
     'answer_relevancy': 0.874}
     ```
     """
+    warnings.warn(
+        "evaluate() is deprecated and will be removed in a future version. "
+        "Use the @experiment decorator instead. "
+        "See https://docs.ragas.io/en/latest/concepts/experiment/ for more information.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     # Create async wrapper for aevaluate
     async def _async_wrapper():
