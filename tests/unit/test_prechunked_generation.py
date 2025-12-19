@@ -1,4 +1,3 @@
-import pytest
 from langchain_core.documents import Document
 
 from ragas.embeddings import BaseRagasEmbeddings
@@ -114,3 +113,54 @@ def test_generate_with_chunks_accepts_strings():
     assert kg.nodes[1].properties["page_content"] == "Second chunk as string"
     # strings should have empty metadata
     assert kg.nodes[0].properties["document_metadata"] == {}
+
+
+def test_generate_with_chunks_filters_empty_content():
+    """generate_with_chunks should filter out chunks with empty content."""
+    generator = TestsetGenerator(llm=MockLLM(), embedding_model=MockEmbeddings())
+
+    chunks = [
+        Document(page_content="Valid content", metadata={"id": 1}),
+        Document(page_content="", metadata={"id": 2}),
+        Document(page_content="   ", metadata={"id": 3}),  # whitespace only
+        "Valid string",
+        "",  # empty string
+        "   ",  # whitespace string
+    ]
+
+    try:
+        generator.generate_with_chunks(
+            chunks=chunks,
+            testset_size=1,
+            transforms=[],
+            return_executor=True,
+        )
+    except ValueError:
+        pass
+
+    kg = generator.knowledge_graph
+
+    # Should only contain the 2 valid chunks
+    assert len(kg.nodes) == 2
+    assert kg.nodes[0].properties["page_content"] == "Valid content"
+    assert kg.nodes[1].properties["page_content"] == "Valid string"
+
+
+def test_generate_with_chunks_handles_empty_sequence():
+    """generate_with_chunks should handle empty sequence gracefully."""
+    generator = TestsetGenerator(llm=MockLLM(), embedding_model=MockEmbeddings())
+
+    chunks = []
+
+    try:
+        generator.generate_with_chunks(
+            chunks=chunks,
+            testset_size=1,
+            transforms=[],
+            return_executor=True,
+        )
+    except ValueError:
+        pass
+
+    kg = generator.knowledge_graph
+    assert len(kg.nodes) == 0

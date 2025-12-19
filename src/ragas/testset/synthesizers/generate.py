@@ -384,14 +384,15 @@ class TestsetGenerator:
                 page_content = chunk.page_content
                 metadata = chunk.metadata
 
-            node = Node(
-                type=NodeType.CHUNK,
-                properties={
-                    "page_content": page_content,
-                    "document_metadata": metadata,
-                },
-            )
-            nodes.append(node)
+            if page_content is not None and page_content.strip() != "":
+                node = Node(
+                    type=NodeType.CHUNK,
+                    properties={
+                        "page_content": page_content,
+                        "document_metadata": metadata,
+                    },
+                )
+                nodes.append(node)
 
         kg = KnowledgeGraph(nodes=nodes)
 
@@ -409,7 +410,6 @@ class TestsetGenerator:
             raise_exceptions=raise_exceptions,
             return_executor=return_executor,
         )
-
 
     def generate(
         self,
