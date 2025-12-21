@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def default_filter(node: Node) -> bool:
     if (
-        node.type.name == "DOCUMENT"
+        (node.type.name == "DOCUMENT" or node.type.name == "CHUNK")
         and node.properties.get("summary_embedding") is not None
     ):
         return True
