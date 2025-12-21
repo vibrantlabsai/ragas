@@ -1,14 +1,30 @@
-# Testset Validation with Pre-chunked Data
+# Using Pre-chunked Data for Testset Generation
 
-Ragas allows you to use your own chunks for testset generation, bypassing the internal splitting mechanism. This is useful when you already have a chunking strategy in place and want to evaluate using those specific chunks.
+When you already have a well-defined chunking strategy in place, Ragas allows you to bypass its internal document splitting mechanism and use your own chunks directly. This is particularly useful when:
 
-## Using Pre-chunked Data
+- You've optimized your chunking strategy for your specific domain
+- You want to maintain consistency between your RAG pipeline and evaluation
+- You have pre-processed documents with custom metadata
+- You need to ensure chunks align with specific business logic or document structure
 
-You can use the `generate_with_chunks` method of `TestsetGenerator` to provide your own documents or strings as chunks. These will be treated directly as `NodeType.CHUNK` and will not be split further.
+## Overview
 
-### Example with Documents
+The `generate_with_chunks` method of `TestsetGenerator` accepts pre-chunked data and treats each chunk as a `NodeType.CHUNK` directly, skipping the internal splitting transforms. This means your chunks remain exactly as you provide them, preserving both content and metadata integrity.
 
-You can pass a list of LangChain `Document` objects. This preserves the metadata of your chunks.
+## How It Works
+
+When you use `generate_with_chunks`, Ragas:
+
+1. **Accepts your chunks** as-is (either as `Document` objects or strings)
+2. **Applies extractors** like `SummaryExtractor`, `ThemesExtractor`, `NERExtractor`, and `EmbeddingExtractor` to enrich each chunk with additional properties
+3. **Builds relationships** between chunks using `CosineSimilarityBuilder` and `OverlapScoreBuilder`
+4. **Generates personas** based on the content themes
+5. **Creates scenarios** for different query types (single-hop, multi-hop)
+6. **Synthesizes test samples** including questions, contexts, and reference answers
+
+## Example: Using Pre-chunked Documents
+
+You can pass a list of LangChain `Document` objects. This approach preserves the metadata of your chunks, which can be useful for tracking source documents or other custom information.
 
 ```python
 import os
@@ -21,7 +37,7 @@ from openai import OpenAI
 # Initialize OpenAI client
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# Initialize generator
+# Initialize generator with your preferred models
 generator = TestsetGenerator(
     llm=llm_factory("gpt-4o-mini", client=client),
     embedding_model=OpenAIEmbeddings(client=client)
@@ -50,6 +66,66 @@ output_file = "testset.csv"
 testset.to_csv(output_file)
 print(f"Testset saved to {output_file}")
 print(testset.to_pandas().head())
+```
+
+### Generation Process
+
+During generation, you'll see progress logs showing the various transformation and synthesis stages:
+
+```
+Applying SummaryExtractor: 100%|████████████████████████████████| 2/2 [00:07<00:00,  3.67s/it]
+Applying CustomNodeFilter: 100%|█████████████████████████████| 2/2 [00:00<00:00, 2226.87it/s]
+Applying EmbeddingExtractor: 100%|███████████████████████████| 2/2 [00:02<00:00,  1.19s/it]
+Applying ThemesExtractor: 100%|██████████████████████████████| 2/2 [00:06<00:00,  3.07s/it]
+Applying NERExtractor: 100%|█████████████████████████████████| 2/2 [00:06<00:00,  3.10s/it]
+Applying CosineSimilarityBuilder: 100%|█████████████████████| 1/1 [00:00<00:00, 613.29it/s]
+Applying OverlapScoreBuilder: 100%|████████████████████████| 1/1 [00:00<00:00, 1491.57it/s]
+Generating personas: 100%|███████████████████████████████████| 2/2 [00:05<00:00,  2.77s/it]
+Generating Scenarios: 100%|██████████████████████████████████| 2/2 [00:08<00:00,  4.19s/it]
+Generating Samples: 100%|████████████████████████████████| 11/11 [00:45<00:00,  4.13s/it]
+Testset saved to testset.csv
+```
+
+
+The testset includes different types of queries:
+- **Single-hop queries**: Questions that can be answered from a single chunk
+- **Multi-hop queries**: Questions requiring information from multiple chunks (when relationships exist)
+
+## Example: Using Plain Strings
+
+If you don't need to preserve metadata, you can also pass plain strings directly:
+
+```python
+from ragas.testset.synthesizers.generate import TestsetGenerator
+from ragas.llms import llm_factory
+from ragas.embeddings import OpenAIEmbeddings
+from openai import OpenAI
+
+# Initialize models
+client = OpenAI()
+generator = TestsetGenerator(
+    llm=llm_factory("gpt-4o-mini", client=client),
+    embedding_model=OpenAIEmbeddings(client=client)
+)
+
+# Simple text chunks
+text_chunks = [
+    "Artificial Intelligence (AI) is the simulation of human intelligence by machines. It involves machine learning, natural language processing, and computer vision.",
+    "Machine Learning is a subset of AI that enables systems to learn from data without explicit programming. Popular algorithms include neural networks and decision trees.",
+    "Deep Learning uses neural networks with multiple layers to process complex patterns in large datasets. It powers modern applications like image recognition and language translation."
+]
+
+# Generate testset
+testset = generator.generate_with_chunks(
+    chunks=text_chunks,
+    testset_size=5
+)
+
+# Save to CSV
+output_file = "testset.csv"
+testset.to_csv(output_file)
+print(f"Testset saved to {output_file}")
+print(testset.to_pandas())
 ```
 
 ## Handling Edge Cases
