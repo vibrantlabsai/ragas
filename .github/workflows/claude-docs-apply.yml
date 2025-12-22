@@ -1,7 +1,7 @@
 name: Claude Docs Apply
 
 on:
-  pull_request:
+  pull_request_target:
     types: [labeled]
 
 jobs:
@@ -15,17 +15,25 @@ jobs:
       id-token: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
+          # Use PAT for fork PRs (requires CLAUDE_CODE_PAT secret), GITHUB_TOKEN for same-repo PRs
+          token: ${{ secrets.CLAUDE_CODE_PAT || secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config --global user.name "Claude Code Bot"
+          git config --global user.email "noreply@anthropic.com"
 
       - name: Apply documentation updates
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.CLAUDE_CODE_PAT || secrets.GITHUB_TOKEN }}
 
           prompt: |
             REPO: ${{ github.repository }}
