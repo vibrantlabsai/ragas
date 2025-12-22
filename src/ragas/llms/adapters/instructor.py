@@ -25,7 +25,7 @@ class InstructorAdapter(StructuredOutputAdapter):
             client: Pre-initialized client
             model: Model name
             provider: Provider name
-            **kwargs: Additional model arguments
+            **kwargs: Additional model arguments (including optional cache)
 
         Returns:
             InstructorLLM instance
@@ -33,6 +33,8 @@ class InstructorAdapter(StructuredOutputAdapter):
         Raises:
             ValueError: If client patching fails
         """
+        cache = kwargs.pop("cache", None)
+
         try:
             patched_client = _get_instructor_client(client, provider)
         except Exception as e:
@@ -43,5 +45,6 @@ class InstructorAdapter(StructuredOutputAdapter):
             model=model,
             provider=provider,
             model_args=InstructorModelArgs(),
+            cache=cache,
             **kwargs,
         )

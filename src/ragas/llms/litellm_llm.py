@@ -5,6 +5,7 @@ import threading
 import typing as t
 
 from ragas._analytics import LLMUsageEvent, track
+from ragas.cache import CacheInterface, cacher
 from ragas.llms.base import InstructorBaseRagasLLM, InstructorTypeVar
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class LiteLLMStructuredLLM(InstructorBaseRagasLLM):
         client: t.Any,
         model: str,
         provider: str,
+        cache: t.Optional[CacheInterface] = None,
         **kwargs,
     ):
         """
@@ -34,15 +36,21 @@ class LiteLLMStructuredLLM(InstructorBaseRagasLLM):
             client: LiteLLM client instance
             model: Model name (e.g., "gemini-2.0-flash")
             provider: Provider name
+            cache: Optional cache backend for caching LLM responses
             **kwargs: Additional model arguments (temperature, max_tokens, etc.)
         """
         self.client = client
         self.model = model
         self.provider = provider
         self.model_args = kwargs
+        self.cache = cache
 
         # Check if client is async-capable at initialization
         self.is_async = self._check_client_async()
+
+        if self.cache is not None:
+            self.generate = cacher(cache_backend=self.cache)(self.generate)  # type: ignore
+            self.agenerate = cacher(cache_backend=self.cache)(self.agenerate)  # type: ignore
 
     def _check_client_async(self) -> bool:
         """Determine if the client is async-capable.

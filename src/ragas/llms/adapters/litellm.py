@@ -27,16 +27,19 @@ class LiteLLMAdapter(StructuredOutputAdapter):
             client: Pre-initialized client
             model: Model name
             provider: Provider name
-            **kwargs: Additional model arguments
+            **kwargs: Additional model arguments (including optional cache)
 
         Returns:
             LiteLLMStructuredLLM instance
         """
         from ragas.llms.litellm_llm import LiteLLMStructuredLLM
 
+        cache = kwargs.pop("cache", None)
+
         return LiteLLMStructuredLLM(
             client=client,
             model=model,
             provider=provider,
+            cache=cache,
             **kwargs,
         )
