@@ -27,7 +27,7 @@ class LiteLLMAdapter(StructuredOutputAdapter):
             client: Pre-initialized client
             model: Model name
             provider: Provider name
-            **kwargs: Additional model arguments (including optional cache)
+            **kwargs: Additional model arguments
 
         Returns:
             LiteLLMStructuredLLM instance
