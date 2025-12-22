@@ -46,7 +46,7 @@ rag = RAG(openai_client, retriever)
 
 # Query the system
 question = "What architecture is the `tokenizers-linux-x64-musl` binary designed for?"
-result = await rag.query(question)
+result = asyncio.run(rag.query(question))
 print(f"Answer: {result['answer']}")
 ```
 ??? note "Output"
