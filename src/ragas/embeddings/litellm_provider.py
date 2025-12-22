@@ -2,6 +2,8 @@
 
 import typing as t
 
+from ragas.cache import CacheInterface
+
 from .base import BaseRagasEmbedding
 from .utils import batch_texts, get_optimal_batch_size, safe_import, validate_texts
 
@@ -25,8 +27,10 @@ class LiteLLMEmbeddings(BaseRagasEmbedding):
         timeout: int = 600,
         max_retries: int = 3,
         batch_size: t.Optional[int] = None,
+        cache: t.Optional[CacheInterface] = None,
         **litellm_params: t.Any,
     ):
+        super().__init__(cache=cache)
         self.litellm = safe_import("litellm", "litellm")
         self.model = model
         self.api_key = api_key

@@ -34,6 +34,19 @@ class BaseRagasEmbedding(ABC):
     embedding single texts, with batch methods automatically provided.
     """
 
+    def __init__(self, cache: t.Optional[CacheInterface] = None):
+        """Initialize embedding with optional caching.
+
+        Args:
+            cache: Optional cache backend for caching embeddings.
+                Use DiskCacheBackend() for persistent caching.
+        """
+        self.cache = cache
+
+        if self.cache is not None:
+            self.embed_text = cacher(cache_backend=self.cache)(self.embed_text)
+            self.aembed_text = cacher(cache_backend=self.cache)(self.aembed_text)
+
     @abstractmethod
     def embed_text(self, text: str, **kwargs: t.Any) -> t.List[float]:
         """Embed a single text.
@@ -646,6 +659,7 @@ def embedding_factory(
     client: t.Optional[t.Any] = None,
     interface: str = "auto",
     base_url: t.Optional[str] = None,
+    cache: t.Optional[CacheInterface] = None,
     **kwargs: t.Any,
 ) -> t.Union[BaseRagasEmbeddings, BaseRagasEmbedding]:
     """
@@ -672,6 +686,10 @@ def embedding_factory(
         "auto" detects based on parameters.
     base_url : str, optional
         Base URL for the API, by default None.
+    cache : CacheInterface, optional
+        Optional cache backend for caching embeddings.
+        Use DiskCacheBackend() for persistent caching across runs.
+        Saves costs and speeds up repeated embedding calls.
     **kwargs : Any
         Additional provider-specific arguments.
 
@@ -690,6 +708,11 @@ def embedding_factory(
     embedder = embedding_factory("openai", "text-embedding-3-small", client=openai_client)
     embedder = embedding_factory("huggingface", "sentence-transformers/all-MiniLM-L6-v2")
     embedder = embedding_factory("google", client=vertex_client, project_id="my-project")
+
+    # With caching
+    from ragas.cache import DiskCacheBackend
+    cache = DiskCacheBackend()
+    embedder = embedding_factory("openai", client=openai_client, cache=cache)
     """
     # Detect if this is a legacy call for backward compatibility
     is_legacy_call = _is_legacy_embedding_call(provider, model, client, interface)
@@ -730,9 +753,11 @@ def embedding_factory(
         )
         return result
 
-    # Modern interface - pass base_url through kwargs for modern providers
+    # Modern interface - pass base_url and cache through kwargs for modern providers
     if base_url is not None:
         kwargs["base_url"] = base_url
+    if cache is not None:
+        kwargs["cache"] = cache
     result = _create_modern_embedding(provider, model, client, **kwargs)
 
     # Track factory usage (modern)
@@ -796,6 +821,8 @@ def _create_modern_embedding(
     provider: str, model: t.Optional[str], client: t.Optional[t.Any], **kwargs: t.Any
 ) -> BaseRagasEmbedding:
     """Create a modern embedding instance based on the provider."""
+    cache = kwargs.pop("cache", None)
+
     # Handle provider/model string format
     if "/" in provider and model is None:
         provider_name, model_name = provider.split("/", 1)
@@ -813,7 +840,7 @@ def _create_modern_embedding(
         )
 
     # Let the provider class validate and construct itself
-    return provider_cls._from_factory(model=model, client=client, **kwargs)
+    return provider_cls._from_factory(model=model, client=client, cache=cache, **kwargs)
 
 
 def modern_embedding_factory(

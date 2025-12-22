@@ -3,6 +3,8 @@
 import sys
 import typing as t
 
+from ragas.cache import CacheInterface
+
 from .base import BaseRagasEmbedding
 from .utils import run_sync_in_async, validate_texts
 
@@ -51,8 +53,10 @@ class GoogleEmbeddings(BaseRagasEmbedding):
         use_vertex: bool = False,
         project_id: t.Optional[str] = None,
         location: t.Optional[str] = "us-central1",
+        cache: t.Optional[CacheInterface] = None,
         **kwargs: t.Any,
     ):
+        super().__init__(cache=cache)
         self._original_client = client
         self.model = model
         self.use_vertex = use_vertex

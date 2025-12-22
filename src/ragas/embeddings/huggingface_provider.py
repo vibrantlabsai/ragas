@@ -2,6 +2,8 @@
 
 import typing as t
 
+from ragas.cache import CacheInterface
+
 from .base import BaseRagasEmbedding
 from .utils import batch_texts, run_sync_in_async, validate_texts
 
@@ -24,8 +26,10 @@ class HuggingFaceEmbeddings(BaseRagasEmbedding):
         device: t.Optional[str] = None,
         normalize_embeddings: bool = True,
         batch_size: int = 32,
+        cache: t.Optional[CacheInterface] = None,
         **model_kwargs: t.Any,
     ):
+        super().__init__(cache=cache)
         self.model = model
         self.use_api = use_api
         self.api_key = api_key

@@ -1,6 +1,7 @@
 import typing as t
 
 from ragas._analytics import EmbeddingUsageEvent, track
+from ragas.cache import CacheInterface
 
 from .base import BaseRagasEmbedding
 from .utils import validate_texts
@@ -17,7 +18,13 @@ class OpenAIEmbeddings(BaseRagasEmbedding):
     REQUIRES_CLIENT = True
     DEFAULT_MODEL = "text-embedding-3-small"
 
-    def __init__(self, client: t.Any, model: str = "text-embedding-3-small"):
+    def __init__(
+        self,
+        client: t.Any,
+        model: str = "text-embedding-3-small",
+        cache: t.Optional[CacheInterface] = None,
+    ):
+        super().__init__(cache=cache)
         self.client = client
         self.model = model
         self.is_async = self._check_client_async(client)
