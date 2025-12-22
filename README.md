@@ -42,8 +42,6 @@
     <p>
 </h4>
 
-> 👋 Help us by providing feedback through this [survey](https://forms.gle/EcPpuzv15f3kt1Jv5) and stand to win $250! ✨
-
 Objective metrics, intelligent test generation, and data-driven insights for LLM apps
 
 Ragas is your ultimate toolkit for evaluating and optimizing Large Language Model (LLM) applications. Say goodbye to time-consuming, subjective assessments and hello to data-driven, efficient evaluation workflows.
