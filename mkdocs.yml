@@ -103,6 +103,8 @@ nav:
               - Custom Single-hop Query: howtos/customizations/testgenerator/_testgen-custom-single-hop.md
               - Custom Multi-hop Query: howtos/customizations/testgenerator/_testgen-customisation.md
               - Using Pre-chunked Data: howtos/customizations/testgenerator/prechunked_data.md
+          - Optimizers:
+              - DSPy Optimizer: howtos/customizations/optimizers/index.md
 
       - Applications:
           - howtos/applications/index.md
@@ -159,6 +161,7 @@ nav:
       - RunConfig: references/run_config.md
       - Executor: references/executor.md
       - Cache: references/cache.md
+      - Optimizers: references/optimizers.md
     - Evaluation:
       - Schemas: references/evaluation_schema.md
       - Metrics: references/metrics.md

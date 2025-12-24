@@ -68,6 +68,7 @@ class DSPyOptimizer(Optimizer):
         Optimize metric prompts using DSPy MIPROv2.
 
         Steps:
+
         1. Convert Ragas PydanticPrompt to DSPy Signature
         2. Create DSPy Module with signature
         3. Convert dataset to DSPy Examples
