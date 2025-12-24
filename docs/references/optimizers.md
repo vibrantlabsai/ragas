@@ -59,7 +59,7 @@ metric.optimize_prompts(dataset, config)
 
 ## DSPyOptimizer
 
-Advanced optimizer using DSPy's MIPROv2 algorithm.
+Advanced optimizer using DSPy's [MIPROv2](https://dspy.ai/api/optimizers/MIPROv2/) algorithm.
 
 ### Parameters
 
@@ -94,12 +94,17 @@ metric.optimize_prompts(dataset, config)
 4. Evaluates all combinations on dataset
 5. Returns best-performing configuration
 
+Learn more about DSPy concepts:
+- [Signatures](https://dspy.ai/learn/programming/signatures/) - DSPy's approach to defining input/output specifications
+- [Optimizers](https://dspy.ai/learn/optimization/optimizers/) - Algorithms for improving prompts and LM weights
+- [Modules](https://dspy.ai/learn/programming/modules/) - Building blocks for LLM programs
+
 **Pros**: Better results, combines instructions + demos
 **Cons**: Requires DSPy installation, more LLM calls
 
 ### Installation
 
-DSPy is an optional dependency:
+[DSPy](https://dspy.ai/) is an optional dependency:
 
 ```bash
 # Using uv (recommended)
@@ -212,3 +217,14 @@ config = InstructionConfig(llm=llm, optimizer=optimizer, loss=loss)
 - [DSPy Optimizer Guide](../howtos/customizations/optimizers/dspy-optimizer.md) - Detailed usage
 - [Metric Customization](../howtos/customizations/metrics/custom-metrics.md) - Creating metrics
 - [Prompt API Reference](./prompt.md) - Understanding prompts
+
+## Additional Resources
+
+**DSPy Documentation:**
+- [DSPy Official Documentation](https://dspy.ai/) - Complete guide to DSPy
+- [MIPROv2 API Reference](https://dspy.ai/api/optimizers/MIPROv2/) - Detailed MIPROv2 documentation
+- [DSPy Optimizers Overview](https://dspy.ai/learn/optimization/optimizers/) - Guide to all DSPy optimizers
+- [DSPy GitHub Repository](https://github.com/stanfordnlp/dspy) - Source code and examples
+
+**Research Papers:**
+- [Optimizing Instructions and Demonstrations for Multi-Stage Language Model Programs](https://arxiv.org/abs/2406.11695) - MIPROv2 paper
