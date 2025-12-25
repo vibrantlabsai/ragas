@@ -176,3 +176,47 @@ code, kbd, samp, pre {
 }
 
 /* Let Material Design handle everything else - no custom colors, spacing, or layouts */
+
+/* Copy to LLM button - dark mode styling */
+[data-md-color-scheme="slate"] .copy-to-llm-split-container {
+  --mystic: #404040;
+  --white: #2d2d2d;
+  --black: #e0e0e0;
+  --athens-gray: rgba(255, 255, 255, 0.1);
+  border-color: #404040;
+}
+
+[data-md-color-scheme="slate"] .copy-to-llm-section {
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+}
+
+[data-md-color-scheme="slate"] .copy-to-llm-left {
+  border-right-color: #404040 !important;
+}
+
+[data-md-color-scheme="slate"] .copy-to-llm-left:hover,
+[data-md-color-scheme="slate"] .copy-to-llm-right:hover,
+[data-md-color-scheme="slate"] .copy-to-llm-right.active {
+  background-color: var(--md-accent-fg-color) !important;
+  color: #ffffff !important;
+}
+
+[data-md-color-scheme="slate"] .copy-to-llm-dropdown {
+  background-color: #2d2d2d !important;
+  border-color: #404040 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+[data-md-color-scheme="slate"] .copy-to-llm-dropdown-item {
+  color: #e0e0e0 !important;
+}
+
+[data-md-color-scheme="slate"] .copy-to-llm-dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-md-color-scheme="slate"] .copy-to-llm-dropdown-item:active {
+  background-color: var(--md-accent-fg-color) !important;
+  color: #ffffff !important;
+}
