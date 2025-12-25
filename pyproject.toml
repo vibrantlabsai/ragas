@@ -183,6 +183,7 @@ docs = [
     "mkdocs-section-index",
     "mkdocs-git-committers-plugin-2",
     "mkdocs-git-revision-date-localized-plugin",
+    "mkdocs-llmstxt",  # Requires Python 3.10+, only used in docs CI
 ]
 
 docs-pdf = [
