@@ -37,6 +37,23 @@ class DSPyOptimizer(Optimizer):
         Maximum number of human-annotated examples to use.
     init_temperature : float
         Exploration temperature for optimization.
+    auto : str, optional
+        Automatic configuration level: 'light', 'medium', or 'heavy'.
+        Controls the depth of optimization search.
+    num_threads : int, optional
+        Number of parallel threads for optimization.
+    max_errors : int, optional
+        Maximum errors tolerated during optimization before stopping.
+    seed : int
+        Random seed for reproducibility.
+    verbose : bool
+        Enable verbose logging during optimization.
+    track_stats : bool
+        Track and report optimization statistics.
+    log_dir : str, optional
+        Directory for saving optimization logs and progress.
+    metric_threshold : float, optional
+        Minimum acceptable metric value to achieve.
     cache : CacheInterface, optional
         Cache backend for storing optimization results.
     """
@@ -45,6 +62,14 @@ class DSPyOptimizer(Optimizer):
     max_bootstrapped_demos: int = 5
     max_labeled_demos: int = 5
     init_temperature: float = 1.0
+    auto: t.Optional[t.Literal["light", "medium", "heavy"]] = "light"
+    num_threads: t.Optional[int] = None
+    max_errors: t.Optional[int] = None
+    seed: int = 9
+    verbose: bool = False
+    track_stats: bool = True
+    log_dir: t.Optional[str] = None
+    metric_threshold: t.Optional[float] = None
     cache: t.Optional[CacheInterface] = field(default=None, repr=False)
     _dspy: t.Optional[t.Any] = field(default=None, init=False, repr=False)
 
@@ -58,6 +83,36 @@ class DSPyOptimizer(Optimizer):
                 "DSPy optimizer requires dspy-ai. Install with:\n"
                 "  uv add 'ragas[dspy]'  # or: pip install 'ragas[dspy]'\n"
             ) from e
+
+        self._validate_parameters()
+
+    def _validate_parameters(self):
+        """Validate optimizer parameters."""
+        if self.num_candidates <= 0:
+            raise ValueError("num_candidates must be positive")
+
+        if self.max_bootstrapped_demos < 0:
+            raise ValueError("max_bootstrapped_demos must be non-negative")
+
+        if self.max_labeled_demos < 0:
+            raise ValueError("max_labeled_demos must be non-negative")
+
+        if self.init_temperature <= 0:
+            raise ValueError("init_temperature must be positive")
+
+        if self.auto not in ["light", "medium", "heavy", None]:
+            raise ValueError("auto must be 'light', 'medium', 'heavy', or None")
+
+        if self.num_threads is not None and self.num_threads <= 0:
+            raise ValueError("num_threads must be positive if specified")
+
+        if self.max_errors is not None and self.max_errors < 0:
+            raise ValueError("max_errors must be non-negative if specified")
+
+        if self.metric_threshold is not None and (
+            self.metric_threshold < 0 or self.metric_threshold > 1
+        ):
+            raise ValueError("metric_threshold must be between 0 and 1")
 
     def optimize(
         self,
@@ -149,6 +204,14 @@ class DSPyOptimizer(Optimizer):
                 max_bootstrapped_demos=self.max_bootstrapped_demos,
                 max_labeled_demos=self.max_labeled_demos,
                 init_temperature=self.init_temperature,
+                auto=self.auto,
+                num_threads=self.num_threads,
+                max_errors=self.max_errors,
+                seed=self.seed,
+                verbose=self.verbose,
+                track_stats=self.track_stats,
+                log_dir=self.log_dir,
+                metric_threshold=self.metric_threshold,
             )
 
             metric_fn = create_dspy_metric(loss, dataset.name)
@@ -235,6 +298,14 @@ class DSPyOptimizer(Optimizer):
             "max_bootstrapped_demos": self.max_bootstrapped_demos,
             "max_labeled_demos": self.max_labeled_demos,
             "init_temperature": self.init_temperature,
+            "auto": self.auto,
+            "num_threads": self.num_threads,
+            "max_errors": self.max_errors,
+            "seed": self.seed,
+            "verbose": self.verbose,
+            "track_stats": self.track_stats,
+            "log_dir": self.log_dir,
+            "metric_threshold": self.metric_threshold,
             "config": config,
         }
 
