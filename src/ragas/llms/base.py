@@ -724,6 +724,7 @@ class InstructorModelArgs(BaseModel):
     temperature: float = 0.01
     top_p: float = 0.1
     max_tokens: int = 1024
+    system_prompt: t.Optional[str] = None
 
 
 class InstructorBaseRagasLLM(ABC):
@@ -769,6 +770,9 @@ class InstructorLLM(InstructorBaseRagasLLM):
 
         # Convert to dict and merge with any additional kwargs
         self.model_args = {**model_args.model_dump(), **kwargs}
+
+        # Extract system_prompt separately (not passed to LLM API)
+        self.system_prompt = self.model_args.pop("system_prompt", None)
 
         self.cache = cache
 
@@ -1031,7 +1035,10 @@ class InstructorLLM(InstructorBaseRagasLLM):
 
         For async clients, this will run the async method in the appropriate event loop.
         """
-        messages = [{"role": "user", "content": prompt}]
+        messages = []
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": prompt})
 
         # If client is async, use the appropriate method to run it
         if self.is_async:
@@ -1076,7 +1083,10 @@ class InstructorLLM(InstructorBaseRagasLLM):
         response_model: t.Type[InstructorTypeVar],
     ) -> InstructorTypeVar:
         """Asynchronously generate a response using the configured LLM."""
-        messages = [{"role": "user", "content": prompt}]
+        messages = []
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": prompt})
 
         # If client is not async, raise a helpful error
         if not self.is_async:
