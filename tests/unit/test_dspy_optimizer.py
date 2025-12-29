@@ -208,3 +208,202 @@ class TestDSPyOptimizer:
 
         result = optimizer._extract_instruction(mock_module)
         assert result == ""
+
+    @pytest.mark.skipif(not DSPY_AVAILABLE, reason="dspy-ai not installed")
+    def test_cache_key_generation(self, fake_llm):
+        """Test cache key generation is deterministic."""
+        from ragas.optimizers.dspy_optimizer import DSPyOptimizer
+
+        optimizer = DSPyOptimizer()
+
+        mock_metric = Mock()
+        mock_metric.name = "test_metric"
+        optimizer.metric = mock_metric
+        optimizer.llm = fake_llm
+
+        dataset = Mock(spec=SingleMetricAnnotation)
+        dataset.model_dump.return_value = {"data": "test"}
+        loss = MSELoss()
+        config = {"test": "config"}
+
+        key1 = optimizer._generate_cache_key(dataset, loss, config)
+        key2 = optimizer._generate_cache_key(dataset, loss, config)
+
+        assert key1 == key2
+        assert isinstance(key1, str)
+        assert len(key1) == 64
+
+    @pytest.mark.skipif(not DSPY_AVAILABLE, reason="dspy-ai not installed")
+    def test_cache_key_different_for_different_inputs(self, fake_llm):
+        """Test cache key changes with different inputs."""
+        from ragas.optimizers.dspy_optimizer import DSPyOptimizer
+
+        optimizer = DSPyOptimizer()
+
+        mock_metric = Mock()
+        mock_metric.name = "test_metric"
+        optimizer.metric = mock_metric
+        optimizer.llm = fake_llm
+
+        dataset1 = Mock(spec=SingleMetricAnnotation)
+        dataset1.model_dump.return_value = {"data": "test1"}
+        dataset2 = Mock(spec=SingleMetricAnnotation)
+        dataset2.model_dump.return_value = {"data": "test2"}
+
+        loss = MSELoss()
+        config = {"test": "config"}
+
+        key1 = optimizer._generate_cache_key(dataset1, loss, config)
+        key2 = optimizer._generate_cache_key(dataset2, loss, config)
+
+        assert key1 != key2
+
+    @pytest.mark.skipif(not DSPY_AVAILABLE, reason="dspy-ai not installed")
+    @patch("ragas.optimizers.dspy_adapter.setup_dspy_llm")
+    @patch("ragas.optimizers.dspy_adapter.pydantic_prompt_to_dspy_signature")
+    @patch("ragas.optimizers.dspy_adapter.ragas_dataset_to_dspy_examples")
+    @patch("ragas.optimizers.dspy_adapter.create_dspy_metric")
+    def test_cache_hit(
+        self,
+        mock_create_metric,
+        mock_to_examples,
+        mock_to_signature,
+        mock_setup_llm,
+        fake_llm,
+    ):
+        """Test that cached results are returned on cache hit."""
+        from ragas.cache import DiskCacheBackend
+        from ragas.optimizers.dspy_optimizer import DSPyOptimizer
+
+        cache = DiskCacheBackend(cache_dir=".test_cache_dspy")
+        optimizer = DSPyOptimizer(cache=cache)
+
+        mock_metric = Mock()
+        mock_metric.name = "test_metric"
+        mock_metric.get_prompts.return_value = {
+            "test_prompt": Mock(instruction="Test instruction")
+        }
+        optimizer.metric = mock_metric
+        optimizer.llm = fake_llm
+
+        mock_dspy = MagicMock()
+        mock_signature = Mock()
+        mock_to_signature.return_value = mock_signature
+
+        mock_module = Mock()
+        mock_dspy.Predict.return_value = mock_module
+
+        mock_examples = [Mock()]
+        mock_to_examples.return_value = mock_examples
+
+        mock_metric_fn = Mock()
+        mock_create_metric.return_value = mock_metric_fn
+
+        mock_teleprompter = Mock()
+        mock_optimized = Mock()
+        mock_optimized.signature.instructions = "Optimized instruction"
+        mock_teleprompter.compile.return_value = mock_optimized
+        mock_dspy.MIPROv2.return_value = mock_teleprompter
+
+        optimizer._dspy = mock_dspy
+
+        dataset = Mock(spec=SingleMetricAnnotation)
+        dataset.name = "test_metric"
+        dataset.model_dump.return_value = {"data": "test"}
+        loss = MSELoss()
+
+        result1 = optimizer.optimize(dataset, loss, {})
+        assert mock_teleprompter.compile.call_count == 1
+
+        result2 = optimizer.optimize(dataset, loss, {})
+        assert mock_teleprompter.compile.call_count == 1
+
+        assert result1 == result2
+        assert result1["test_prompt"] == "Optimized instruction"
+
+        cache.cache.close()
+        import shutil
+
+        shutil.rmtree(".test_cache_dspy", ignore_errors=True)
+
+    @pytest.mark.skipif(not DSPY_AVAILABLE, reason="dspy-ai not installed")
+    @patch("ragas.optimizers.dspy_adapter.setup_dspy_llm")
+    @patch("ragas.optimizers.dspy_adapter.pydantic_prompt_to_dspy_signature")
+    @patch("ragas.optimizers.dspy_adapter.ragas_dataset_to_dspy_examples")
+    @patch("ragas.optimizers.dspy_adapter.create_dspy_metric")
+    def test_cache_miss(
+        self,
+        mock_create_metric,
+        mock_to_examples,
+        mock_to_signature,
+        mock_setup_llm,
+        fake_llm,
+    ):
+        """Test that optimization runs on cache miss."""
+        from ragas.cache import DiskCacheBackend
+        from ragas.optimizers.dspy_optimizer import DSPyOptimizer
+
+        cache = DiskCacheBackend(cache_dir=".test_cache_dspy_miss")
+        optimizer = DSPyOptimizer(cache=cache)
+
+        mock_metric = Mock()
+        mock_metric.name = "test_metric"
+        mock_metric.get_prompts.return_value = {
+            "test_prompt": Mock(instruction="Test instruction")
+        }
+        optimizer.metric = mock_metric
+        optimizer.llm = fake_llm
+
+        mock_dspy = MagicMock()
+        mock_signature = Mock()
+        mock_to_signature.return_value = mock_signature
+
+        mock_module = Mock()
+        mock_dspy.Predict.return_value = mock_module
+
+        mock_examples = [Mock()]
+        mock_to_examples.return_value = mock_examples
+
+        mock_metric_fn = Mock()
+        mock_create_metric.return_value = mock_metric_fn
+
+        mock_teleprompter = Mock()
+        mock_optimized = Mock()
+        mock_optimized.signature.instructions = "Optimized instruction"
+        mock_teleprompter.compile.return_value = mock_optimized
+        mock_dspy.MIPROv2.return_value = mock_teleprompter
+
+        optimizer._dspy = mock_dspy
+
+        dataset1 = Mock(spec=SingleMetricAnnotation)
+        dataset1.name = "test_metric"
+        dataset1.model_dump.return_value = {"data": "test1"}
+
+        dataset2 = Mock(spec=SingleMetricAnnotation)
+        dataset2.name = "test_metric"
+        dataset2.model_dump.return_value = {"data": "test2"}
+
+        loss = MSELoss()
+
+        result1 = optimizer.optimize(dataset1, loss, {})
+        assert mock_teleprompter.compile.call_count == 1
+
+        result2 = optimizer.optimize(dataset2, loss, {})
+        assert mock_teleprompter.compile.call_count == 2
+
+        assert result1["test_prompt"] == "Optimized instruction"
+        assert result2["test_prompt"] == "Optimized instruction"
+
+        cache.cache.close()
+        import shutil
+
+        shutil.rmtree(".test_cache_dspy_miss", ignore_errors=True)
+
+    @pytest.mark.skipif(not DSPY_AVAILABLE, reason="dspy-ai not installed")
+    def test_optimize_without_cache(self, fake_llm):
+        """Test that optimization works without cache configured."""
+        from ragas.optimizers.dspy_optimizer import DSPyOptimizer
+
+        optimizer = DSPyOptimizer(cache=None)
+
+        assert optimizer.cache is None

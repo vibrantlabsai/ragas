@@ -1,9 +1,12 @@
+import hashlib
+import json
 import logging
 import typing as t
 from dataclasses import dataclass, field
 
 from langchain_core.callbacks import Callbacks
 
+from ragas.cache import CacheInterface
 from ragas.dataset_schema import SingleMetricAnnotation
 from ragas.losses import Loss
 from ragas.optimizers.base import Optimizer
@@ -34,12 +37,15 @@ class DSPyOptimizer(Optimizer):
         Maximum number of human-annotated examples to use.
     init_temperature : float
         Exploration temperature for optimization.
+    cache : CacheInterface, optional
+        Cache backend for storing optimization results.
     """
 
     num_candidates: int = 10
     max_bootstrapped_demos: int = 5
     max_labeled_demos: int = 5
     init_temperature: float = 1.0
+    cache: t.Optional[CacheInterface] = field(default=None, repr=False)
     _dspy: t.Optional[t.Any] = field(default=None, init=False, repr=False)
 
     def __post_init__(self):
@@ -109,6 +115,14 @@ class DSPyOptimizer(Optimizer):
         if self._dspy is None:
             raise RuntimeError("DSPy module not loaded.")
 
+        if self.cache is not None:
+            cache_key = self._generate_cache_key(dataset, loss, config)
+            if self.cache.has_key(cache_key):
+                logger.info(
+                    f"Cache hit for DSPy optimization of metric: {self.metric.name}"
+                )
+                return self.cache.get(cache_key)
+
         logger.info(f"Starting DSPy optimization for metric: {self.metric.name}")
 
         from ragas.optimizers.dspy_adapter import (
@@ -152,6 +166,11 @@ class DSPyOptimizer(Optimizer):
                 f"Optimized prompt for {prompt_name}: {optimized_instruction[:100]}..."
             )
 
+        if self.cache is not None:
+            cache_key = self._generate_cache_key(dataset, loss, config)
+            self.cache.set(cache_key, optimized_prompts)
+            logger.info("Cached optimization results")
+
         return optimized_prompts
 
     def _extract_instruction(self, optimized_module: t.Any) -> str:
@@ -179,3 +198,46 @@ class DSPyOptimizer(Optimizer):
             return str(optimized_module.extended_signature)
 
         return ""
+
+    def _generate_cache_key(
+        self,
+        dataset: SingleMetricAnnotation,
+        loss: Loss,
+        config: t.Dict[t.Any, t.Any],
+    ) -> str:
+        """
+        Generate a unique cache key for optimization results.
+
+        Parameters
+        ----------
+        dataset : SingleMetricAnnotation
+            Annotated dataset with ground truth scores.
+        loss : Loss
+            Loss function to optimize.
+        config : Dict[Any, Any]
+            Additional configuration parameters.
+
+        Returns
+        -------
+        str
+            SHA256 hash of the optimization parameters.
+        """
+        if self.metric is None:
+            raise ValueError("Metric must be set to generate cache key")
+
+        cache_data = {
+            "metric_name": self.metric.name,
+            "dataset_hash": hashlib.sha256(
+                json.dumps(dataset.model_dump(), sort_keys=True).encode()
+            ).hexdigest(),
+            "loss_name": loss.__class__.__name__,
+            "num_candidates": self.num_candidates,
+            "max_bootstrapped_demos": self.max_bootstrapped_demos,
+            "max_labeled_demos": self.max_labeled_demos,
+            "init_temperature": self.init_temperature,
+            "config": config,
+        }
+
+        key_string = json.dumps(cache_data, sort_keys=True, default=str)
+        cache_key = hashlib.sha256(key_string.encode("utf-8")).hexdigest()
+        return cache_key
