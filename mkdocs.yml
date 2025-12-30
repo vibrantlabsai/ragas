@@ -266,6 +266,14 @@ plugins:
   - search
   - social:
       enabled: !ENV [MKDOCS_CI, true]
+  - copy-to-llm:
+      repo_url: "https://raw.githubusercontent.com/vibrantlabsai/ragas/main/docs"
+      buttons:
+        copy_page: true
+        copy_markdown_link: false  # Disabled until plugin bug is fixed
+        view_as_markdown: false    # Disabled until plugin bug is fixed
+        open_in_chatgpt: true
+        open_in_claude: true
   - llmstxt:
       markdown_description: |
         Ragas is an open-source evaluation framework for LLM applications including RAG pipelines,
