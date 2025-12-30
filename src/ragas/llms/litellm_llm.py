@@ -27,6 +27,7 @@ class LiteLLMStructuredLLM(InstructorBaseRagasLLM):
         model: str,
         provider: str,
         cache: t.Optional[CacheInterface] = None,
+        system_prompt: t.Optional[str] = None,
         **kwargs,
     ):
         """
@@ -37,11 +38,13 @@ class LiteLLMStructuredLLM(InstructorBaseRagasLLM):
             model: Model name (e.g., "gemini-2.0-flash")
             provider: Provider name
             cache: Optional cache backend for caching LLM responses
+            system_prompt: Optional system prompt to prepend to all messages
             **kwargs: Additional model arguments (temperature, max_tokens, etc.)
         """
         self.client = client
         self.model = model
         self.provider = provider
+        self.system_prompt = system_prompt
         self.model_args = kwargs
         self.cache = cache
 
@@ -183,7 +186,10 @@ class LiteLLMStructuredLLM(InstructorBaseRagasLLM):
         Returns:
             Instance of response_model with generated data
         """
-        messages = [{"role": "user", "content": prompt}]
+        messages = []
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": prompt})
 
         # If client is async, use the appropriate method to run it
         if self.is_async:
@@ -225,7 +231,10 @@ class LiteLLMStructuredLLM(InstructorBaseRagasLLM):
         Returns:
             Instance of response_model with generated data
         """
-        messages = [{"role": "user", "content": prompt}]
+        messages = []
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": prompt})
 
         # If client is not async, raise a helpful error
         if not self.is_async:

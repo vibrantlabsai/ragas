@@ -263,9 +263,9 @@ extra:
     provider: google
     property: !ENV GOOGLE_ANALYTICS_KEY
 plugins:
+  - search
   - social:
       enabled: !ENV [MKDOCS_CI, true]
-  - search
   - copy-to-llm:
       repo_url: "https://raw.githubusercontent.com/vibrantlabsai/ragas/main/docs"
       buttons:
@@ -274,6 +274,38 @@ plugins:
         view_as_markdown: false    # Disabled until plugin bug is fixed
         open_in_chatgpt: true
         open_in_claude: true
+  - llmstxt:
+      markdown_description: |
+        Ragas is an open-source evaluation framework for LLM applications including RAG pipelines,
+        AI agents, and workflows. It provides objective metrics for evaluation, test data generation
+        capabilities, and integrations with popular LLM frameworks like LangChain and LlamaIndex.
+      full_output: llms-full.txt
+      sections:
+        Getting Started:
+          - getstarted/*.md
+        Tutorials:
+          - tutorials/*.md
+        Core Concepts:
+          - concepts/*.md
+          - concepts/components/*.md
+        Metrics:
+          - concepts/metrics/overview/*.md
+          - concepts/metrics/available_metrics/*.md
+        Test Data Generation:
+          - concepts/test_data_generation/*.md
+        Customization Guides:
+          - howtos/customizations/*.md
+          - howtos/customizations/metrics/*.md
+          - howtos/customizations/testgenerator/*.md
+          - howtos/customizations/optimizers/*.md
+        Application Guides:
+          - howtos/applications/*.md
+        CLI:
+          - howtos/cli/*.md
+        Integrations:
+          - howtos/integrations/*.md
+        API Reference:
+          - references/*.md
   - git-revision-date-localized:
       enabled: !ENV [MKDOCS_CI, false]
       enable_creation_date: true

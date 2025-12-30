@@ -9,9 +9,31 @@ Ragas provides factory functions (`llm_factory` and `embedding_factory`) that su
 
 The factory functions use the [Instructor](https://python.useinstructor.com/) library for structured outputs and [LiteLLM](https://docs.litellm.ai/) for unified access to multiple LLM providers.
 
+## System Prompts
+
+You can provide system prompts to customize LLM behavior across all evaluations:
+
+```python
+from ragas.llms import llm_factory
+from openai import OpenAI
+
+client = OpenAI(api_key="your-key")
+llm = llm_factory(
+    "gpt-4o",
+    client=client,
+    system_prompt="You are a helpful assistant that evaluates RAG systems."
+)
+```
+
+System prompts are particularly useful for:
+- Fine-tuned models that expect specific system instructions
+- Guiding evaluation behavior consistently
+- Models that require custom prompts to function properly
+
 ## Examples
 
 - [Customize Models](#customize-models)
+- [System Prompts](#system-prompts)
 - [Examples](#examples)
   - [Azure OpenAI](#azure-openai)
   - [Google Vertex](#google-vertex)
@@ -49,6 +71,8 @@ azure_llm = llm_factory(
     f"azure/{azure_configs['model_deployment']}",
     provider="litellm",
     client=litellm.completion,
+    # Optional: Add system prompt
+    # system_prompt="You are a helpful assistant that evaluates RAG systems."
 )
 
 # Create embeddings using embedding_factory
@@ -92,6 +116,8 @@ vertex_llm = llm_factory(
     f"vertex_ai/{config['chat_model_id']}",
     provider="litellm",
     client=litellm.completion,
+    # Optional: Add system prompt
+    # system_prompt="You are a helpful assistant that evaluates RAG systems."
 )
 
 # Create embeddings using embedding_factory
@@ -136,6 +162,8 @@ bedrock_llm = llm_factory(
     provider="litellm",
     client=litellm.completion,
     temperature=config["temperature"],
+    # Optional: Add system prompt
+    # system_prompt="You are a helpful assistant that evaluates RAG systems."
 )
 
 # Create embeddings using embedding_factory

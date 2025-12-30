@@ -242,6 +242,25 @@ llm = llm_factory(
 )
 ```
 
+### System Prompts
+
+Both adapters support system prompts for models that require specific instructions:
+
+```python
+llm = llm_factory(
+    "gpt-4o",
+    client=client,
+    system_prompt="You are a helpful assistant that evaluates RAG systems."
+)
+```
+
+System prompts are useful when:
+- Your LLM requires specific behavior instructions
+- You're using fine-tuned models with custom system prompts
+- You want to guide the evaluation style across all metrics
+
+The system prompt is prepended to all LLM calls as a system message.
+
 ### Async Support
 
 Both adapters support async operations:
