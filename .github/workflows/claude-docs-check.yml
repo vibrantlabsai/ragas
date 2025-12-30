@@ -20,6 +20,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          # Use PAT for fork PRs (requires CLAUDE_CODE_PAT secret), GITHUB_TOKEN for same-repo PRs
+          token: ${{ secrets.CLAUDE_CODE_PAT || secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Analyze PR for documentation needs
@@ -27,7 +29,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.CLAUDE_CODE_PAT || secrets.GITHUB_TOKEN }}
 
           prompt: |
             REPO: ${{ github.repository }}
