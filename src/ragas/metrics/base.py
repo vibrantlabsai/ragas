@@ -669,8 +669,8 @@ class Ensember:
         for i in range(len(inputs[0])):
             item = inputs[0][i]
             verdicts = [inputs[k][i][attribute] for k in range(len(inputs))]
-            verdict_counts = dict(Counter(verdicts).most_common())
-            item[attribute] = list(verdict_counts.keys())[0]
+            # Get most common verdict directly without creating intermediate dict/list
+            item[attribute] = Counter(verdicts).most_common(1)[0][0]
             verdict_agg.append(item)
 
         return verdict_agg
