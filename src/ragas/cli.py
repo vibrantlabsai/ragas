@@ -494,27 +494,41 @@ def quickstart(
             "description": "Compare naive vs agentic RAG using BM25 retrieval and HuggingFace docs",
             "source_path": "ragas_examples/improve_rag",
         },
-        # Coming soon - not yet fully implemented:
-        # "agent_evals": {
-        #     "name": "Agent Evaluation",
-        #     "description": "Evaluate AI agents with structured metrics and workflows",
-        #     "source_path": "ragas_examples/agent_evals",
-        # },
-        # "benchmark_llm": {
-        #     "name": "LLM Benchmarking",
-        #     "description": "Benchmark and compare different LLM models with datasets",
-        #     "source_path": "ragas_examples/benchmark_llm",
-        # },
-        # "prompt_evals": {
-        #     "name": "Prompt Evaluation",
-        #     "description": "Evaluate and compare different prompt variations",
-        #     "source_path": "ragas_examples/prompt_evals",
-        # },
-        # "workflow_eval": {
-        #     "name": "Workflow Evaluation",
-        #     "description": "Evaluate complex LLM workflows and pipelines",
-        #     "source_path": "ragas_examples/workflow_eval",
-        # },
+        "agent_evals": {
+            "name": "Agent Evaluation",
+            "description": "Evaluate AI agents solving math problems with correctness metrics",
+            "source_path": "ragas_examples/agent_evals",
+        },
+        "llamaIndex_agent_evals": {
+            "name": "LlamaIndex Agent Evaluation",
+            "description": "Evaluate LlamaIndex agents with tool call accuracy metrics",
+            "source_path": "ragas_examples/llamaIndex_agent_evals",
+        },
+        "text2sql": {
+            "name": "Text-to-SQL Evaluation",
+            "description": "Evaluate text-to-SQL systems with execution accuracy comparison",
+            "source_path": "ragas_examples/text2sql",
+        },
+        "workflow_eval": {
+            "name": "Workflow Evaluation",
+            "description": "Evaluate complex LLM workflows with email classification and routing",
+            "source_path": "ragas_examples/workflow_eval",
+        },
+        "prompt_evals": {
+            "name": "Prompt Evaluation",
+            "description": "Evaluate and compare prompt variations with sentiment analysis",
+            "source_path": "ragas_examples/prompt_evals",
+        },
+        "judge_alignment": {
+            "name": "Judge Alignment",
+            "description": "Measure LLM-as-judge alignment with human evaluation standards",
+            "source_path": "ragas_examples/judge_alignment",
+        },
+        "benchmark_llm": {
+            "name": "LLM Benchmarking",
+            "description": "Benchmark and compare different LLM models on discount calculation tasks",
+            "source_path": "ragas_examples/benchmark_llm",
+        },
     }
 
     # If no template specified, list available templates
@@ -667,6 +681,19 @@ def quickstart(
         (evals_dir / "datasets").mkdir(exist_ok=True)
         (evals_dir / "experiments").mkdir(exist_ok=True)
         (evals_dir / "logs").mkdir(exist_ok=True)
+
+        datasets_src = output_path / "datasets"
+        if datasets_src.exists() and datasets_src.is_dir():
+            for item in datasets_src.iterdir():
+                if item.is_file():
+                    shutil.copy2(item, evals_dir / "datasets" / item.name)
+            shutil.rmtree(datasets_src)
+
+        contexts_src = output_path / "contexts"
+        if contexts_src.exists() and contexts_src.is_dir():
+            shutil.copytree(contexts_src, evals_dir / "datasets" / "contexts")
+            shutil.rmtree(contexts_src)
+
         time.sleep(0.2)
 
         # Create a README.md with setup instructions
