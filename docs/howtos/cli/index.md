@@ -86,8 +86,22 @@ ragas hello_world [DIRECTORY]
 
 ## Quickstart Templates
 
-- [RAG Evaluation (`rag_eval`)](rag_eval.md)
-- [Improve RAG (`improve_rag`)](improve_rag.md)
+### RAG & Retrieval
+- [RAG Evaluation (`rag_eval`)](rag_eval.md) - Evaluate RAG systems with custom metrics
+- [Improve RAG (`improve_rag`)](improve_rag.md) - Compare naive vs agentic RAG approaches
+
+### Agent Evaluation
+- [Agent Evaluation (`agent_evals`)](agent_evals.md) - Evaluate AI agents solving math problems
+- [LlamaIndex Agent Evaluation (`llamaIndex_agent_evals`)](llamaIndex_agent_evals.md) - Evaluate LlamaIndex agents with tool call metrics
+
+### Specialized Use Cases
+- [Text-to-SQL Evaluation (`text2sql`)](text2sql.md) - Evaluate text-to-SQL systems with execution accuracy
+- [Workflow Evaluation (`workflow_eval`)](workflow_eval.md) - Evaluate complex LLM workflows
+- [Prompt Evaluation (`prompt_evals`)](prompt_evals.md) - Compare different prompt variations
+
+### LLM Testing
+- [Judge Alignment (`judge_alignment`)](judge_alignment.md) - Measure LLM-as-judge alignment with human standards
+- [LLM Benchmarking (`benchmark_llm`)](benchmark_llm.md) - Benchmark and compare different LLM models
 
 ## Quick Start
 
