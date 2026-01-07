@@ -35,22 +35,19 @@ logger = logging.getLogger(__name__)
 # TypeVar for Instructor LLM response models
 InstructorTypeVar = t.TypeVar("T", bound=BaseModel)  # type: ignore
 
-MULTIPLE_COMPLETION_SUPPORTED = [
+MULTIPLE_COMPLETION_SUPPORTED = (
     OpenAI,
     ChatOpenAI,
     AzureOpenAI,
     AzureChatOpenAI,
     ChatVertexAI,
     VertexAI,
-]
+)
 
 
 def is_multiple_completion_supported(llm: BaseLanguageModel) -> bool:
     """Return whether the given LLM supports n-completion."""
-    for llm_type in MULTIPLE_COMPLETION_SUPPORTED:
-        if isinstance(llm, llm_type):
-            return True
-    return False
+    return isinstance(llm, MULTIPLE_COMPLETION_SUPPORTED)
 
 
 @dataclass

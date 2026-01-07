@@ -157,6 +157,9 @@ class KnowledgeGraph:
 
     nodes: t.List[Node] = field(default_factory=list)
     relationships: t.List[Relationship] = field(default_factory=list)
+    _node_id_cache: t.Dict[uuid.UUID, Node] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
     def add(self, item: t.Union[Node, Relationship]):
         """
@@ -176,6 +179,7 @@ class KnowledgeGraph:
 
     def _add_node(self, node: Node):
         self.nodes.append(node)
+        self._node_id_cache[node.id] = node
 
     def _add_relationship(self, relationship: Relationship):
         self.relationships.append(relationship)
@@ -271,7 +275,13 @@ class KnowledgeGraph:
         if isinstance(node_id, str):
             node_id = uuid.UUID(node_id)
 
-        return next(filter(lambda n: n.id == node_id, self.nodes), None)
+        # Use cache for O(1) lookup instead of O(n) linear search
+        if self._node_id_cache:
+            return self._node_id_cache.get(node_id)
+
+        # Rebuild cache if empty (e.g., after deserialization)
+        self._node_id_cache = {node.id: node for node in self.nodes}
+        return self._node_id_cache.get(node_id)
 
     def find_indirect_clusters(
         self,
