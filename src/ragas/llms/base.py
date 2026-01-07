@@ -851,7 +851,7 @@ class InstructorLLM(InstructorBaseRagasLLM):
             # TODO: Update to support gpt-20+ when OpenAI releases models beyond gpt-19
             if model_str.startswith("gpt-"):
                 version_str = (
-                    model_str[4:].split("-")[0].split("_")[0]
+                    model_str[4:].split("-")[0].split("_")[0].split(".")[0]
                 )  # Get version number
                 try:
                     version = int(version_str)
