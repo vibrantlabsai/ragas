@@ -90,9 +90,11 @@ Your quickstart project initializes the OpenAI LLM by default in the `_init_clie
     In your `evals.py` `_init_clients()` function:
 
     ```python
+    from openai import OpenAI
     from ragas.llms import llm_factory
 
-    llm = llm_factory("gpt-4o")
+    client = OpenAI()
+    llm = llm_factory("gpt-4o", client=client)
     ```
 
     This is already set up in your quickstart project!
@@ -107,9 +109,12 @@ Your quickstart project initializes the OpenAI LLM by default in the `_init_clie
     In your `evals.py` `_init_clients()` function:
 
     ```python
+    import os
+    from anthropic import Anthropic
     from ragas.llms import llm_factory
 
-    llm = llm_factory("claude-3-5-sonnet-20241022", provider="anthropic")
+    client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+    llm = llm_factory("claude-3-5-sonnet-20241022", provider="anthropic", client=client)
     ```
 
 === "Google Gemini"
@@ -122,35 +127,41 @@ Your quickstart project initializes the OpenAI LLM by default in the `_init_clie
     In your `evals.py` `_init_clients()` function:
 
     ```python
+    import os
+    import google.generativeai as genai
     from ragas.llms import llm_factory
 
-    llm = llm_factory("gemini-1.5-pro", provider="google")
+    genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+    client = genai.GenerativeModel("gemini-2.0-flash")
+    llm = llm_factory("gemini-2.0-flash", provider="google", client=client)
     ```
 
 === "Local Models (Ollama)"
     Install and run Ollama locally, then in your `evals.py` `_init_clients()` function:
 
     ```python
+    from openai import OpenAI
     from ragas.llms import llm_factory
 
-    llm = llm_factory(
-        "mistral",
-        provider="ollama",
-        base_url="http://localhost:11434"  # Default Ollama URL
+    client = OpenAI(
+        api_key="ollama",  # Ollama doesn't require a real key
+        base_url="http://localhost:11434/v1"
     )
+    llm = llm_factory("mistral", provider="openai", client=client)
     ```
 
 === "Custom / Other Providers"
     For any LLM with OpenAI-compatible API:
 
     ```python
+    from openai import OpenAI
     from ragas.llms import llm_factory
 
-    llm = llm_factory(
-        "model-name",
+    client = OpenAI(
         api_key="your-api-key",
         base_url="https://your-api-endpoint"
     )
+    llm = llm_factory("model-name", provider="openai", client=client)
     ```
 
     For more details, learn about [LLM integrations](../concepts/metrics/index.md).
@@ -160,11 +171,14 @@ Your quickstart project initializes the OpenAI LLM by default in the `_init_clie
 `ragas` comes with pre-built metrics for common evaluation tasks. For example, [Aspect Critique](../concepts/metrics/available_metrics/aspect_critic.md) evaluates any aspect of your output using `DiscreteMetric`:
 
 ```python
+import asyncio
+from openai import AsyncOpenAI
 from ragas.metrics import DiscreteMetric
 from ragas.llms import llm_factory
 
 # Setup your evaluator LLM
-evaluator_llm = llm_factory("gpt-4o")
+client = AsyncOpenAI()
+evaluator_llm = llm_factory("gpt-4o", client=client)
 
 # Create a custom aspect evaluator
 metric = DiscreteMetric(
@@ -174,16 +188,21 @@ metric = DiscreteMetric(
 
 Response: {response}
 
-Answer with only 'accurate' or 'inaccurate'.""",
-    llm=evaluator_llm
+Answer with only 'accurate' or 'inaccurate'."""
 )
 
 # Score your application's output
-score = await metric.ascore(
-    response="The summary of the text is..."
-)
-print(f"Score: {score.value}")  # 'accurate' or 'inaccurate'
-print(f"Reason: {score.reason}")
+async def main():
+    score = await metric.ascore(
+        llm=llm,
+        response="The summary of the text is..."
+    )
+    print(f"Score: {score.value}")  # 'accurate' or 'inaccurate'
+    print(f"Reason: {score.reason}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 Pre-built metrics like this save you from defining evaluation logic from scratch. Explore [all available metrics](../concepts/metrics/available_metrics/index.md).
