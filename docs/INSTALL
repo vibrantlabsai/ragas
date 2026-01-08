@@ -11,7 +11,7 @@
 
 1. Install documentation dependencies:
    ```bash
-   uv sync --extra docs --project ragas
+   uv sync --group docs --project ragas
    ```
 
 2. Serve the documentation:
