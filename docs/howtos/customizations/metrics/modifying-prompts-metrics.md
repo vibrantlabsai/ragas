@@ -57,21 +57,36 @@ Modern metrics in Ragas use modular BasePrompt classes. To customize a prompt:
 
 ### Example: Customizing FactualCorrectness prompt
 
+FactualCorrectness uses two prompts internally:
+- `prompt` - ClaimDecompositionPrompt for breaking text into claims
+- `nli_prompt` - NLIStatementPrompt for verifying claims against context
+
+You can customize either or both:
+
 ```python
 from ragas.metrics.collections import FactualCorrectness
-from ragas.metrics.collections.factual_correctness.util import ClaimDecompositionPrompt
+from ragas.metrics.collections.factual_correctness.util import (
+    ClaimDecompositionPrompt,
+    NLIStatementPrompt,
+)
 
-# Create a custom prompt by subclassing
+# Create a custom claim decomposition prompt by subclassing
 class CustomClaimDecompositionPrompt(ClaimDecompositionPrompt):
     instruction = """You are an expert at breaking down complex statements into atomic claims.
 Break down the input text into clear, verifiable claims.
 Only output valid JSON with a "claims" array."""
 
-# Create metric instance and replace prompt
+# Optionally customize the NLI prompt too
+class CustomNLIPrompt(NLIStatementPrompt):
+    instruction = """Carefully evaluate if each statement is supported by the context.
+Be strict in your verification - only mark as supported if directly stated."""
+
+# Create metric instance and replace prompts
 scorer = FactualCorrectness(llm=llm)
 scorer.prompt = CustomClaimDecompositionPrompt()
+scorer.nli_prompt = CustomNLIPrompt()
 
-# Now the metric will use the custom prompt
+# Now the metric will use the custom prompts
 result = await scorer.ascore(
     response="The Eiffel Tower is in Paris and was built in 1889.",
     reference="The Eiffel Tower is located in Paris. It was completed in 1889."

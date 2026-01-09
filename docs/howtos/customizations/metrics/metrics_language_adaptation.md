@@ -77,3 +77,40 @@ relevancy.prompt = await relevancy.prompt.adapt(
 print(relevancy.prompt.examples[0][0].response)
 # Albert Einstein nació en Alemania.
 ```
+
+## Adapting FactualCorrectness
+
+FactualCorrectness has two prompts that both need to be adapted:
+
+```python
+from ragas.metrics.collections import FactualCorrectness
+
+metric = FactualCorrectness(llm=llm)
+
+# Adapt both prompts to German
+metric.prompt = await metric.prompt.adapt(
+    target_language="german", llm=llm
+)
+metric.nli_prompt = await metric.nli_prompt.adapt(
+    target_language="german", llm=llm
+)
+
+# Verify adaptation
+print(metric.prompt.language)  # german
+print(metric.nli_prompt.language)  # german
+
+# Now use the adapted metric
+result = await metric.ascore(
+    response="Einstein wurde 1879 in Deutschland geboren.",
+    reference="Albert Einstein wurde am 14. März 1879 in Ulm, Deutschland geboren."
+)
+
+print(f"Factual Correctness: {result.value}")
+```
+
+!!! tip
+    Like Faithfulness, FactualCorrectness uses two prompts internally:
+    - `prompt` - ClaimDecompositionPrompt for breaking text into claims
+    - `nli_prompt` - NLIStatementPrompt for verifying claims
+
+    Both prompts should be adapted when evaluating in non-English languages.
