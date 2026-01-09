@@ -4,35 +4,22 @@ import typing as t
 from typing import List
 
 import numpy as np
-from pydantic import BaseModel
 
 from ragas.metrics.collections.base import BaseMetric
 from ragas.metrics.result import MetricResult
 from ragas.metrics.utils import fbeta_score
-from ragas.prompt.metrics.common import nli_statement_prompt
 
 from .util import (
     ClaimDecompositionInput,
     ClaimDecompositionOutput,
     ClaimDecompositionPrompt,
+    NLIStatementInput,
+    NLIStatementOutput,
+    NLIStatementPrompt,
 )
 
 if t.TYPE_CHECKING:
     from ragas.llms.base import InstructorBaseRagasLLM
-
-
-class StatementFaithfulnessAnswer(BaseModel):
-    """Individual statement with reason and verdict for NLI evaluation."""
-
-    statement: str
-    reason: str
-    verdict: int
-
-
-class NLIStatementOutput(BaseModel):
-    """Structured output for NLI statement evaluation."""
-
-    statements: List[StatementFaithfulnessAnswer]
 
 
 class FactualCorrectness(BaseMetric):
@@ -113,6 +100,7 @@ class FactualCorrectness(BaseMetric):
         self.atomicity = atomicity
         self.coverage = coverage
         self.prompt = ClaimDecompositionPrompt()
+        self.nli_prompt = NLIStatementPrompt()
 
         # Validate beta parameter
         if not isinstance(beta, (int, float)):
@@ -189,8 +177,9 @@ class FactualCorrectness(BaseMetric):
         self, claims: List[str], reference: str
     ) -> NLIStatementOutput:
         """Verify claims against reference using NLI."""
-        prompt = nli_statement_prompt(reference, claims)
-        result = await self.llm.agenerate(prompt, NLIStatementOutput)
+        input_data = NLIStatementInput(context=reference, statements=claims)
+        prompt_str = self.nli_prompt.to_string(input_data)
+        result = await self.llm.agenerate(prompt_str, NLIStatementOutput)
         return result
 
     async def _decompose_and_verify_claims(
