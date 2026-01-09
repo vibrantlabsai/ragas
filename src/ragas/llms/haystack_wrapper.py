@@ -71,7 +71,7 @@ class HaystackLLMWrapper(BaseRagasLLM):
         # Set up Haystack pipeline and generator
         self.generator = haystack_generator
         self.async_pipeline = AsyncPipeline()
-        self.async_pipeline.add_component("llm", self.generator)
+        self.async_pipeline.add_component("llm", self.generator)  # type: ignore[reportArgumentType]
 
         if run_config is None:
             run_config = RunConfig()
@@ -88,7 +88,7 @@ class HaystackLLMWrapper(BaseRagasLLM):
         stop: t.Optional[t.List[str]] = None,
         callbacks: t.Optional[Callbacks] = None,
     ) -> LLMResult:
-        component_output: t.Dict[str, t.Any] = self.generator.run(prompt.to_string())
+        component_output: t.Dict[str, t.Any] = self.generator.run(prompt.to_string())  # type: ignore[reportAttributeAccessIssue]
         replies = component_output.get("llm", {}).get("replies", [])
         output_text = replies[0] if replies else ""
 

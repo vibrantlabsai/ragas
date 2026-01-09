@@ -74,7 +74,7 @@ class HaystackEmbeddingsWrapper(BaseRagasEmbeddings):
 
         # Initialize an asynchronous pipeline and add the embedder component
         self.async_pipeline = AsyncPipeline()
-        self.async_pipeline.add_component("embedder", self.embedder)
+        self.async_pipeline.add_component("embedder", self.embedder)  # type: ignore[reportArgumentType]
 
         # Set or create the run configuration
         if run_config is None:
@@ -82,7 +82,7 @@ class HaystackEmbeddingsWrapper(BaseRagasEmbeddings):
         self.set_run_config(run_config)
 
     def embed_query(self, text: str) -> t.List[float]:
-        result = self.embedder.run(text=text)
+        result = self.embedder.run(text=text)  # type: ignore[reportAttributeAccessIssue]
         embedding = result["embedding"]
         # Force conversion to float using NumPy's vectorized conversion.
         return t.cast(t.List[float], np.asarray(embedding, dtype=float).tolist())
