@@ -8,6 +8,16 @@ from ragas.cache import CacheInterface
 from ragas.llms import BaseRagasLLM
 from ragas.run_config import RunConfig
 
+if t.TYPE_CHECKING:
+    from haystack.components.generators.azure import AzureOpenAIGenerator
+    from haystack.components.generators.hugging_face_api import (
+        HuggingFaceAPIGenerator,
+    )
+    from haystack.components.generators.hugging_face_local import (
+        HuggingFaceLocalGenerator,
+    )
+    from haystack.components.generators.openai import OpenAIGenerator
+
 
 class HaystackLLMWrapper(BaseRagasLLM):
     """
@@ -29,7 +39,12 @@ class HaystackLLMWrapper(BaseRagasLLM):
 
     def __init__(
         self,
-        haystack_generator: t.Any,
+        haystack_generator: t.Union[
+            "AzureOpenAIGenerator",
+            "HuggingFaceAPIGenerator",
+            "HuggingFaceLocalGenerator",
+            "OpenAIGenerator",
+        ],
         run_config: t.Optional[RunConfig] = None,
         cache: t.Optional[CacheInterface] = None,
     ):
