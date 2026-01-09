@@ -78,12 +78,22 @@ jobs:
       - name: Parse analysis result
         id: parse
         run: |
-          OUTPUT='${{ steps.analyze.outputs.structured_output }}'
-          echo "structured_output=$OUTPUT"
-          NEEDS_UPDATE=$(echo "$OUTPUT" | jq -r '.needs_update')
-          REASON=$(echo "$OUTPUT" | jq -r '.reason')
+          # Use heredoc to safely handle JSON with special characters
+          cat <<'EOF' > /tmp/output.json
+          ${{ steps.analyze.outputs.structured_output }}
+          EOF
+
+          echo "structured_output=$(cat /tmp/output.json)"
+          NEEDS_UPDATE=$(jq -r '.needs_update' /tmp/output.json)
+          REASON=$(jq -r '.reason' /tmp/output.json)
           echo "needs_update=$NEEDS_UPDATE" >> $GITHUB_OUTPUT
-          echo "reason=$REASON" >> $GITHUB_OUTPUT
+
+          # Use multiline string format for reason to handle special characters
+          {
+            echo 'reason<<EOF'
+            jq -r '.reason' /tmp/output.json
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
 
       - name: Add label and comment if docs needed
         if: steps.parse.outputs.needs_update == 'true'
