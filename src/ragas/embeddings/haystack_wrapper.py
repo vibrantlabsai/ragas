@@ -7,6 +7,20 @@ from ragas.cache import CacheInterface
 from ragas.embeddings.base import BaseRagasEmbeddings
 from ragas.run_config import RunConfig
 
+if t.TYPE_CHECKING:
+    from haystack.components.embedders.azure_text_embedder import (
+        AzureOpenAITextEmbedder,
+    )
+    from haystack.components.embedders.hugging_face_api_text_embedder import (
+        HuggingFaceAPITextEmbedder,
+    )
+    from haystack.components.embedders.openai_text_embedder import (
+        OpenAITextEmbedder,
+    )
+    from haystack.components.embedders.sentence_transformers_text_embedder import (
+        SentenceTransformersTextEmbedder,
+    )
+
 
 class HaystackEmbeddingsWrapper(BaseRagasEmbeddings):
     """
@@ -28,7 +42,12 @@ class HaystackEmbeddingsWrapper(BaseRagasEmbeddings):
 
     def __init__(
         self,
-        embedder: t.Any,
+        embedder: t.Union[
+            "AzureOpenAITextEmbedder",
+            "HuggingFaceAPITextEmbedder",
+            "OpenAITextEmbedder",
+            "SentenceTransformersTextEmbedder",
+        ],
         run_config: t.Optional[RunConfig] = None,
         cache: t.Optional[CacheInterface] = None,
     ):
