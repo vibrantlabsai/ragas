@@ -3,6 +3,7 @@ import hashlib
 import inspect
 import json
 import logging
+import sys
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
@@ -147,6 +148,39 @@ def _make_hashable(o):
 EXCLUDE_KEYS = ["callbacks"]
 
 
+def _make_pydantic_picklable(obj: Any) -> Any:
+    """Make Pydantic models returned by instructor library picklable.
+
+    The instructor library dynamically creates new class objects during structured
+    output generation. These modified classes have class identity issues that prevent
+    pickling. This function detects such instances and recreates them using the
+    original class from the module namespace.
+
+    Args:
+        obj: Object to make picklable (typically a Pydantic model instance).
+
+    Returns:
+        A picklable version of the object. For Pydantic models with class identity
+        issues, returns a new instance created with the correct class. Otherwise,
+        returns the original object unchanged.
+    """
+    if isinstance(obj, BaseModel):
+        obj_class = obj.__class__
+        module = sys.modules.get(obj_class.__module__)
+
+        if module is not None:
+            actual_class = getattr(module, obj_class.__name__, None)
+
+            if actual_class is not None and actual_class is not obj_class:
+                logger.debug(
+                    f"Detected class identity mismatch for {obj_class.__name__}, "
+                    f"recreating with actual class from module"
+                )
+                return actual_class(**obj.model_dump())
+
+    return obj
+
+
 def _generate_cache_key(func, args, kwargs):
     filtered_kwargs = {k: v for k, v in kwargs.items() if k not in EXCLUDE_KEYS}
 
@@ -193,7 +227,8 @@ def cacher(cache_backend: Optional[CacheInterface] = None):
                 return backend.get(cache_key)
 
             result = await func(*args, **kwargs)
-            backend.set(cache_key, result)
+            picklable_result = _make_pydantic_picklable(result)
+            backend.set(cache_key, picklable_result)
             return result
 
         @functools.wraps(func)
@@ -205,7 +240,8 @@ def cacher(cache_backend: Optional[CacheInterface] = None):
                 return backend.get(cache_key)
 
             result = func(*args, **kwargs)
-            backend.set(cache_key, result)
+            picklable_result = _make_pydantic_picklable(result)
+            backend.set(cache_key, picklable_result)
             return result
 
         return async_wrapper if is_async else sync_wrapper
