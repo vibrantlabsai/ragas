@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from langchain_core.callbacks import Callbacks
 
 from ragas.cache import CacheInterface
-from ragas.dataset_schema import SingleMetricAnnotation
+from ragas.dataset_schema import MultiMetricAnnotation, SingleMetricAnnotation
 from ragas.losses import Loss
 from ragas.optimizers.base import Optimizer
 from ragas.run_config import RunConfig
@@ -116,8 +116,8 @@ class DSPyOptimizer(Optimizer):
 
     def optimize(
         self,
-        dataset: SingleMetricAnnotation,
-        loss: Loss,
+        dataset: t.Union[SingleMetricAnnotation, MultiMetricAnnotation],
+        loss: t.Union[Loss, t.Dict[str, Loss]],
         config: t.Dict[t.Any, t.Any],
         run_config: t.Optional[RunConfig] = None,
         batch_size: t.Optional[int] = None,
@@ -127,6 +127,10 @@ class DSPyOptimizer(Optimizer):
     ) -> t.Dict[str, str]:
         """
         Optimize metric prompts using DSPy MIPROv2.
+
+        Supports both single-metric and multi-metric optimization.
+        For multi-metric optimization, combines multiple metrics with
+        configurable weights.
 
         Steps:
 
@@ -139,10 +143,12 @@ class DSPyOptimizer(Optimizer):
 
         Parameters
         ----------
-        dataset : SingleMetricAnnotation
+        dataset : Union[SingleMetricAnnotation, MultiMetricAnnotation]
             Annotated dataset with ground truth scores.
-        loss : Loss
-            Loss function to optimize.
+            Can be single metric or multiple metrics.
+        loss : Union[Loss, Dict[str, Loss]]
+            Loss function(s) to optimize.
+            For multi-metric, provide dict mapping metric names to losses.
         config : Dict[Any, Any]
             Additional configuration parameters.
         run_config : RunConfig, optional
@@ -170,13 +176,68 @@ class DSPyOptimizer(Optimizer):
         if self._dspy is None:
             raise RuntimeError("DSPy module not loaded.")
 
+        is_multi_metric = isinstance(dataset, MultiMetricAnnotation)
+
         if self.cache is not None:
             cache_key = self._generate_cache_key(dataset, loss, config)
             if self.cache.has_key(cache_key):
-                logger.info(
-                    f"Cache hit for DSPy optimization of metric: {self.metric.name}"
+                metric_name = (
+                    "multiple metrics" if is_multi_metric else self.metric.name
                 )
+                logger.info(f"Cache hit for DSPy optimization of {metric_name}")
                 return self.cache.get(cache_key)
+
+        if is_multi_metric:
+            if not isinstance(dataset, MultiMetricAnnotation):
+                raise TypeError("Expected MultiMetricAnnotation for multi-metric mode")
+            return self._optimize_multi_metric(
+                dataset,
+                loss,
+                config,
+                run_config,
+                batch_size,
+                callbacks,
+                with_debugging_logs,
+                raise_exceptions,
+            )
+        else:
+            if not isinstance(dataset, SingleMetricAnnotation):
+                raise TypeError(
+                    "Expected SingleMetricAnnotation for single-metric mode"
+                )
+            if isinstance(loss, dict):
+                raise TypeError(
+                    "Expected Loss for single-metric mode, got Dict[str, Loss]"
+                )
+            return self._optimize_single_metric(
+                dataset,
+                loss,
+                config,
+                run_config,
+                batch_size,
+                callbacks,
+                with_debugging_logs,
+                raise_exceptions,
+            )
+
+    def _optimize_single_metric(
+        self,
+        dataset: SingleMetricAnnotation,
+        loss: Loss,
+        config: t.Dict[t.Any, t.Any],
+        run_config: t.Optional[RunConfig] = None,
+        batch_size: t.Optional[int] = None,
+        callbacks: t.Optional[Callbacks] = None,
+        with_debugging_logs: bool = False,
+        raise_exceptions: bool = True,
+    ) -> t.Dict[str, str]:
+        """Optimize prompts for a single metric."""
+        if self.metric is None:
+            raise ValueError("No metric provided for optimization.")
+        if self.llm is None:
+            raise ValueError("No llm provided for optimization.")
+        if self._dspy is None:
+            raise RuntimeError("DSPy module not loaded.")
 
         logger.info(f"Starting DSPy optimization for metric: {self.metric.name}")
 
@@ -236,6 +297,93 @@ class DSPyOptimizer(Optimizer):
 
         return optimized_prompts
 
+    def _optimize_multi_metric(
+        self,
+        dataset: MultiMetricAnnotation,
+        loss: t.Union[Loss, t.Dict[str, Loss]],
+        config: t.Dict[t.Any, t.Any],
+        run_config: t.Optional[RunConfig] = None,
+        batch_size: t.Optional[int] = None,
+        callbacks: t.Optional[Callbacks] = None,
+        with_debugging_logs: bool = False,
+        raise_exceptions: bool = True,
+    ) -> t.Dict[str, str]:
+        """Optimize prompts for multiple metrics simultaneously."""
+        if self.metric is None:
+            raise ValueError("No metric provided for optimization.")
+        if self.llm is None:
+            raise ValueError("No llm provided for optimization.")
+        if self._dspy is None:
+            raise RuntimeError("DSPy module not loaded.")
+
+        metric_names = list(dataset.metrics.keys())
+        logger.info(
+            f"Starting DSPy multi-metric optimization for metrics: {', '.join(metric_names)}"
+        )
+
+        from ragas.optimizers.dspy_adapter import (
+            create_combined_dspy_metric,
+            pydantic_prompt_to_dspy_signature,
+            ragas_multi_dataset_to_dspy_examples,
+            setup_dspy_llm,
+        )
+
+        setup_dspy_llm(self._dspy, self.llm)
+
+        if not isinstance(loss, dict):
+            loss_dict = {name: loss for name in metric_names}
+        else:
+            loss_dict = loss
+
+        prompts = self.metric.get_prompts()
+        optimized_prompts = {}
+
+        for prompt_name, prompt in prompts.items():
+            logger.info(f"Optimizing prompt: {prompt_name} (multi-metric)")
+
+            signature = pydantic_prompt_to_dspy_signature(prompt)
+            module = self._dspy.Predict(signature)
+            examples = ragas_multi_dataset_to_dspy_examples(dataset, prompt_name)
+
+            teleprompter = self._dspy.MIPROv2(
+                num_candidates=self.num_candidates,
+                max_bootstrapped_demos=self.max_bootstrapped_demos,
+                max_labeled_demos=self.max_labeled_demos,
+                init_temperature=self.init_temperature,
+                auto=self.auto,
+                num_threads=self.num_threads,
+                max_errors=self.max_errors,
+                seed=self.seed,
+                verbose=self.verbose,
+                track_stats=self.track_stats,
+                log_dir=self.log_dir,
+                metric_threshold=self.metric_threshold,
+            )
+
+            metric_fn = create_combined_dspy_metric(
+                loss_dict, dataset.metrics, dataset.weights or {}
+            )
+
+            optimized = teleprompter.compile(
+                module,
+                trainset=examples,
+                metric=metric_fn,
+            )
+
+            optimized_instruction = self._extract_instruction(optimized)
+            optimized_prompts[prompt_name] = optimized_instruction
+
+            logger.info(
+                f"Optimized prompt for {prompt_name}: {optimized_instruction[:100]}..."
+            )
+
+        if self.cache is not None:
+            cache_key = self._generate_cache_key(dataset, loss, config)
+            self.cache.set(cache_key, optimized_prompts)
+            logger.info("Cached optimization results")
+
+        return optimized_prompts
+
     def _extract_instruction(self, optimized_module: t.Any) -> str:
         """
         Extract the optimized instruction from DSPy module.
@@ -264,8 +412,8 @@ class DSPyOptimizer(Optimizer):
 
     def _generate_cache_key(
         self,
-        dataset: SingleMetricAnnotation,
-        loss: Loss,
+        dataset: t.Union[SingleMetricAnnotation, MultiMetricAnnotation],
+        loss: t.Union[Loss, t.Dict[str, Loss]],
         config: t.Dict[t.Any, t.Any],
     ) -> str:
         """
@@ -273,10 +421,10 @@ class DSPyOptimizer(Optimizer):
 
         Parameters
         ----------
-        dataset : SingleMetricAnnotation
+        dataset : Union[SingleMetricAnnotation, MultiMetricAnnotation]
             Annotated dataset with ground truth scores.
-        loss : Loss
-            Loss function to optimize.
+        loss : Union[Loss, Dict[str, Loss]]
+            Loss function(s) to optimize.
         config : Dict[Any, Any]
             Additional configuration parameters.
 
@@ -288,12 +436,31 @@ class DSPyOptimizer(Optimizer):
         if self.metric is None:
             raise ValueError("Metric must be set to generate cache key")
 
-        cache_data = {
-            "metric_name": self.metric.name,
-            "dataset_hash": hashlib.sha256(
+        if isinstance(dataset, MultiMetricAnnotation):
+            dataset_hash = hashlib.sha256(
+                json.dumps(
+                    {name: ds.model_dump() for name, ds in dataset.metrics.items()},
+                    sort_keys=True,
+                ).encode()
+            ).hexdigest()
+            metric_name = f"multi_metric_{','.join(sorted(dataset.metrics.keys()))}"
+        else:
+            dataset_hash = hashlib.sha256(
                 json.dumps(dataset.model_dump(), sort_keys=True).encode()
-            ).hexdigest(),
-            "loss_name": loss.__class__.__name__,
+            ).hexdigest()
+            metric_name = self.metric.name
+
+        if isinstance(loss, dict):
+            loss_name = ",".join(
+                f"{k}:{v.__class__.__name__}" for k, v in sorted(loss.items())
+            )
+        else:
+            loss_name = loss.__class__.__name__
+
+        cache_data = {
+            "metric_name": metric_name,
+            "dataset_hash": dataset_hash,
+            "loss_name": loss_name,
             "num_candidates": self.num_candidates,
             "max_bootstrapped_demos": self.max_bootstrapped_demos,
             "max_labeled_demos": self.max_labeled_demos,
