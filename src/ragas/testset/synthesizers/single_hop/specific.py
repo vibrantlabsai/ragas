@@ -131,7 +131,7 @@ class SingleHopSpecificQuerySynthesizer(SingleHopQuerySynthesizer):
         """
 
         nodes = self.get_node_clusters(knowledge_graph)
-        if len(nodes) == 0:
+        if not nodes:
             raise ValueError("No nodes found with the `entities` property.")
         samples_per_node = int(np.ceil(n / len(nodes)))
 

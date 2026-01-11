@@ -18,9 +18,10 @@ def hamming_distance(vectors: np.ndarray) -> np.ndarray:
         raise ValueError("All vectors must have the same dimensions.")
 
     # Calculate Hamming distances for all pairs
-    distances = np.zeros((len(vectors), len(vectors)), dtype=int)
-    for i in range(len(vectors)):
-        for j in range(i + 1, len(vectors)):
+    n_vectors = len(vectors)
+    distances = np.zeros((n_vectors, n_vectors), dtype=int)
+    for i in range(n_vectors):
+        for j in range(i + 1, n_vectors):
             distance = np.sum(vectors[i] != vectors[j])
             distances[i][j] = distance
 

@@ -203,7 +203,7 @@ class RagasDataset(ABC, t.Generic[Sample]):
 
     def validate_samples(self, samples: t.List[Sample]) -> t.List[Sample]:
         """Validates that all samples are of the same type."""
-        if len(samples) == 0:
+        if not samples:
             return samples
 
         first_sample_type = type(samples[0])
@@ -611,7 +611,8 @@ class MetricAnnotation(BaseModel):
     @classmethod
     def from_json(cls, path: str, metric_name: t.Optional[str]) -> "MetricAnnotation":
         """Load annotations from a JSON file"""
-        dataset = json.load(open(path))
+        with open(path) as f:
+            dataset = json.load(f)
         return cls._process_dataset(dataset, metric_name)
 
     def __len__(self):
@@ -643,7 +644,8 @@ class SingleMetricAnnotation(BaseModel):
 
     @classmethod
     def from_json(cls, path) -> "SingleMetricAnnotation":
-        dataset = json.load(open(path))
+        with open(path) as f:
+            dataset = json.load(f)
 
         return cls(
             name=dataset["name"],

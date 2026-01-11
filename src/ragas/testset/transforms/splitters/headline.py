@@ -73,7 +73,7 @@ class HeadlineSplitter(Splitter):
             if index != -1:
                 indices.append(index)
         indices.append(len(text))
-        chunks = [text[indices[i] : indices[i + 1]] for i in range(len(indices) - 1)]
+        chunks = [text[start:end] for start, end in zip(indices, indices[1:])]
         chunks = self.adjust_chunks(chunks)
 
         # if there was no headline, return the original node

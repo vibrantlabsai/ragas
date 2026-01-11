@@ -118,10 +118,8 @@ class LLMContextPrecisionWithReference(MetricWithLLM, SingleTurnMetric):
         verdict_list = [1 if ver.verdict else 0 for ver in verifications]
         denominator = sum(verdict_list) + 1e-10
         numerator = sum(
-            [
-                (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
-                for i in range(len(verdict_list))
-            ]
+            (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
+            for i, _ in enumerate(verdict_list)
         )
         score = numerator / denominator
         if np.isnan(score):
@@ -238,10 +236,8 @@ class NonLLMContextPrecisionWithReference(SingleTurnMetric):
 
         denominator = sum(verdict_list) + 1e-10
         numerator = sum(
-            [
-                (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
-                for i in range(len(verdict_list))
-            ]
+            (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
+            for i, _ in enumerate(verdict_list)
         )
         score = numerator / denominator
         return score

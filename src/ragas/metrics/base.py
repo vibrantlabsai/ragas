@@ -666,11 +666,11 @@ class Ensember:
             return inputs[0]
 
         verdict_agg = []
-        for i in range(len(inputs[0])):
-            item = inputs[0][i]
-            verdicts = [inputs[k][i][attribute] for k in range(len(inputs))]
+        for item_list in zip(*inputs):
+            item = item_list[0]
+            verdicts = [item_dict[attribute] for item_dict in item_list]
             verdict_counts = dict(Counter(verdicts).most_common())
-            item[attribute] = list(verdict_counts.keys())[0]
+            item[attribute] = next(iter(verdict_counts))
             verdict_agg.append(item)
 
         return verdict_agg

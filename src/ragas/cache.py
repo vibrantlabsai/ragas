@@ -42,7 +42,7 @@ class CacheInterface(ABC):
         pass
 
     @abstractmethod
-    def has_key(self, key: str) -> bool:
+    def __contains__(self, key: str) -> bool:
         """Check if a key exists in the cache.
 
         Args:
@@ -106,7 +106,7 @@ class DiskCacheBackend(CacheInterface):
         """
         self.cache.set(key, value)
 
-    def has_key(self, key: str) -> bool:
+    def __contains__(self, key: str) -> bool:
         """Check if a key exists in the disk cache.
 
         Args:
@@ -188,7 +188,7 @@ def cacher(cache_backend: Optional[CacheInterface] = None):
         async def async_wrapper(*args, **kwargs):
             cache_key = _generate_cache_key(func, args, kwargs)
 
-            if backend.has_key(cache_key):
+            if cache_key in backend:
                 logger.debug(f"Cache hit for {cache_key}")
                 return backend.get(cache_key)
 
@@ -200,7 +200,7 @@ def cacher(cache_backend: Optional[CacheInterface] = None):
         def sync_wrapper(*args, **kwargs):
             cache_key = _generate_cache_key(func, args, kwargs)
 
-            if backend.has_key(cache_key):
+            if cache_key in backend:
                 logger.debug(f"Cache hit for {cache_key}")
                 return backend.get(cache_key)
 

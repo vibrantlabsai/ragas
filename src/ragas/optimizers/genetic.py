@@ -505,7 +505,7 @@ class GeneticOptimizer(Optimizer):
             raise ValueError("No metric provided for optimization.")
 
         prediction = results.to_pandas()[self.metric.name].values.tolist()
-        indices = [idx for idx in range(len(target)) if target[idx] != prediction[idx]]
+        indices = [idx for idx, (t, p) in enumerate(zip(target, prediction)) if t != p]
         traces = [trace[self.metric.name] for trace in results.traces]
         if indices:
             feedback_candidates = {}

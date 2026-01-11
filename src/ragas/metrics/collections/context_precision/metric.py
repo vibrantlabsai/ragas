@@ -120,10 +120,8 @@ class ContextPrecisionWithReference(BaseMetric):
         verdict_list = verdicts
         denominator = sum(verdict_list) + 1e-10
         numerator = sum(
-            [
-                (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
-                for i in range(len(verdict_list))
-            ]
+            (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
+            for i, _ in enumerate(verdict_list)
         )
         score = numerator / denominator
 
@@ -240,10 +238,8 @@ class ContextPrecisionWithoutReference(BaseMetric):
         verdict_list = verdicts
         denominator = sum(verdict_list) + 1e-10
         numerator = sum(
-            [
-                (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
-                for i in range(len(verdict_list))
-            ]
+            (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
+            for i, _ in enumerate(verdict_list)
         )
         score = numerator / denominator
 
