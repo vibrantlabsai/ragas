@@ -121,8 +121,40 @@ class HuggingFaceTokenizer(BaseTokenizer):
         return self._tokenizer
 
 
-# Default tokenizer instance
-DEFAULT_TOKENIZER = TiktokenWrapper(encoding_name="o200k_base")
+# Lazy initialization to avoid network calls at import time
+_default_tokenizer: t.Optional[TiktokenWrapper] = None
+
+
+def get_default_tokenizer() -> TiktokenWrapper:
+    """Get the default tokenizer, creating it lazily on first access."""
+    global _default_tokenizer
+    if _default_tokenizer is None:
+        _default_tokenizer = TiktokenWrapper(encoding_name="o200k_base")
+    return _default_tokenizer
+
+
+class _LazyTokenizer(BaseTokenizer):
+    """Lazy wrapper that defers tokenizer creation until first attribute access.
+
+    Now inherits from BaseTokenizer so it satisfies static type checks. All
+    operations are delegated to the real tokenizer created by get_default_tokenizer().
+    """
+
+    def __getattr__(self, name: str) -> t.Any:
+        return getattr(get_default_tokenizer(), name)
+
+    def encode(self, text: str) -> t.List[int]:
+        return get_default_tokenizer().encode(text)
+
+    def decode(self, tokens: t.List[int]) -> str:
+        return get_default_tokenizer().decode(tokens)
+
+    def count_tokens(self, text: str) -> int:
+        return get_default_tokenizer().count_tokens(text)
+
+
+# For backwards compatibility
+DEFAULT_TOKENIZER: BaseTokenizer = _LazyTokenizer()
 
 
 def get_tokenizer(
