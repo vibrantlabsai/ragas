@@ -77,7 +77,6 @@ clarity_metric = DiscreteMetric(
 Response: {response}
 
 Respond with only the number (0-10).""",
-    llm=llm
 )
 
 sample = SingleTurnSample(
@@ -85,7 +84,7 @@ sample = SingleTurnSample(
     response="Machine learning is a subset of artificial intelligence that enables systems to learn from data."
 )
 
-result = await clarity_metric.ascore(response=sample.response)
+result = await clarity_metric.ascore(response=sample.response, llm=llm)
 print(f"Clarity Score: {result.value}")  # Output: e.g., 8
 ```
 
@@ -106,10 +105,9 @@ quality_metric = DiscreteMetric(
 Response: {response}
 
 Respond with only the number (1-5).""",
-    llm=llm
 )
 
-result = await quality_metric.ascore(response=sample.response)
+result = await quality_metric.ascore(response=sample.response, llm=llm)
 print(f"Quality Score: {result.value}")
 ```
 
@@ -129,7 +127,6 @@ Reference: {reference}
 Response: {response}
 
 Respond with only the number (0-5).""",
-    llm=llm
 )
 
 sample = SingleTurnSample(
@@ -140,7 +137,8 @@ sample = SingleTurnSample(
 
 result = await similarity_metric.ascore(
     response=sample.response,
-    reference=sample.reference
+    reference=sample.reference,
+    llm=llm
 )
 print(f"Similarity Score: {result.value}")
 ```
