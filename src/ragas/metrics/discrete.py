@@ -29,8 +29,6 @@ class DiscreteMetric(SimpleLLMMetric, DiscreteValidator):
     allowed_values : List[str]
         List of allowed categorical values the metric can output.
         Default is ["pass", "fail"].
-    llm : Optional[BaseRagasLLM]
-        The language model instance for evaluation. Can be created using llm_factory().
     prompt : Optional[Union[str, Prompt]]
         The prompt template for the metric. Should contain placeholders for
         evaluation inputs that will be formatted at runtime.
@@ -48,7 +46,6 @@ class DiscreteMetric(SimpleLLMMetric, DiscreteValidator):
     >>> # Create a custom discrete metric
     >>> metric = DiscreteMetric(
     ...     name="quality_check",
-    ...     llm=llm,
     ...     prompt="Check the quality of the response: {response}. Return 'excellent', 'good', or 'poor'.",
     ...     allowed_values=["excellent", "good", "poor"]
     ... )
