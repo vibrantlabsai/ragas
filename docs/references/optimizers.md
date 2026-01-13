@@ -102,6 +102,64 @@ Learn more about DSPy concepts:
 **Pros**: Better results, combines instructions + demos
 **Cons**: Requires DSPy installation, more LLM calls
 
+### Multi-Metric Optimization
+
+DSPyOptimizer supports optimizing prompts for multiple metrics simultaneously. This allows you to find prompts that perform well across different evaluation objectives with configurable weights.
+
+```python
+from ragas.dataset_schema import MultiMetricAnnotation, SingleMetricAnnotation
+from ragas.optimizers import DSPyOptimizer
+from ragas.losses import MSELoss
+
+# Create individual metric datasets
+faithfulness_dataset = SingleMetricAnnotation(
+    name="faithfulness",
+    samples=[...]  # Annotated samples for faithfulness
+)
+
+answer_relevancy_dataset = SingleMetricAnnotation(
+    name="answer_relevancy",
+    samples=[...]  # Annotated samples for answer relevancy
+)
+
+# Combine into multi-metric dataset
+multi_dataset = MultiMetricAnnotation(
+    metrics={
+        "faithfulness": faithfulness_dataset,
+        "answer_relevancy": answer_relevancy_dataset
+    },
+    weights={
+        "faithfulness": 0.6,     # 60% weight
+        "answer_relevancy": 0.4  # 40% weight
+    }
+)
+
+# Create optimizer
+optimizer = DSPyOptimizer(num_candidates=10)
+optimizer.metric = metric
+optimizer.llm = llm
+
+# Define losses for each metric
+losses = {
+    "faithfulness": MSELoss(),
+    "answer_relevancy": MSELoss()
+}
+
+# Optimize for multiple metrics
+optimized_prompts = optimizer.optimize(multi_dataset, losses, {})
+```
+
+**Key Features:**
+- Combines multiple metrics into a single objective
+- Configurable weights for each metric (must sum to 1.0)
+- Returns prompts optimized for the weighted combination
+- Useful when metrics have trade-offs
+
+**When to Use:**
+- When improving one metric tends to hurt another
+- When you need balanced performance across metrics
+- When different metrics have different importance in your use case
+
 ### Installation
 
 [DSPy](https://dspy.ai/) is an optional dependency:
@@ -160,7 +218,8 @@ Optimizers require annotated datasets with ground truth scores:
 from ragas.dataset_schema import (
     PromptAnnotation,
     SampleAnnotation,
-    SingleMetricAnnotation
+    SingleMetricAnnotation,
+    MultiMetricAnnotation
 )
 
 # Create annotated sample
@@ -177,10 +236,19 @@ sample = SampleAnnotation(
     is_accepted=True,  # Include in optimization
 )
 
-# Create dataset
+# Create single-metric dataset
 dataset = SingleMetricAnnotation(
     name="metric_name",
     samples=[sample, ...]  # 20-50+ samples recommended
+)
+
+# Or create multi-metric dataset
+multi_dataset = MultiMetricAnnotation(
+    metrics={
+        "metric1": SingleMetricAnnotation(name="metric1", samples=[...]),
+        "metric2": SingleMetricAnnotation(name="metric2", samples=[...])
+    },
+    weights={"metric1": 0.6, "metric2": 0.4}  # Optional, defaults to equal
 )
 ```
 
@@ -207,6 +275,7 @@ config = InstructionConfig(llm=llm, optimizer=optimizer, loss=loss)
 |---------|------------------|---------------|
 | Installation | Built-in | Requires `ragas[dspy]` |
 | Optimization Target | Instructions only | Instructions + Demos |
+| Multi-Metric Support | No | Yes |
 | Min Dataset Size | 10+ samples | 20+ samples |
 | Typical LLM Calls | 100-500 | 200-700 |
 | Accuracy Improvement | +5-8% | +8-12% |
@@ -214,9 +283,9 @@ config = InstructionConfig(llm=llm, optimizer=optimizer, loss=loss)
 
 ## See Also
 
-- [DSPy Optimizer Guide](../howtos/customizations/optimizers/dspy-optimizer.md) - Detailed usage
-- [Metric Customization](../howtos/customizations/metrics/custom-metrics.md) - Creating metrics
-- [Prompt API Reference](./prompt.md) - Understanding prompts
+- [DSPy Optimizer Guide](../howtos/customizations/optimizers/) - Detailed usage
+- [Metric Customization](../howtos/customizations/metrics/modifying-prompts-metrics/) - Creating metrics
+- [Prompt API Reference](./prompt/) - Understanding prompts
 
 ## Additional Resources
 

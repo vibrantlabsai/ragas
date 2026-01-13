@@ -604,3 +604,148 @@ class TestDSPyOptimizer:
         optimizer = DSPyOptimizer(cache=None)
 
         assert optimizer.cache is None
+
+    @pytest.mark.skipif(not DSPY_AVAILABLE, reason="dspy-ai not installed")
+    def test_multi_metric_annotation_creation(self):
+        """Test MultiMetricAnnotation creation and validation."""
+        from ragas.dataset_schema import MultiMetricAnnotation, SingleMetricAnnotation
+
+        dataset1 = SingleMetricAnnotation(name="faithfulness", samples=[])
+        dataset2 = SingleMetricAnnotation(name="answer_relevancy", samples=[])
+
+        multi = MultiMetricAnnotation(
+            metrics={"faithfulness": dataset1, "answer_relevancy": dataset2}
+        )
+
+        assert "faithfulness" in multi.metrics
+        assert "answer_relevancy" in multi.metrics
+        assert multi.weights is not None
+        assert abs(multi.weights["faithfulness"] - 0.5) < 1e-6
+        assert abs(multi.weights["answer_relevancy"] - 0.5) < 1e-6
+
+    @pytest.mark.skipif(not DSPY_AVAILABLE, reason="dspy-ai not installed")
+    def test_multi_metric_annotation_with_custom_weights(self):
+        """Test MultiMetricAnnotation with custom weights."""
+        from ragas.dataset_schema import MultiMetricAnnotation, SingleMetricAnnotation
+
+        dataset1 = SingleMetricAnnotation(name="faithfulness", samples=[])
+        dataset2 = SingleMetricAnnotation(name="answer_relevancy", samples=[])
+
+        multi = MultiMetricAnnotation(
+            metrics={"faithfulness": dataset1, "answer_relevancy": dataset2},
+            weights={"faithfulness": 0.7, "answer_relevancy": 0.3},
+        )
+
+        assert abs(multi.weights["faithfulness"] - 0.7) < 1e-6
+        assert abs(multi.weights["answer_relevancy"] - 0.3) < 1e-6
+
+    @pytest.mark.skipif(not DSPY_AVAILABLE, reason="dspy-ai not installed")
+    def test_multi_metric_annotation_invalid_weights(self):
+        """Test MultiMetricAnnotation with invalid weights."""
+        from ragas.dataset_schema import MultiMetricAnnotation, SingleMetricAnnotation
+
+        dataset1 = SingleMetricAnnotation(name="faithfulness", samples=[])
+        dataset2 = SingleMetricAnnotation(name="answer_relevancy", samples=[])
+
+        with pytest.raises(ValueError, match="Weights must sum to 1.0"):
+            MultiMetricAnnotation(
+                metrics={"faithfulness": dataset1, "answer_relevancy": dataset2},
+                weights={"faithfulness": 0.5, "answer_relevancy": 0.6},
+            )
+
+    @pytest.mark.skipif(not DSPY_AVAILABLE, reason="dspy-ai not installed")
+    @patch("ragas.optimizers.dspy_adapter.setup_dspy_llm")
+    @patch("ragas.optimizers.dspy_adapter.pydantic_prompt_to_dspy_signature")
+    @patch("ragas.optimizers.dspy_adapter.ragas_multi_dataset_to_dspy_examples")
+    @patch("ragas.optimizers.dspy_adapter.create_combined_dspy_metric")
+    def test_optimize_multi_metric(
+        self,
+        mock_create_combined,
+        mock_to_examples,
+        mock_to_signature,
+        mock_setup_llm,
+        fake_llm,
+    ):
+        """Test multi-metric optimization."""
+        from ragas.dataset_schema import MultiMetricAnnotation, SingleMetricAnnotation
+        from ragas.optimizers.dspy_optimizer import DSPyOptimizer
+
+        optimizer = DSPyOptimizer()
+
+        mock_metric = Mock()
+        mock_metric.name = "combined_metric"
+        mock_metric.get_prompts.return_value = {
+            "test_prompt": Mock(instruction="Test instruction")
+        }
+        optimizer.metric = mock_metric
+        optimizer.llm = fake_llm
+
+        mock_dspy = MagicMock()
+        mock_signature = Mock()
+        mock_to_signature.return_value = mock_signature
+
+        mock_module = Mock()
+        mock_dspy.Predict.return_value = mock_module
+
+        mock_examples = [Mock()]
+        mock_to_examples.return_value = mock_examples
+
+        mock_metric_fn = Mock()
+        mock_create_combined.return_value = mock_metric_fn
+
+        mock_teleprompter = Mock()
+        mock_optimized = Mock()
+        mock_optimized.signature.instructions = "Optimized multi-metric instruction"
+        mock_teleprompter.compile.return_value = mock_optimized
+        mock_dspy.MIPROv2.return_value = mock_teleprompter
+
+        optimizer._dspy = mock_dspy
+
+        dataset1 = SingleMetricAnnotation(name="faithfulness", samples=[])
+        dataset2 = SingleMetricAnnotation(name="answer_relevancy", samples=[])
+
+        multi_dataset = MultiMetricAnnotation(
+            metrics={"faithfulness": dataset1, "answer_relevancy": dataset2}
+        )
+
+        loss1 = MSELoss()
+        loss2 = MSELoss()
+        losses = {"faithfulness": loss1, "answer_relevancy": loss2}
+
+        result = optimizer.optimize(multi_dataset, losses, {})
+
+        assert "test_prompt" in result
+        assert result["test_prompt"] == "Optimized multi-metric instruction"
+
+        mock_to_examples.assert_called_once_with(multi_dataset, "test_prompt")
+        mock_create_combined.assert_called_once()
+
+    @pytest.mark.skipif(not DSPY_AVAILABLE, reason="dspy-ai not installed")
+    def test_cache_key_generation_multi_metric(self, fake_llm):
+        """Test cache key generation for multi-metric optimization."""
+        from ragas.dataset_schema import MultiMetricAnnotation, SingleMetricAnnotation
+        from ragas.optimizers.dspy_optimizer import DSPyOptimizer
+
+        optimizer = DSPyOptimizer()
+
+        mock_metric = Mock()
+        mock_metric.name = "combined_metric"
+        optimizer.metric = mock_metric
+
+        dataset1 = SingleMetricAnnotation(name="faithfulness", samples=[])
+        dataset2 = SingleMetricAnnotation(name="answer_relevancy", samples=[])
+
+        multi_dataset = MultiMetricAnnotation(
+            metrics={"faithfulness": dataset1, "answer_relevancy": dataset2}
+        )
+
+        loss1 = MSELoss()
+        loss2 = MSELoss()
+        losses = {"faithfulness": loss1, "answer_relevancy": loss2}
+
+        key1 = optimizer._generate_cache_key(multi_dataset, losses, {})
+        key2 = optimizer._generate_cache_key(multi_dataset, losses, {})
+
+        assert key1 == key2
+        assert isinstance(key1, str)
+        assert len(key1) == 64

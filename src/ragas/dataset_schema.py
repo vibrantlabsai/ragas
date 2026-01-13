@@ -835,3 +835,44 @@ class SingleMetricAnnotation(BaseModel):
                 for prompt_name, prompt_annotation in sample.prompts.items():
                     prompt_annotations[prompt_name].append(prompt_annotation)
         return prompt_annotations
+
+
+class MultiMetricAnnotation(BaseModel):
+    """
+    Container for multiple metric annotations.
+
+    Used for multi-metric optimization where prompts are optimized
+    considering multiple evaluation metrics simultaneously.
+
+    Attributes
+    ----------
+    metrics : Dict[str, SingleMetricAnnotation]
+        Mapping of metric names to their annotations.
+    weights : Dict[str, float]
+        Optional weights for each metric (defaults to equal weights).
+    """
+
+    metrics: t.Dict[str, SingleMetricAnnotation]
+    weights: t.Optional[t.Dict[str, float]] = None
+
+    def model_post_init(self, __context: t.Any) -> None:
+        if self.weights is None:
+            self.weights = {name: 1.0 / len(self.metrics) for name in self.metrics}
+
+        total_weight = sum(self.weights.values())
+        if abs(total_weight - 1.0) > 1e-6:
+            raise ValueError(f"Weights must sum to 1.0, got {total_weight}")
+
+        for name in self.weights:
+            if name not in self.metrics:
+                raise ValueError(f"Weight specified for unknown metric: {name}")
+
+    def __getitem__(self, key: str) -> SingleMetricAnnotation:
+        return self.metrics[key]
+
+    def __repr__(self):
+        metric_names = ", ".join(self.metrics.keys())
+        return f"MultiMetricAnnotation(metrics=[{metric_names}])"
+
+    def __len__(self):
+        return sum(len(m) for m in self.metrics.values())
