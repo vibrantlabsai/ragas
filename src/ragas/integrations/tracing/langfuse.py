@@ -132,7 +132,6 @@ async def sync_trace(
                 scores=[],
                 tags=[],
                 public=False,
-                environment=None,
             )
             return LangfuseTrace(trace=trace)
         except Exception as e:
