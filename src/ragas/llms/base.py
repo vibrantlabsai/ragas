@@ -484,18 +484,46 @@ def _patch_client_for_provider(client: t.Any, provider: str) -> t.Any:
 
     provider_enum = provider_map.get(provider, Provider.OPENAI)
 
+    # Detect the appropriate create method based on client API style
+    create_method = None
+    is_async = False
+
+    # Check for OpenAI-compatible API (chat.completions.create)
+    if (
+        hasattr(client, "chat")
+        and client.chat is not None
+        and hasattr(client.chat, "completions")
+        and hasattr(client.chat.completions, "create")
+    ):
+        create_method = client.chat.completions.create
+        is_async = "Async" in client.__class__.__name__
+    # Check for Anthropic-compatible API (messages.create)
+    elif (
+        hasattr(client, "messages")
+        and client.messages is not None
+        and hasattr(client.messages, "create")
+    ):
+        create_method = client.messages.create
+        is_async = "Async" in client.__class__.__name__
+    else:
+        raise ValueError(
+            f"Unable to detect API style for {provider} client. "
+            f"Client should have either 'chat.completions.create' (OpenAI-style) "
+            f"or 'messages.create' (Anthropic-style) method."
+        )
+
     # Use JSON mode to avoid issues with Dict types in function calling
-    if hasattr(client, "acompletion"):
+    if is_async:
         return instructor.AsyncInstructor(
             client=client,
-            create=client.messages.create,
+            create=create_method,
             provider=provider_enum,
             mode=instructor.Mode.JSON,
         )
     else:
         return instructor.Instructor(
             client=client,
-            create=client.messages.create,
+            create=create_method,
             provider=provider_enum,
             mode=instructor.Mode.JSON,
         )

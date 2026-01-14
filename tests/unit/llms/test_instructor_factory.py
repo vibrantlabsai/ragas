@@ -116,6 +116,7 @@ def test_llm_factory_with_model_args(mock_sync_client, monkeypatch):
 def test_unsupported_provider(monkeypatch):
     """Test that invalid clients are handled gracefully for unknown providers."""
     mock_client = Mock()
+    mock_client.chat = None
     mock_client.messages = None
 
     with pytest.raises(ValueError, match="Failed to initialize"):
