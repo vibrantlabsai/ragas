@@ -34,6 +34,9 @@ else:
                 totalCost: float = 0.0,
                 observations: t.Optional[t.List[t.Any]] = None,
                 scores: t.Optional[t.List[t.Any]] = None,
+                tags: t.Optional[t.List[str]] = None,
+                public: bool = False,
+                environment: t.Optional[str] = None,
             ):  # type: ignore
                 self.id = id
                 self.timestamp = timestamp or datetime.now()
@@ -42,6 +45,9 @@ else:
                 self.totalCost = totalCost
                 self.observations = observations or []
                 self.scores = scores or []
+                self.tags = tags or []
+                self.public = public
+                self.environment = environment
 
         class Langfuse:  # type: ignore
             def get_current_trace_id(self) -> t.Optional[str]:  # type: ignore
@@ -124,6 +130,9 @@ async def sync_trace(
                 totalCost=0.0,
                 observations=[],
                 scores=[],
+                tags=[],
+                public=False,
+                environment=None,
             )
             return LangfuseTrace(trace=trace)
         except Exception as e:
