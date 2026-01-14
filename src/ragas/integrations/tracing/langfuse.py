@@ -36,7 +36,7 @@ else:
                 scores: t.Optional[t.List[t.Any]] = None,
                 tags: t.Optional[t.List[str]] = None,
                 public: bool = False,
-                environment: t.Optional[str] = None,
+                environment: str = "",
             ):  # type: ignore
                 self.id = id
                 self.timestamp = timestamp or datetime.now()
@@ -132,6 +132,7 @@ async def sync_trace(
                 scores=[],
                 tags=[],
                 public=False,
+                environment="",
             )
             return LangfuseTrace(trace=trace)
         except Exception as e:
