@@ -233,3 +233,33 @@ def test_llm_factory_missing_model():
 
     with pytest.raises(ValueError, match="model parameter is required"):
         llm_factory("", provider="openai", client=mock_client)
+
+
+def test_openai_compatible_providers_with_openai_client(monkeypatch):
+    """
+    Test that OpenAI-compatible providers (DeepSeek, Groq, Mistral, etc.)
+    work correctly with OpenAI SDK clients.
+
+    This tests the fix for issue #2560 where provider="deepseek" with
+    AsyncOpenAI client was failing with "'AsyncOpenAI' object has no attribute 'messages'"
+    """
+
+    def mock_from_openai(client, mode=None):
+        return MockInstructor(client)
+
+    monkeypatch.setattr("instructor.from_openai", mock_from_openai)
+
+    # Test OpenAI-compatible providers that use chat.completions.create
+    openai_compatible_providers = ["deepseek", "groq", "mistral", "cohere", "xai"]
+
+    for provider in openai_compatible_providers:
+        # Create a mock client with OpenAI-style API (chat.completions.create)
+        mock_client = MockClient(is_async=True)
+        # Remove messages attribute to simulate OpenAI client
+        delattr(mock_client, "messages")
+
+        # This should work now - it detects chat.completions.create and uses from_openai
+        llm = llm_factory("test-model", provider=provider, client=mock_client)
+
+        assert llm.model == "test-model"
+        assert llm.is_async
