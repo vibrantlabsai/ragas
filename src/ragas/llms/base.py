@@ -460,7 +460,9 @@ class LlamaIndexLLMWrapper(BaseRagasLLM):
         return f"{self.__class__.__name__}(llm={self.llm.__class__.__name__}(...))"
 
 
-def _patch_client_for_provider(client: t.Any, provider: str) -> t.Any:
+def _patch_client_for_provider(
+    client: t.Any, provider: str, mode: t.Optional[instructor.Mode] = None
+) -> t.Any:
     """
     Patch a client with Instructor for generic providers.
 
@@ -472,6 +474,9 @@ def _patch_client_for_provider(client: t.Any, provider: str) -> t.Any:
     correctly when using OpenAI SDK clients.
     """
     from instructor import Provider
+
+    if mode is None:
+        mode = instructor.Mode.JSON
 
     provider_map = {
         "anthropic": Provider.ANTHROPIC,
@@ -488,19 +493,14 @@ def _patch_client_for_provider(client: t.Any, provider: str) -> t.Any:
 
     provider_enum = provider_map.get(provider, Provider.OPENAI)
 
-    # Check for OpenAI-compatible API (chat.completions.create)
     if (
         hasattr(client, "chat")
         and client.chat is not None
         and hasattr(client.chat, "completions")
         and hasattr(client.chat.completions, "create")
     ):
-        # For OpenAI-compatible APIs, use instructor.from_openai()
-        # This properly handles the OpenAI client structure and response parsing
-        # Use JSON mode to avoid issues with Dict types in function calling
-        return instructor.from_openai(client, mode=instructor.Mode.JSON)
+        return instructor.from_openai(client, mode=mode)
 
-    # Check for Anthropic-compatible API (messages.create)
     elif (
         hasattr(client, "messages")
         and client.messages is not None
@@ -509,20 +509,19 @@ def _patch_client_for_provider(client: t.Any, provider: str) -> t.Any:
         create_method = client.messages.create
         is_async = "Async" in client.__class__.__name__
 
-        # Use JSON mode to avoid issues with Dict types in function calling
         if is_async:
             return instructor.AsyncInstructor(
                 client=client,
                 create=create_method,
                 provider=provider_enum,
-                mode=instructor.Mode.JSON,
+                mode=mode,
             )
         else:
             return instructor.Instructor(
                 client=client,
                 create=create_method,
                 provider=provider_enum,
-                mode=instructor.Mode.JSON,
+                mode=mode,
             )
     else:
         raise ValueError(
@@ -564,13 +563,15 @@ def _is_new_google_genai_client(client: t.Any) -> bool:
     return False
 
 
-def _get_instructor_client(client: t.Any, provider: str) -> t.Any:
+def _get_instructor_client(
+    client: t.Any, provider: str, mode: t.Optional[instructor.Mode] = None
+) -> t.Any:
     """
     Get an instructor-patched client for the specified provider.
 
     Uses provider-specific methods when available, falls back to generic patcher.
 
-    Note: For OpenAI, we use Mode.JSON instead of the default Mode.TOOLS because
+    Note: For OpenAI, we use Mode.JSON by default instead of Mode.TOOLS because
     OpenAI's function calling (TOOLS mode) has issues with Dict type annotations
     in Pydantic models - it returns empty objects `{}` instead of proper structured
     data. Mode.JSON works correctly with all Pydantic types including Dict.
@@ -580,31 +581,26 @@ def _get_instructor_client(client: t.Any, provider: str) -> t.Any:
     - New SDK (google-genai): Uses instructor.from_genai()
     - Old SDK (google-generativeai): Uses instructor.from_gemini()
     """
+    if mode is None:
+        mode = instructor.Mode.JSON
+
     provider_lower = provider.lower()
 
     if provider_lower == "openai":
-        # Use JSON mode to avoid issues with Dict types in function calling
-        return instructor.from_openai(client, mode=instructor.Mode.JSON)
+        return instructor.from_openai(client, mode=mode)
     elif provider_lower == "anthropic":
         return instructor.from_anthropic(client)
     elif provider_lower in ("google", "gemini"):
-        # Detect which Google SDK is being used
         if _is_new_google_genai_client(client):
-            # New google-genai SDK - uses instructor.from_genai()
-            # WARNING: Known upstream issue with instructor sending invalid safety
-            # settings (HARM_CATEGORY_JAILBREAK). Track: github.com/567-labs/instructor/issues/1658
-            # Workaround: Use OpenAI-compatible endpoint with Gemini base URL instead.
             return instructor.from_genai(client)
         else:
-            # Old google-generativeai SDK (deprecated, support ends Aug 2025)
             return instructor.from_gemini(client)
     elif provider_lower == "litellm":
-        # Use JSON mode to avoid issues with Dict types in function calling
-        return instructor.from_litellm(client, mode=instructor.Mode.JSON)
+        return instructor.from_litellm(client, mode=mode)
     elif provider_lower == "perplexity":
         return instructor.from_perplexity(client)
     else:
-        return _patch_client_for_provider(client, provider_lower)
+        return _patch_client_for_provider(client, provider_lower, mode=mode)
 
 
 def llm_factory(
@@ -613,6 +609,7 @@ def llm_factory(
     client: t.Optional[t.Any] = None,
     adapter: str = "auto",
     cache: t.Optional[CacheInterface] = None,
+    mode: t.Optional[instructor.Mode] = None,
     **kwargs: t.Any,
 ) -> InstructorBaseRagasLLM:
     """
@@ -640,6 +637,10 @@ def llm_factory(
         cache: Optional cache backend for caching LLM responses.
                Pass DiskCacheBackend() for persistent caching across runs.
                Saves costs and speeds up repeated evaluations by 60x.
+        mode: Instructor mode for structured outputs (default: Mode.JSON).
+              Only applies when using instructor adapter.
+              Options: Mode.JSON, Mode.MD_JSON, Mode.TOOLS, Mode.JSON_SCHEMA, etc.
+              Use Mode.MD_JSON for backends that don't support response_format parameter.
         **kwargs: Additional model arguments (temperature, max_tokens, top_p, etc).
 
     Returns:
@@ -675,6 +676,11 @@ def llm_factory(
         # Explicit adapter selection
         llm = llm_factory("gemini-2.0-flash", client=client, adapter="litellm")
 
+        # Custom instructor mode for backends without response_format support
+        import instructor
+        client = OpenAI(api_key="...", base_url="https://custom-backend")
+        llm = llm_factory("custom-model", client=client, mode=instructor.Mode.MD_JSON)
+
         # Async
         from openai import AsyncOpenAI
         client = AsyncOpenAI(api_key="...")
@@ -709,7 +715,7 @@ def llm_factory(
     try:
         adapter_instance = get_adapter(adapter)
         llm = adapter_instance.create_llm(
-            client, model, provider_lower, cache=cache, **kwargs
+            client, model, provider_lower, cache=cache, mode=mode, **kwargs
         )
     except ValueError as e:
         # Re-raise ValueError from get_adapter for unknown adapter names

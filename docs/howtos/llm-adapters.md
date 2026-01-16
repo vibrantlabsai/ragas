@@ -261,6 +261,36 @@ System prompts are useful when:
 
 The system prompt is prepended to all LLM calls as a system message.
 
+### Custom Instructor Modes
+
+The instructor adapter supports multiple modes for structured output generation. By default, `Mode.JSON` is used, but you can specify a different mode for backends that don't support certain features:
+
+```python
+import instructor
+from ragas.llms import llm_factory
+from openai import OpenAI
+
+# Use MD_JSON mode for backends without response_format support
+client = OpenAI(api_key="...", base_url="https://custom-backend")
+llm = llm_factory(
+    "custom-model",
+    provider="openai",
+    client=client,
+    mode=instructor.Mode.MD_JSON
+)
+```
+
+Available instructor modes:
+- `Mode.JSON` (default) - Uses OpenAI's response_format parameter
+- `Mode.MD_JSON` - Uses markdown JSON in the prompt (fallback for unsupported backends)
+- `Mode.TOOLS` - Uses function calling
+- `Mode.JSON_SCHEMA` - Uses JSON schema validation
+
+Use `Mode.MD_JSON` when you encounter errors like:
+```
+Error code: 400 - {'message': 'only pytorch backend can use response_format now'}
+```
+
 ### Async Support
 
 Both adapters support async operations:

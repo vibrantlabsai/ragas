@@ -263,3 +263,73 @@ def test_openai_compatible_providers_with_openai_client(monkeypatch):
 
         assert llm.model == "test-model"
         assert llm.is_async
+
+
+def test_llm_factory_with_custom_mode(mock_sync_client, monkeypatch):
+    """Test that llm_factory accepts and uses custom instructor mode."""
+    import instructor
+
+    captured_mode = None
+
+    def mock_from_openai(client, mode=None):
+        nonlocal captured_mode
+        captured_mode = mode
+        return MockInstructor(client)
+
+    monkeypatch.setattr("instructor.from_openai", mock_from_openai)
+
+    llm = llm_factory(
+        "gpt-4",
+        provider="openai",
+        client=mock_sync_client,
+        mode=instructor.Mode.MD_JSON,
+    )
+
+    assert llm.model == "gpt-4"
+    assert captured_mode == instructor.Mode.MD_JSON
+
+
+def test_llm_factory_default_mode_is_json(mock_sync_client, monkeypatch):
+    """Test that llm_factory defaults to Mode.JSON when no mode is specified."""
+    import instructor
+
+    captured_mode = None
+
+    def mock_from_openai(client, mode=None):
+        nonlocal captured_mode
+        captured_mode = mode
+        return MockInstructor(client)
+
+    monkeypatch.setattr("instructor.from_openai", mock_from_openai)
+
+    llm = llm_factory("gpt-4", provider="openai", client=mock_sync_client)
+
+    assert llm.model == "gpt-4"
+    assert captured_mode == instructor.Mode.JSON
+
+
+def test_llm_factory_mode_with_generic_provider(monkeypatch):
+    """Test that mode parameter works with generic providers via _patch_client_for_provider."""
+    import instructor
+
+    captured_mode = None
+
+    def mock_from_openai(client, mode=None):
+        nonlocal captured_mode
+        captured_mode = mode
+        return MockInstructor(client)
+
+    monkeypatch.setattr("instructor.from_openai", mock_from_openai)
+
+    mock_client = MockClient(is_async=False)
+    delattr(mock_client, "messages")
+
+    llm = llm_factory(
+        "custom-model",
+        provider="custom-provider",
+        client=mock_client,
+        mode=instructor.Mode.TOOLS,
+    )
+
+    assert llm.model == "custom-model"
+    assert captured_mode == instructor.Mode.TOOLS
