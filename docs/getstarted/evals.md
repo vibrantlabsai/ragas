@@ -194,7 +194,7 @@ Answer with only 'accurate' or 'inaccurate'."""
 # Score your application's output
 async def main():
     score = await metric.ascore(
-        llm=llm,
+        llm=evaluator_llm,
         response="The summary of the text is..."
     )
     print(f"Score: {score.value}")  # 'accurate' or 'inaccurate'
