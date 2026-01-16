@@ -116,15 +116,15 @@ class ContextPrecisionWithReference(BaseMetric):
         return MetricResult(value=float(score))
 
     def _calculate_average_precision(self, verdicts: List[int]) -> float:
-        """Calculate average precision from binary verdicts. Matches legacy logic exactly."""
-        verdict_list = verdicts
-        denominator = sum(verdict_list) + 1e-10
-        numerator = sum(
-            [
-                (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
-                for i in range(len(verdict_list))
-            ]
-        )
+        """Calculate average precision from binary verdicts."""
+        cumsum = 0
+        numerator = 0.0
+        for i, v in enumerate(verdicts):
+            cumsum += v
+            if v:
+                numerator += cumsum / (i + 1)
+
+        denominator = cumsum + 1e-10
         score = numerator / denominator
 
         if np.isnan(score):
@@ -236,15 +236,15 @@ class ContextPrecisionWithoutReference(BaseMetric):
         return MetricResult(value=float(score))
 
     def _calculate_average_precision(self, verdicts: List[int]) -> float:
-        """Calculate average precision from binary verdicts. Matches legacy logic exactly."""
-        verdict_list = verdicts
-        denominator = sum(verdict_list) + 1e-10
-        numerator = sum(
-            [
-                (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
-                for i in range(len(verdict_list))
-            ]
-        )
+        """Calculate average precision from binary verdicts."""
+        cumsum = 0
+        numerator = 0.0
+        for i, v in enumerate(verdicts):
+            cumsum += v
+            if v:
+                numerator += cumsum / (i + 1)
+
+        denominator = cumsum + 1e-10
         score = numerator / denominator
 
         if np.isnan(score):

@@ -115,14 +115,15 @@ class LLMContextPrecisionWithReference(MetricWithLLM, SingleTurnMetric):
     ) -> float:
         score = np.nan
 
-        verdict_list = [1 if ver.verdict else 0 for ver in verifications]
-        denominator = sum(verdict_list) + 1e-10
-        numerator = sum(
-            [
-                (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
-                for i in range(len(verdict_list))
-            ]
-        )
+        cumsum = 0
+        numerator = 0.0
+        for i, ver in enumerate(verifications):
+            v = 1 if ver.verdict else 0
+            cumsum += v
+            if v:
+                numerator += cumsum / (i + 1)
+
+        denominator = cumsum + 1e-10
         score = numerator / denominator
         if np.isnan(score):
             logger.warning(
@@ -234,15 +235,14 @@ class NonLLMContextPrecisionWithReference(SingleTurnMetric):
         return self._calculate_average_precision(scores)
 
     def _calculate_average_precision(self, verdict_list: t.List[int]) -> float:
-        score = np.nan
+        cumsum = 0
+        numerator = 0.0
+        for i, v in enumerate(verdict_list):
+            cumsum += v
+            if v:
+                numerator += cumsum / (i + 1)
 
-        denominator = sum(verdict_list) + 1e-10
-        numerator = sum(
-            [
-                (sum(verdict_list[: i + 1]) / (i + 1)) * verdict_list[i]
-                for i in range(len(verdict_list))
-            ]
-        )
+        denominator = cumsum + 1e-10
         score = numerator / denominator
         return score
 
