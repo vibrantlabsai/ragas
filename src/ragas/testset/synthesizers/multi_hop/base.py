@@ -174,6 +174,9 @@ class MultiHopQuerySynthesizer(BaseSynthesizer[Scenario]):
             user_input=response.query,
             reference=response.answer,
             reference_contexts=reference_context,
+            persona_name=getattr(scenario.persona, "name", None),
+            query_style=getattr(scenario.style, "name", None),
+            query_length=getattr(scenario.length, "name", None),
         )
 
     def make_contexts(self, scenario: MultiHopScenario) -> t.List[str]:
