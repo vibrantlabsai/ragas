@@ -68,11 +68,22 @@ def apply_transforms(
     if isinstance(transforms, t.Sequence):
         for transform in transforms:
             apply_transforms(kg, transform, run_config, callbacks)
-    elif isinstance(transforms, Parallel):
-        apply_transforms(kg, transforms.transformations, run_config, callbacks)
-    elif isinstance(transforms, BaseGraphTransformation):
+    elif isinstance(
+        transforms,
+        (
+            BaseGraphTransformation,
+            Parallel,
+        ),
+    ):
+        if isinstance(transforms, Parallel):
+            transformation_names = [
+                t.__class__.__name__ for t in transforms.transformations
+            ]
+        else:
+            transformation_names = [transforms.__class__.__name__]
+
         logger.debug(
-            f"Generating execution plan for transformation {transforms.__class__.__name__}"
+            f"Generating execution plan for transformations {transformation_names}"
         )
         coros = transforms.generate_execution_plan(kg)
         desc = get_desc(transforms)
