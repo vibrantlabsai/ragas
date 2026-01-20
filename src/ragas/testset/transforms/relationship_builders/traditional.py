@@ -172,6 +172,7 @@ class OverlapScoreBuilder(RelationshipBuilder):
                                 f"{self.property_name}_{self.new_property_name}": similarity,
                                 "overlapped_items": overlapped_items,
                             },
+                            bidirectional=True,
                         )
                     )
 
