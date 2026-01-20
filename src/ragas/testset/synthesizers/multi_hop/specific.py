@@ -79,7 +79,6 @@ class MultiHopSpecificQuerySynthesizer(MultiHopQuerySynthesizer):
         for triplet in triplets:
             if len(scenarios) < n:
                 node_a, node_b = triplet[0], triplet[-1]
-                overlapped_items = []
                 overlapped_items = triplet[1].properties[self.relation_overlap_property]
                 if overlapped_items:
                     if not all(
@@ -98,7 +97,9 @@ class MultiHopSpecificQuerySynthesizer(MultiHopQuerySynthesizer):
                         )
                     )
 
-                    combinations = [[theme] for theme in themes]
+                    combinations = self._extract_theme_groups_from_overlaps(
+                        overlapped_items
+                    )
 
                     base_scenarios = self.prepare_combinations(
                         [node_a, node_b],
@@ -141,3 +142,32 @@ class MultiHopSpecificQuerySynthesizer(MultiHopQuerySynthesizer):
                 unique_entities.add(item)
 
         return list(unique_entities)
+
+    def _extract_theme_groups_from_overlaps(
+        self, overlapped_items: t.Any
+    ) -> t.List[t.List[str]]:
+        """
+        Extract unique groups of entity names from overlapped items.
+
+        Handles multiple formats:
+        - List[Tuple[str, str]]: Entity pairs from overlap detection
+        - List[List[str]]: Entity pairs as lists
+        - List[str]: Direct entity names
+        - Dict[str, Any]: Keys as entity names
+        """
+        if isinstance(overlapped_items, dict):
+            return [[key] for key in overlapped_items]
+
+        if not isinstance(overlapped_items, list):
+            return []
+
+        unique_groups = set()
+        for item in overlapped_items:
+            if isinstance(item, tuple):
+                unique_groups.add(item)
+            elif isinstance(item, list):
+                unique_groups.add(tuple(item))
+            elif isinstance(item, str):
+                unique_groups.add((item,))
+
+        return [list(group) for group in unique_groups]
