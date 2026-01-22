@@ -364,7 +364,6 @@ def evaluate(
     _run_id: t.Optional[UUID] = None,
     _pbar: t.Optional[tqdm] = None,
     return_executor: bool = False,
-    allow_nest_asyncio: bool = True,
 ) -> t.Union[EvaluationResult, Executor]:
     """
     Perform the evaluation on the dataset with different metrics
@@ -409,9 +408,6 @@ def evaluate(
         If True, returns the Executor instance instead of running evaluation.
         The returned executor can be used to cancel execution by calling executor.cancel().
         To get results, call executor.results(). Default is False.
-    allow_nest_asyncio : bool, optional
-        Whether to allow nest_asyncio patching for Jupyter compatibility.
-        Set to False in production async applications to avoid event loop conflicts. Default is True.
 
     Returns
     -------
@@ -472,13 +468,7 @@ def evaluate(
             return_executor=return_executor,
         )
 
-    if not allow_nest_asyncio:
-        # Run without nest_asyncio - creates a new event loop
-        import asyncio
+    # Use the run utility which handles both Jupyter and standard environments
+    from ragas.async_utils import run
 
-        return asyncio.run(_async_wrapper())
-    else:
-        # Default behavior: use nest_asyncio for backward compatibility (Jupyter notebooks)
-        from ragas.async_utils import run
-
-        return run(_async_wrapper())
+    return run(_async_wrapper())

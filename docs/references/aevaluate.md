@@ -24,33 +24,27 @@ async def evaluate_app():
 result = await evaluate_app()
 ```
 
-### Using evaluate() with Async Control
+### Using evaluate() in Different Environments
 
-For backward compatibility and Jupyter notebook usage, `evaluate()` provides optional control over `nest_asyncio`:
+The `evaluate()` function automatically handles both Jupyter notebooks and standard Python environments:
 
 ```python
-# Default behavior (Jupyter-compatible)
-result = evaluate(dataset, metrics)  # allow_nest_asyncio=True
-
-# Production-safe (avoids event loop patching)
-result = evaluate(dataset, metrics, allow_nest_asyncio=False)
-```
-
-### Migration from nest_asyncio Issues
-
-If you're experiencing issues with `nest_asyncio` in production:
-
-**Before (problematic):**
-```python
-# This may cause event loop conflicts
+# Works in both Jupyter and standard Python
 result = evaluate(dataset, metrics)
 ```
 
-**After (fixed):**
-```python
-# Option 1: Use async API
-result = await aevaluate(dataset, metrics)
+**How it works:**
+- **In Jupyter notebooks:** Automatically schedules evaluation on the existing event loop
+- **In standard Python:** Creates a new event loop with `asyncio.run()`
 
-# Option 2: Disable nest_asyncio
-result = evaluate(dataset, metrics, allow_nest_asyncio=False)
+### When to Use aevaluate()
+
+Use `aevaluate()` when you're already in an async context and want to avoid synchronous wrappers:
+
+```python
+async def evaluate_multiple_datasets():
+    # More efficient in async code
+    results1 = await aevaluate(dataset1, metrics)
+    results2 = await aevaluate(dataset2, metrics)
+    return results1, results2
 ```

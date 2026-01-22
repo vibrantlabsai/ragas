@@ -1,4 +1,4 @@
-"""Test uvloop compatibility with nest_asyncio."""
+"""Test uvloop compatibility and async execution."""
 
 import asyncio
 import sys
@@ -10,20 +10,20 @@ class TestUvloopCompatibility:
     """Test that ragas works with uvloop event loops."""
 
     @pytest.mark.skipif(sys.version_info < (3, 8), reason="uvloop requires Python 3.8+")
-    def test_apply_nest_asyncio_with_uvloop_returns_false(self):
-        """Test that apply_nest_asyncio returns False with uvloop."""
+    def test_is_event_loop_running_with_uvloop(self):
+        """Test that is_event_loop_running works with uvloop."""
         uvloop = pytest.importorskip("uvloop")
 
-        from ragas.async_utils import apply_nest_asyncio
+        from ragas.async_utils import is_event_loop_running
 
         async def test_func():
-            result = apply_nest_asyncio()
+            result = is_event_loop_running()
             return result
 
         uvloop.install()
         try:
             result = asyncio.run(test_func())
-            assert result is False
+            assert result is True
         finally:
             asyncio.set_event_loop_policy(None)
 
@@ -66,27 +66,19 @@ class TestUvloopCompatibility:
         finally:
             asyncio.set_event_loop_policy(None)
 
-    def test_apply_nest_asyncio_without_uvloop_returns_true(self):
-        """Test that apply_nest_asyncio returns True with standard asyncio."""
-        from ragas.async_utils import apply_nest_asyncio
+    def test_is_jupyter_environment_returns_false(self):
+        """Test that is_jupyter_environment returns False in non-Jupyter environments."""
+        from ragas.async_utils import is_jupyter_environment
 
-        async def test_func():
-            result = apply_nest_asyncio()
-            return result
+        result = is_jupyter_environment()
+        assert result is False
 
-        result = asyncio.run(test_func())
-        assert result is True
-
-    def test_run_with_standard_asyncio_and_running_loop(self):
-        """Test that run() works with standard asyncio in a running loop."""
+    def test_run_without_running_loop(self):
+        """Test that run() works when no event loop is running."""
         from ragas.async_utils import run
 
-        async def inner_task():
-            return "nested_success"
+        async def task():
+            return "success"
 
-        async def outer_task():
-            result = run(inner_task)
-            return result
-
-        result = asyncio.run(outer_task())
-        assert result == "nested_success"
+        result = run(task)
+        assert result == "success"
