@@ -19,42 +19,6 @@ def is_event_loop_running() -> bool:
         return loop.is_running()
 
 
-def apply_nest_asyncio() -> bool:
-    """
-    Apply nest_asyncio if an event loop is running and compatible.
-
-    Returns:
-        bool: True if nest_asyncio was applied, False if skipped
-    """
-    if not is_event_loop_running():
-        return False
-
-    try:
-        import nest_asyncio
-    except ImportError:
-        raise ImportError(
-            "It seems like your running this in a jupyter-like environment. Please install nest_asyncio with `pip install nest_asyncio` to make it work."
-        )
-
-    try:
-        loop = asyncio.get_running_loop()
-        loop_type = type(loop).__name__
-
-        if "uvloop" in loop_type.lower() or "uvloop" in str(type(loop)):
-            logger.debug(
-                f"Skipping nest_asyncio.apply() for incompatible loop type: {loop_type}"
-            )
-            return False
-
-        nest_asyncio.apply()
-        return True
-    except ValueError as e:
-        if "Can't patch loop of type" in str(e):
-            logger.debug(f"Skipping nest_asyncio.apply(): {e}")
-            return False
-        raise
-
-
 def as_completed(
     coroutines: t.Sequence[t.Coroutine],
     max_workers: int = -1,
@@ -118,13 +82,11 @@ async def process_futures(
             result = e
         yield result
 
-
 def run(
     async_func: t.Union[
         t.Callable[[], t.Coroutine[t.Any, t.Any, t.Any]],
         t.Coroutine[t.Any, t.Any, t.Any],
     ],
-    allow_nest_asyncio: bool = True,
 ) -> t.Any:
     """
     Run an async function in the current event loop or a new one if not running.
@@ -133,26 +95,18 @@ def run(
     ----------
     async_func : Callable or Coroutine
         The async function or coroutine to run
-    allow_nest_asyncio : bool, optional
-        Whether to apply nest_asyncio for Jupyter compatibility. Default is True.
-        Set to False in production environments to avoid event loop patching.
     """
-    nest_asyncio_applied = False
-    if allow_nest_asyncio:
-        nest_asyncio_applied = apply_nest_asyncio()
-
-    coro = async_func() if callable(async_func) else async_func
-
-    if is_event_loop_running() and not nest_asyncio_applied:
+    if is_event_loop_running():
         loop = asyncio.get_running_loop()
         loop_type = type(loop).__name__
         raise RuntimeError(
-            f"Cannot execute nested async code with {loop_type}. "
-            f"uvloop does not support nested event loop execution. "
-            f"Please use asyncio's standard event loop in Jupyter environments, "
-            f"or refactor your code to avoid nested async calls."
+            f"Event loop is already running (type: {loop_type}). "
+            "Simultaneous use of synchronous runner with an active event loop is not permitted. "
+            "Please explicitly use `await` with the async version of this function "
+            "or refactor your code to avoid nested event loop execution."
         )
 
+    coro = async_func() if callable(async_func) else async_func
     return asyncio.run(coro)
 
 
