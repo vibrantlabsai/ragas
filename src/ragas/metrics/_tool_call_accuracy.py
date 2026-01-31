@@ -102,10 +102,51 @@ class ToolCallAccuracy(MultiTurnMetric):
         self, pred_sequence: t.List[str], ref_sequence: t.List[str]
     ) -> bool:
         if self.strict_order:
-            return pred_sequence == ref_sequence
+            if len(pred_sequence) == len(ref_sequence):
+                return pred_sequence == ref_sequence
+            # When lengths differ, check if reference is a subsequence of
+            # predicted (handles extra/retried tool calls gracefully).
+            return self._is_subsequence(ref_sequence, pred_sequence)
         else:
-            # For non-strict mode, sort both sequences before comparison
-            return sorted(pred_sequence) == sorted(ref_sequence)
+            # For non-strict mode, check that every reference tool name
+            # has a matching predicted tool name (multiset containment).
+            from collections import Counter
+
+            pred_counts = Counter(pred_sequence)
+            ref_counts = Counter(ref_sequence)
+            return all(
+                pred_counts[name] >= count for name, count in ref_counts.items()
+            )
+
+    @staticmethod
+    def _is_subsequence(subseq: t.List[str], seq: t.List[str]) -> bool:
+        """Check if subseq appears in order within seq (not necessarily contiguous)."""
+        it = iter(seq)
+        return all(item in it for item in subseq)
+
+    async def _find_best_match_score(
+        self,
+        ref_tool_call: ToolCall,
+        candidates: t.List[ToolCall],
+        callbacks: Callbacks,
+    ) -> t.Tuple[float, int]:
+        """Find the best matching predicted tool call for a reference tool call.
+
+        Returns:
+            Tuple of (best_score, best_index) where best_index is the index
+            in candidates. Returns (0.0, -1) if no match found.
+        """
+        best_score = 0.0
+        best_idx = -1
+        for idx, pred_tool_call in enumerate(candidates):
+            if pred_tool_call.name == ref_tool_call.name:
+                arg_score = await self._get_arg_score(
+                    pred_tool_call.args, ref_tool_call.args, callbacks
+                )
+                if arg_score > best_score:
+                    best_score = arg_score
+                    best_idx = idx
+        return best_score, best_idx
 
     async def _multi_turn_ascore(
         self, sample: MultiTurnSample, callbacks: Callbacks
@@ -147,8 +188,6 @@ class ToolCallAccuracy(MultiTurnMetric):
             warnings.warn(
                 f"Length mismatch: predicted tool calls ({len(pred_tool_calls)}) "
                 f"vs reference tool calls ({len(reference_tool_calls)}). "
-                f"Only the first {min(len(pred_tool_calls), len(reference_tool_calls))} "
-                f"tool calls will be compared."
             )
 
         tool_call_pred_sequence = [tool_call.name for tool_call in pred_tool_calls]
@@ -158,24 +197,29 @@ class ToolCallAccuracy(MultiTurnMetric):
             self.is_sequence_aligned(tool_call_pred_sequence, tool_call_ref_sequence)
         )
 
-        # Calculate score based on paired tool calls (without nested loop)
+        # Use best-match scoring: for each reference tool call, find the
+        # predicted tool call with the highest argument score. Each predicted
+        # call can only be matched once to avoid double-counting.
         score = 0.0
-        compared_count = min(len(pred_tool_calls), len(reference_tool_calls))
+        remaining_preds = list(pred_tool_calls)
 
-        for ref_tool_call, pred_tool_call in zip(reference_tool_calls, pred_tool_calls):
-            if ref_tool_call.name == pred_tool_call.name:
-                arg_score = await self._get_arg_score(
-                    pred_tool_call.args, ref_tool_call.args, callbacks
-                )
-                score += arg_score
+        for ref_tool_call in reference_tool_calls:
+            best_score, best_idx = await self._find_best_match_score(
+                ref_tool_call, remaining_preds, callbacks
+            )
+            score += best_score
+            if best_idx >= 0:
+                remaining_preds.pop(best_idx)
 
         score /= len(reference_tool_calls)
 
-        if compared_count < len(reference_tool_calls):
-            coverage_penalty = compared_count / len(reference_tool_calls)
+        # Apply coverage penalty when fewer predicted calls than reference
+        if len(pred_tool_calls) < len(reference_tool_calls):
+            coverage_penalty = len(pred_tool_calls) / len(reference_tool_calls)
             score *= coverage_penalty
 
-        return score * sequence_aligned
+        # Clamp to valid range as a safety net
+        return min(1.0, max(0.0, score * sequence_aligned))
 
     async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> float:
         return await self._multi_turn_ascore(MultiTurnSample(**row), callbacks)

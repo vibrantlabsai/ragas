@@ -80,11 +80,33 @@ class ToolCallAccuracy(BaseMetric):
     def _is_sequence_aligned(
         self, pred_sequence: List[str], ref_sequence: List[str]
     ) -> bool:
-        """Check if tool call sequences are aligned."""
+        """Check if tool call sequences are aligned.
+
+        In strict mode, checks if reference is an exact match or a subsequence
+        of predicted (to handle extra/retried tool calls).
+        In flexible mode, checks multiset containment (all reference names
+        appear in predicted with sufficient count).
+        """
         if self.strict_order:
-            return pred_sequence == ref_sequence
+            if len(pred_sequence) == len(ref_sequence):
+                return pred_sequence == ref_sequence
+            # When lengths differ, check if reference is a subsequence of
+            # predicted (handles extra/retried tool calls gracefully).
+            return self._is_subsequence(ref_sequence, pred_sequence)
         else:
-            return sorted(pred_sequence) == sorted(ref_sequence)
+            from collections import Counter
+
+            pred_counts = Counter(pred_sequence)
+            ref_counts = Counter(ref_sequence)
+            return all(
+                pred_counts[name] >= count for name, count in ref_counts.items()
+            )
+
+    @staticmethod
+    def _is_subsequence(subseq: List[str], seq: List[str]) -> bool:
+        """Check if subseq appears in order within seq."""
+        it = iter(seq)
+        return all(item in it for item in subseq)
 
     async def ascore(
         self,
@@ -135,8 +157,6 @@ class ToolCallAccuracy(BaseMetric):
             warnings.warn(
                 f"Length mismatch: predicted tool calls ({len(pred_tool_calls)}) "
                 f"vs reference tool calls ({len(reference_tool_calls)}). "
-                f"Only the first {min(len(pred_tool_calls), len(reference_tool_calls))} "
-                f"tool calls will be compared."
             )
 
         # Extract sequences and check alignment
@@ -147,24 +167,36 @@ class ToolCallAccuracy(BaseMetric):
             self._is_sequence_aligned(tool_call_pred_sequence, tool_call_ref_sequence)
         )
 
-        # Calculate argument accuracy for matching tool calls
+        # Use best-match scoring: for each reference tool call, find the
+        # predicted tool call with the highest argument score. Each predicted
+        # call can only be matched once to avoid double-counting.
         score = 0.0
-        compared_count = min(len(pred_tool_calls), len(reference_tool_calls))
+        remaining_preds = list(pred_tool_calls)
 
-        for ref_tool_call, pred_tool_call in zip(reference_tool_calls, pred_tool_calls):
-            if ref_tool_call.name == pred_tool_call.name:
-                arg_score = exact_match_args(pred_tool_call.args, ref_tool_call.args)
-                score += arg_score
+        for ref_tool_call in reference_tool_calls:
+            best_score = 0.0
+            best_idx = -1
+            for idx, pred_tool_call in enumerate(remaining_preds):
+                if pred_tool_call.name == ref_tool_call.name:
+                    arg_score = exact_match_args(
+                        pred_tool_call.args, ref_tool_call.args
+                    )
+                    if arg_score > best_score:
+                        best_score = arg_score
+                        best_idx = idx
+            score += best_score
+            if best_idx >= 0:
+                remaining_preds.pop(best_idx)
 
         # Normalize by reference length
         score /= len(reference_tool_calls)
 
-        # Apply coverage penalty for length mismatch
-        if compared_count < len(reference_tool_calls):
-            coverage_penalty = compared_count / len(reference_tool_calls)
+        # Apply coverage penalty when fewer predicted calls than reference
+        if len(pred_tool_calls) < len(reference_tool_calls):
+            coverage_penalty = len(pred_tool_calls) / len(reference_tool_calls)
             score *= coverage_penalty
 
-        # Apply sequence alignment factor
-        final_score = score * sequence_aligned
+        # Apply sequence alignment factor and clamp to valid range
+        final_score = min(1.0, max(0.0, score * sequence_aligned))
 
         return MetricResult(value=float(final_score))
