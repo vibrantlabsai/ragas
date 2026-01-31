@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import typing as t
 import warnings
 from uuid import UUID
@@ -28,7 +29,7 @@ from ragas.embeddings.base import (
 from ragas.exceptions import ExceptionInRunner
 from ragas.executor import Executor
 from ragas.integrations.helicone import helicone_config
-from ragas.llms import llm_factory
+from ragas.llms import GroqLLMWrapper, llm_factory
 from ragas.llms.base import BaseRagasLLM, InstructorBaseRagasLLM, LangchainLLMWrapper
 from ragas.metrics._answer_correctness import AnswerCorrectness
 from ragas.metrics._aspect_critic import AspectCritic
@@ -48,12 +49,85 @@ from ragas.validation import (
     validate_supported_metrics,
 )
 
+logger = logging.getLogger(__name__)
+
 if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
 
     from ragas.cost import CostCallbackHandler, TokenUsageParser
 
 RAGAS_EVALUATION_CHAIN_NAME = "ragas evaluation"
+
+
+def _wrap_if_groq(
+    llm: t.Any, run_config: RunConfig, model: str = "llama3-70b-8192"
+) -> t.Any:
+    """
+    Wrap a Groq client in GroqLLMWrapper if detected.
+
+    This helper automatically wraps raw Groq clients for seamless evaluation.
+    If the LLM is already a BaseRagasLLM or not a Groq client, it returns unchanged.
+
+    Parameters
+    ----------
+    llm : Any
+        The LLM object to potentially wrap
+    run_config : RunConfig
+        Configuration for the wrapper
+    model : str
+        The model name to use if wrapping (default: llama3-70b-8192)
+
+    Returns
+    -------
+    Any
+        Original LLM if not Groq, or GroqLLMWrapper if Groq client detected
+    """
+    # If already a BaseRagasLLM, leave unchanged
+    if isinstance(llm, (BaseRagasLLM, InstructorBaseRagasLLM)):
+        return llm
+
+    # Check if it looks like a Groq client
+    # Groq clients have chat.completions.create method
+    is_groq = False
+    confidence = "low"
+
+    # Primary detection: Check for Groq API structure
+    if (
+        hasattr(llm, "chat")
+        and hasattr(llm.chat, "completions")
+        and hasattr(llm.chat.completions, "create")
+    ):
+        # Check type name to confirm it's actually Groq
+        type_name = type(llm).__name__
+        module_name = getattr(type(llm), "__module__", "")
+
+        if "groq" in type_name.lower() or "groq" in module_name.lower():
+            is_groq = True
+            confidence = "high"
+        elif type_name in ("Groq", "AsyncGroq"):
+            is_groq = True
+            confidence = "high"
+        else:
+            # Has the right structure but not confirmed as Groq
+            # Could be OpenAI or another OpenAI-compatible client
+            # Don't auto-wrap to avoid conflicts
+            logger.debug(
+                f"LLM has OpenAI-compatible API structure but type is {type_name}. "
+                "Not auto-wrapping as Groq. Use GroqLLMWrapper explicitly if needed."
+            )
+            confidence = "low"
+
+    if is_groq and confidence == "high":
+        logger.info(
+            f"Detected Groq client ({type(llm).__name__}). "
+            f"Auto-wrapping with GroqLLMWrapper for model '{model}'."
+        )
+        return GroqLLMWrapper(
+            groq_client=llm, model=model, run_config=run_config, rpm_limit=30
+        )
+
+    # Not a Groq client or ambiguous - return unchanged
+    return llm
 
 
 async def aevaluate(
@@ -157,6 +231,10 @@ async def aevaluate(
     # set the llm and embeddings
     if isinstance(llm, LangchainLLM):
         llm = LangchainLLMWrapper(llm, run_config=run_config)
+    else:
+        # Try to wrap Groq clients automatically
+        llm = _wrap_if_groq(llm, run_config) if llm is not None else llm
+
     if isinstance(embeddings, LangchainEmbeddings):
         embeddings = LangchainEmbeddingsWrapper(embeddings)
 

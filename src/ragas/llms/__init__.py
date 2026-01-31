@@ -7,10 +7,21 @@ from ragas.llms.base import (
     LlamaIndexLLMWrapper as _LlamaIndexLLMWrapper,
     llm_factory,
 )
+from ragas.llms.groq_wrapper import GroqLLMWrapper
 from ragas.llms.haystack_wrapper import HaystackLLMWrapper
 from ragas.llms.litellm_llm import LiteLLMStructuredLLM
 from ragas.llms.oci_genai_wrapper import OCIGenAIWrapper, oci_genai_factory
 from ragas.utils import DeprecationHelper
+
+# Groq Integration Notes:
+# - llm_factory() with provider="groq" → Uses instructor adapter for structured outputs
+#   Example: llm = llm_factory("llama3-70b-8192", provider="groq", client=groq_client)
+#
+# - GroqLLMWrapper() → Direct wrapper for text generation (BaseRagasLLM interface)
+#   Example: llm = GroqLLMWrapper(groq_client, model="llama3-70b-8192")
+#
+# Both approaches are valid. Use llm_factory for structured outputs (Pydantic models),
+# use GroqLLMWrapper for direct text generation with custom rate limiting.
 
 # Create deprecation wrappers for legacy classes
 LangchainLLMWrapper = DeprecationHelper(
@@ -33,6 +44,7 @@ LlamaIndexLLMWrapper = DeprecationHelper(
 
 __all__ = [
     "BaseRagasLLM",
+    "GroqLLMWrapper",
     "HaystackLLMWrapper",
     "InstructorBaseRagasLLM",
     "InstructorLLM",
