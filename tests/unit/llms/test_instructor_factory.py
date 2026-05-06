@@ -42,16 +42,19 @@ class MockInstructor:
         self.client = client
         self.chat = Mock()
         self.chat.completions = Mock()
+        self.last_kwargs = None
 
         if client.is_async:
             # Async client - create a proper async function
             async def async_create(*args, **kwargs):
+                self.last_kwargs = kwargs
                 return LLMResponseModel(response="Instructor response")
 
             self.chat.completions.create = async_create
         else:
             # Sync client - create a regular function
             def sync_create(*args, **kwargs):
+                self.last_kwargs = kwargs
                 return LLMResponseModel(response="Instructor response")
 
             self.chat.completions.create = sync_create
@@ -154,6 +157,63 @@ async def test_async_llm_agenerate(mock_async_client, monkeypatch):
 
     assert isinstance(result, LLMResponseModel)
     assert result.response == "Instructor response"
+
+
+@pytest.mark.asyncio
+async def test_async_openai_gpt5_maps_max_tokens_to_max_completion_tokens(
+    mock_async_client, monkeypatch
+):
+    """Test async OpenAI GPT-5 models use max_completion_tokens."""
+    instructor_client = None
+
+    def mock_from_openai(client, mode=None):
+        nonlocal instructor_client
+        instructor_client = MockInstructor(client)
+        return instructor_client
+
+    monkeypatch.setattr("instructor.from_openai", mock_from_openai)
+
+    llm = llm_factory(
+        "gpt-5.2",
+        provider="openai",
+        client=mock_async_client,
+        max_tokens=2000,
+    )
+
+    result = await llm.agenerate("Test prompt", LLMResponseModel)
+
+    assert result.response == "Instructor response"
+    assert instructor_client is not None
+    assert instructor_client.last_kwargs["max_completion_tokens"] == 2000
+    assert "max_tokens" not in instructor_client.last_kwargs
+
+
+def test_sync_openai_gpt5_maps_max_tokens_to_max_completion_tokens(
+    mock_sync_client, monkeypatch
+):
+    """Test sync OpenAI GPT-5 models use max_completion_tokens."""
+    instructor_client = None
+
+    def mock_from_openai(client, mode=None):
+        nonlocal instructor_client
+        instructor_client = MockInstructor(client)
+        return instructor_client
+
+    monkeypatch.setattr("instructor.from_openai", mock_from_openai)
+
+    llm = llm_factory(
+        "gpt-5.2",
+        provider="openai",
+        client=mock_sync_client,
+        max_tokens=2000,
+    )
+
+    result = llm.generate("Test prompt", LLMResponseModel)
+
+    assert result.response == "Instructor response"
+    assert instructor_client is not None
+    assert instructor_client.last_kwargs["max_completion_tokens"] == 2000
+    assert "max_tokens" not in instructor_client.last_kwargs
 
 
 def test_sync_client_agenerate_error(mock_sync_client, monkeypatch):
