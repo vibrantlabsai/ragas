@@ -100,6 +100,7 @@ Coming Soon:
 
 ```python
 import asyncio
+import os
 from openai import AsyncOpenAI
 from ragas.metrics import DiscreteMetric
 from ragas.llms import llm_factory
@@ -107,6 +108,13 @@ from ragas.llms import llm_factory
 # Setup your LLM
 client = AsyncOpenAI()
 llm = llm_factory("gpt-4o", client=client)
+
+# OpenAI-compatible providers can use the same client path. For example, TokenLab:
+tokenlab_client = AsyncOpenAI(
+    api_key=os.environ["TOKENLAB_API_KEY"],
+    base_url="https://api.tokenlab.sh/v1",
+)
+tokenlab_llm = llm_factory("claude-sonnet-5", client=tokenlab_client)
 
 # Create a custom aspect evaluator
 metric = DiscreteMetric(
