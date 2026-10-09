@@ -46,21 +46,13 @@ critic_llm = ChatOpenAI(model="gpt-4o")
 openai_client = openai.OpenAI()
 embeddings = OpenAIEmbeddings(client=openai_client)
 
-generator = TestsetGenerator.from_langchain(
-    generator_llm,
-    critic_llm,
-    embeddings
-)
+generator = TestsetGenerator.from_langchain(generator_llm, critic_llm, embeddings)
 
 
-distributions = {
-    simple: 0.5,
-    multi_context: 0.4,
-    reasoning: 0.1
-}
+distributions = {simple: 0.5, multi_context: 0.4, reasoning: 0.1}
 
 # generate testset
-testset = generator.generate_with_llamaindex_docs(documents, 100,distributions)
+testset = generator.generate_with_llamaindex_docs(documents, 100, distributions)
 test_df = testset.to_pandas()
 ```
 
@@ -70,8 +62,8 @@ test_df = testset.to_pandas()
 </figure>
 
 ```python
-test_questions = test_df['question'].values.tolist()
-test_answers = [[item] for item in test_df['answer'].values.tolist()]
+test_questions = test_df["question"].values.tolist()
+test_answers = [[item] for item in test_df["answer"].values.tolist()]
 ```
 
 
@@ -83,7 +75,6 @@ Here I am using llama-index to build a basic RAG pipeline with my documents. The
     refer to [langchain-tutorial](../integrations/_langchain.md) see how to evaluate using langchain
 
 ```python
-
 import nest_asyncio
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, ServiceContext
 from langchain.embeddings import HuggingFaceEmbeddings
@@ -96,7 +87,8 @@ nest_asyncio.apply()
 
 def build_query_engine(embed_model):
     vector_index = VectorStoreIndex.from_documents(
-        documents, service_context=ServiceContext.from_defaults(chunk_size=512),
+        documents,
+        service_context=ServiceContext.from_defaults(chunk_size=512),
         embed_model=embed_model,
     )
 
@@ -131,7 +123,7 @@ result = evaluate(query_engine1, metrics, test_questions, test_answers)
 ```
 
 ```python
-{'context_precision': 0.2378, 'context_recall': 0.7159}
+{"context_precision": 0.2378, "context_recall": 0.7159}
 ```
 
 ## Evaluate Bge embeddings
@@ -145,8 +137,7 @@ result = evaluate(query_engine2, metrics, test_questions, test_answers)
 ```
 
 ```python
-{'context_precision': 0.2655, 'context_recall': 0.7227}
-
+{"context_precision": 0.2655, "context_recall": 0.7227}
 ```
 
 ## Compare Scores

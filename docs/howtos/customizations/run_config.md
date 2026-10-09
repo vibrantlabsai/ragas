@@ -11,8 +11,8 @@ from ragas.metrics.collections import Faithfulness
 
 # Configure timeout and retries on the client
 client = AsyncOpenAI(
-    timeout=60.0,        # 60 second timeout
-    max_retries=5,       # Retry up to 5 times on failures
+    timeout=60.0,  # 60 second timeout
+    max_retries=5,  # Retry up to 5 times on failures
 )
 
 llm = llm_factory("gpt-4o-mini", client=client)
@@ -24,7 +24,7 @@ result = scorer.score(
     response="The first superbowl was held on Jan 15, 1967",
     retrieved_contexts=[
         "The First AFL–NFL World Championship Game was an American football game played on January 15, 1967, at the Los Angeles Memorial Coliseum in Los Angeles."
-    ]
+    ],
 )
 ```
 
@@ -45,10 +45,10 @@ from openai import AsyncOpenAI
 
 client = AsyncOpenAI(
     timeout=httpx.Timeout(
-        60.0,           # Total timeout
-        connect=5.0,    # Connection timeout
-        read=30.0,      # Read timeout
-        write=10.0,     # Write timeout
+        60.0,  # Total timeout
+        connect=5.0,  # Connection timeout
+        read=30.0,  # Read timeout
+        write=10.0,  # Write timeout
     ),
     max_retries=3,
 )
@@ -74,12 +74,12 @@ The following examples use the legacy metrics API pattern with `RunConfig`. For 
 from ragas.run_config import RunConfig
 
 run_config = RunConfig(
-    timeout=180,        # Max seconds per operation (default: 180)
-    max_retries=10,     # Retry attempts (default: 10)
-    max_wait=60,        # Max seconds between retries (default: 60)
-    max_workers=16,     # Concurrent workers (default: 16)
-    log_tenacity=False, # Log retry attempts (default: False)
-    seed=42,            # Random seed (default: 42)
+    timeout=180,  # Max seconds per operation (default: 180)
+    max_retries=10,  # Retry attempts (default: 10)
+    max_wait=60,  # Max seconds between retries (default: 60)
+    max_workers=16,  # Concurrent workers (default: 16)
+    log_tenacity=False,  # Log retry attempts (default: False)
+    seed=42,  # Random seed (default: 42)
 )
 ```
 

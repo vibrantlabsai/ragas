@@ -24,13 +24,13 @@ import pandas as pd
 dataset_dict = [
     {
         "email": "Hi, I'm getting error code XYZ-123 when using version 2.1.4 of your software. Please help!",
-        "pass_criteria": "category Bug Report; product_version 2.1.4; error_code XYZ-123; response references both version and error code"
+        "pass_criteria": "category Bug Report; product_version 2.1.4; error_code XYZ-123; response references both version and error code",
     },
-    
     {
         "email": "I need to dispute invoice #INV-2024-001 for 299.99 dollars. The charge seems incorrect.",
-        "pass_criteria": "category Billing; invoice_number INV-2024-001; amount 299.99; response references invoice and dispute process"
-    }]
+        "pass_criteria": "category Billing; invoice_number INV-2024-001; amount 299.99; response references invoice and dispute process",
+    },
+]
 pd.DataFrame(dataset_dict).to_csv("datasets/test_dataset.csv", index=False)
 ```
 
@@ -51,16 +51,15 @@ Next, we will write the evaluation experiment loop that will run our workflow on
 ```python
 from ragas import experiment
 
+
 @experiment()
 async def run_experiment(row):
-    response = workflow_client.process_email(
-        row["email"]
-    )
-    
+    response = workflow_client.process_email(row["email"])
+
     score = my_metric.score(
         llm=llm,
         response=response.get("response_template", " "),
-        pass_criteria=row["pass_criteria"]
+        pass_criteria=row["pass_criteria"],
     )
 
     experiment_view = {

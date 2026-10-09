@@ -44,7 +44,7 @@ scorer = AnswerRelevancy(llm=llm, embeddings=embeddings)
 # Evaluate
 result = await scorer.ascore(
     user_input="When was the first super bowl?",
-    response="The first superbowl was held on Jan 15, 1967"
+    response="The first superbowl was held on Jan 15, 1967",
 )
 print(f"Answer Relevancy Score: {result.value}")
 ```
@@ -61,7 +61,7 @@ Answer Relevancy Score: 0.9165088378587264
     ```python
     result = scorer.score(
         user_input="When was the first super bowl?",
-        response="The first superbowl was held on Jan 15, 1967"
+        response="The first superbowl was held on Jan 15, 1967",
     )
     ```
 
@@ -97,16 +97,16 @@ The following examples use the legacy metrics API pattern. For new projects, we 
 ### Example with SingleTurnSample
 
 ```python
-from ragas import SingleTurnSample 
+from ragas import SingleTurnSample
 from ragas.metrics import ResponseRelevancy
 
 sample = SingleTurnSample(
-        user_input="When was the first super bowl?",
-        response="The first superbowl was held on Jan 15, 1967",
-        retrieved_contexts=[
-            "The First AFL–NFL World Championship Game was an American football game played on January 15, 1967, at the Los Angeles Memorial Coliseum in Los Angeles."
-        ]
-    )
+    user_input="When was the first super bowl?",
+    response="The first superbowl was held on Jan 15, 1967",
+    retrieved_contexts=[
+        "The First AFL–NFL World Championship Game was an American football game played on January 15, 1967, at the Los Angeles Memorial Coliseum in Los Angeles."
+    ],
+)
 
 scorer = ResponseRelevancy(llm=evaluator_llm, embeddings=evaluator_embeddings)
 await scorer.single_turn_ascore(sample)

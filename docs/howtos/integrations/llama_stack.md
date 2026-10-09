@@ -150,6 +150,7 @@ To perform evaluations using Ragas we will create a `EvaluationDataset`
 ```python
 import json
 
+
 # This function extracts the search results for the trace of each query
 def extract_retrieved_contexts(turn_object):
     results = []

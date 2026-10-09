@@ -44,19 +44,23 @@ To evaluate the performance of our agent, we will define a non-LLM metric that c
 from ragas.metrics import numeric_metric
 from ragas.metrics.result import MetricResult
 
+
 @numeric_metric(name="correctness")
 def correctness_metric(prediction: float, actual: float):
     """Calculate correctness of the prediction."""
     if isinstance(prediction, str) and "ERROR" in prediction:
         return 0.0
     result = 1.0 if abs(prediction - actual) < 1e-5 else 0.0
-    return MetricResult(value=result, reason=f"Prediction: {prediction}, Actual: {actual}")
+    return MetricResult(
+        value=result, reason=f"Prediction: {prediction}, Actual: {actual}"
+    )
 ```
 
 Next, we will write the experiment loop that will run our agent on the test dataset and evaluate it using the metric, and store the results in a CSV file.
 
 ```python
 from ragas import experiment
+
 
 @experiment()
 async def run_experiment(row):
@@ -67,14 +71,16 @@ async def run_experiment(row):
     prediction = math_agent.solve(expression)
 
     # Calculate the correctness metric
-    correctness = correctness_metric.score(prediction=prediction.get("result"), actual=expected_result)
+    correctness = correctness_metric.score(
+        prediction=prediction.get("result"), actual=expected_result
+    )
 
     return {
         "expression": expression,
         "expected_result": expected_result,
         "prediction": prediction.get("result"),
         "log_file": prediction.get("log_file"),
-        "correctness": correctness.value
+        "correctness": correctness.value,
     }
 ```
 

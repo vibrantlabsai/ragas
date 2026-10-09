@@ -81,11 +81,18 @@ The documents are chunked to form hierarchical nodes. The chunking can be done b
 ```python
 from ragas.testset.graph import Node
 
-sample_nodes = [Node(
-    properties={"page_content": "Einstein's theory of relativity revolutionized our understanding of space and time. It introduced the concept that time is not absolute but can change depending on the observer's frame of reference."}
-),Node(
-    properties={"page_content": "Time dilation occurs when an object moves close to the speed of light, causing time to pass slower relative to a stationary observer. This phenomenon is a key prediction of Einstein's special theory of relativity."}
-)]
+sample_nodes = [
+    Node(
+        properties={
+            "page_content": "Einstein's theory of relativity revolutionized our understanding of space and time. It introduced the concept that time is not absolute but can change depending on the observer's frame of reference."
+        }
+    ),
+    Node(
+        properties={
+            "page_content": "Time dilation occurs when an object moves close to the speed of light, causing time to pass slower relative to a stationary observer. This phenomenon is a key prediction of Einstein's special theory of relativity."
+        }
+    ),
+]
 sample_nodes
 ```
 Output:
@@ -127,7 +134,9 @@ Returns a tuple of the type of the extractor and the extracted information.
 Let's add the extracted information to the node.
 
 ```python
-_ = [node.properties.update({key:val}) for (key,val), node in zip(output, sample_nodes)]
+_ = [
+    node.properties.update({key: val}) for (key, val), node in zip(output, sample_nodes)
+]
 sample_nodes[0].properties
 ```
 
@@ -157,10 +166,16 @@ You can write your own [custom relationship builder]() to establish the relation
 
 ```python
 from ragas.testset.graph import KnowledgeGraph
-from ragas.testset.transforms.relationship_builders.traditional import JaccardSimilarityBuilder
+from ragas.testset.transforms.relationship_builders.traditional import (
+    JaccardSimilarityBuilder,
+)
 
 kg = KnowledgeGraph(nodes=sample_nodes)
-rel_builder = JaccardSimilarityBuilder(property_name="entities", key_name="PER", new_property_name="entity_jaccard_similarity")
+rel_builder = JaccardSimilarityBuilder(
+    property_name="entities",
+    key_name="PER",
+    new_property_name="entity_jaccard_similarity",
+)
 relationships = await rel_builder.transform(kg)
 relationships
 ```
@@ -191,12 +206,10 @@ All of the components used to build the knowledge graph can be combined into a s
 Let's build the above knowledge graph using the above components with a `transform`.
 ```python
 from ragas.testset.transforms import apply_transforms
-transforms = [
-    extractor,
-    rel_builder
-    ]
 
-apply_transforms(kg,transforms)
+transforms = [extractor, rel_builder]
+
+apply_transforms(kg, transforms)
 ```
 
 
@@ -207,15 +220,9 @@ To apply few of the components in parallel, you can wrap them in `Parallel` clas
 from ragas.testset.transforms import KeyphraseExtractor, NERExtractor
 from ragas.testset.transforms import apply_transforms, Parallel
 
-tranforms = [
-    Parallel(
-        KeyphraseExtractor(),
-        NERExtractor()
-    ),
-    rel_builder
-]
+tranforms = [Parallel(KeyphraseExtractor(), NERExtractor()), rel_builder]
 
-apply_transforms(kg,transforms)
+apply_transforms(kg, transforms)
 ```
 
 
@@ -253,10 +260,10 @@ Imagine your goal is to create 50 different queries where each query is about so
 from dataclasses import dataclass
 from ragas.testset.synthesizers.base_query import QuerySynthesizer
 
+
 @dataclass
 class EntityQuerySynthesizer(QuerySynthesizer):
-
-    async def _generate_scenarios( self, n, knowledge_graph, callbacks):
+    async def _generate_scenarios(self, n, knowledge_graph, callbacks):
         """
         logic to query nodes with entity
         logic describing how to combine nodes,styles,length,persona to form n scenarios
@@ -264,14 +271,13 @@ class EntityQuerySynthesizer(QuerySynthesizer):
 
         return scenarios
 
-    async def _generate_sample(
-        self, scenario, callbacks
-    ):
-
+    async def _generate_sample(self, scenario, callbacks):
         """
         logic on how to use tranform each scenario to EvalSample (Query,Context,Reference)
         you may create singleturn or multiturn sample
         """
 
-        return SingleTurnSample(user_input=query, reference_contexs=contexts, reference=reference)
+        return SingleTurnSample(
+            user_input=query, reference_contexs=contexts, reference=reference
+        )
 ```

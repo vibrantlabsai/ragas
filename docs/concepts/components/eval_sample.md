@@ -24,11 +24,7 @@ response = "The capital of France is Paris."
 reference = "Paris"
 
 # Evaluation rubric
-rubric = {
-    "accuracy": "Correct",
-    "completeness": "High",
-    "fluency": "Excellent"
-}
+rubric = {"accuracy": "Correct", "completeness": "High", "fluency": "Excellent"}
 
 # Create the SingleTurnSample instance
 sample = SingleTurnSample(
@@ -36,7 +32,7 @@ sample = SingleTurnSample(
     retrieved_contexts=retrieved_contexts,
     response=response,
     reference=reference,
-    rubric=rubric
+    rubric=rubric,
 )
 ```
 
@@ -58,27 +54,27 @@ user_message = HumanMessage(content="What's the weather like in New York City to
 # AI decides to use a weather API tool to fetch the information
 ai_initial_response = AIMessage(
     content="Let me check the current weather in New York City for you.",
-    tool_calls=[ToolCall(name="WeatherAPI", args={"location": "New York City"})]
+    tool_calls=[ToolCall(name="WeatherAPI", args={"location": "New York City"})],
 )
 
 # Tool provides the weather information
-tool_response = ToolMessage(content="It's sunny with a temperature of 75°F in New York City.")
+tool_response = ToolMessage(
+    content="It's sunny with a temperature of 75°F in New York City."
+)
 
 # AI delivers the final response to the user
-ai_final_response = AIMessage(content="It's sunny and 75 degrees Fahrenheit in New York City today.")
+ai_final_response = AIMessage(
+    content="It's sunny and 75 degrees Fahrenheit in New York City today."
+)
 
 # Combine all messages into a list to represent the conversation
-conversation = [
-    user_message,
-    ai_initial_response,
-    tool_response,
-    ai_final_response
-]
+conversation = [user_message, ai_initial_response, tool_response, ai_final_response]
 ```
 
 Now, use the conversation to create a MultiTurnSample object, including any reference responses and evaluation rubrics.
 ```python
 from ragas import MultiTurnSample
+
 # Reference response for evaluation purposes
 reference_response = "Provide the current weather in New York City to the user."
 

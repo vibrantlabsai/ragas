@@ -145,7 +145,6 @@ from ragas.testset.synthesizers.prompts import (
 
 @dataclass
 class MySingleHopScenario(SingleHopQuerySynthesizer):
-
     theme_persona_matching_prompt = ThemesPersonasMatchingPrompt()
 
     async def _generate_scenarios(self, n, knowledge_graph, persona_list, callbacks):
@@ -178,6 +177,7 @@ class MySingleHopScenario(SingleHopQuerySynthesizer):
             )
 
         return scenarios
+
 
 query = MySingleHopScenario(llm=llm)
 

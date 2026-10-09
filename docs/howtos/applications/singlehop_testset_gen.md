@@ -44,7 +44,9 @@ import openai
 
 generator_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o-mini"))
 openai_client = openai.OpenAI()
-generator_embeddings = OpenAIEmbeddings(client=openai_client, model="text-embedding-3-small")
+generator_embeddings = OpenAIEmbeddings(
+    client=openai_client, model="text-embedding-3-small"
+)
 ```
 
 ## Create Knowledge Graph
@@ -63,10 +65,13 @@ for doc in docs:
     kg.nodes.append(
         Node(
             type=NodeType.DOCUMENT,
-            properties={"page_content": doc.page_content, "document_metadata": doc.metadata}
+            properties={
+                "page_content": doc.page_content,
+                "document_metadata": doc.metadata,
+            },
         )
     )
-    
+
 kg
 ```
 Output
@@ -86,17 +91,17 @@ In this tutorial, we create a Single Hop Query dataset using a knowledge graph b
 
 ```python
 from ragas.testset.transforms import apply_transforms
-from ragas.testset.transforms import HeadlinesExtractor, HeadlineSplitter, KeyphrasesExtractor
+from ragas.testset.transforms import (
+    HeadlinesExtractor,
+    HeadlineSplitter,
+    KeyphrasesExtractor,
+)
 
 headline_extractor = HeadlinesExtractor(llm=generator_llm, max_num=20)
 headline_splitter = HeadlineSplitter(max_tokens=1500)
 keyphrase_extractor = KeyphrasesExtractor(llm=generator_llm)
 
-transforms = [
-    headline_extractor,
-    headline_splitter,
-    keyphrase_extractor
-]
+transforms = [headline_extractor, headline_splitter, keyphrase_extractor]
 
 apply_transforms(kg, transforms=transforms)
 ```
@@ -133,7 +138,11 @@ persona_angry_business_flier = Persona(
     role_description="Demands top-tier service and is easily irritated by any delays or issues. Expects immediate resolutions and is quick to express frustration if standards are not met.",
 )
 
-personas = [persona_first_time_flier, persona_frequent_flier, persona_angry_business_flier]
+personas = [
+    persona_first_time_flier,
+    persona_frequent_flier,
+    persona_angry_business_flier,
+]
 ```
 
 ## Query Generation Using Synthesizers

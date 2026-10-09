@@ -18,7 +18,7 @@ You can easily translate
 ```python
 from ragas import EvaluationDataset, SingleTurnSample
 
-hf_dataset = ... # your huggingface evaluation dataset
+hf_dataset = ...  # your huggingface evaluation dataset
 eval_dataset = EvaluationDataset.from_hf_dataset(hf_dataset)
 
 # save eval dataset
@@ -37,7 +37,9 @@ However, there are a couple of changes in how you use metrics
 Firstly it is now preferred to initialize metrics with the evaluator LLM of your choice as opposed to using the initialized version of the metrics into [`evaluate()`][ragas.evaluation.evaluate]. This avoids a lot of confusion regarding which LLMs are used where.
 
 ```python
-from ragas.metrics import faithfullness # old way, not recommended but still supported till v0.3
+from ragas.metrics import (
+    faithfullness,
+)  # old way, not recommended but still supported till v0.3
 from ragas.metrics import Faithfulness
 
 # preffered way
@@ -52,11 +54,12 @@ from ragas import SingleTurnSample
 sample = SingleTurnSample(
     user_input="user query",
     response="response from your pipeline",
-    retrieved_contexts=["retrieved", "contexts", "from your pipeline" ]
+    retrieved_contexts=["retrieved", "contexts", "from your pipeline"],
 )
 
 # Init the metric
 from ragas.metrics import Faithfulness
+
 faithfulness_metric = Faithfulness(llm=your_evaluator_llm)
 await faithfulness_metric.single_turn_ascore(sample)
 ```

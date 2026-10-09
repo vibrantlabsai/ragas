@@ -28,7 +28,7 @@ metrics = [...]
 executor = evaluate(
     dataset=dataset,
     metrics=metrics,
-    return_executor=True  # Key parameter
+    return_executor=True,  # Key parameter
 )
 
 # Now you can:
@@ -50,7 +50,7 @@ generator = TestsetGenerator(...)
 executor = generator.generate_with_langchain_docs(
     documents=documents,
     testset_size=100,
-    return_executor=True  # Allow access to Executor to cancel
+    return_executor=True,  # Allow access to Executor to cancel
 )
 
 # Use the same cancellation interface
@@ -67,35 +67,37 @@ Automatically cancel operations that exceed a time limit:
 import threading
 import time
 
+
 def evaluate_with_timeout(dataset, metrics, timeout_seconds=300):
     """Run evaluation with automatic timeout."""
     # Get cancellable executor
     executor = evaluate(dataset=dataset, metrics=metrics, return_executor=True)
-    
+
     results = None
     exception = None
-    
+
     def run_evaluation():
         nonlocal results, exception
         try:
             results = executor.results()
         except Exception as e:
             exception = e
-    
+
     # Start evaluation in background thread
     thread = threading.Thread(target=run_evaluation)
     thread.start()
-    
+
     # Wait for completion or timeout
     thread.join(timeout=timeout_seconds)
-    
+
     if thread.is_alive():
         print(f"Evaluation exceeded {timeout_seconds}s timeout, cancelling...")
         executor.cancel()
         thread.join(timeout=10)  # Custom timeout as per need
         return None, "timeout"
-    
+
     return results, exception
+
 
 # Usage
 results, error = evaluate_with_timeout(dataset, metrics, timeout_seconds=600)
@@ -113,21 +115,23 @@ Allow users to cancel with keyboard interrupt:
 import signal
 import sys
 
+
 def setup_cancellation_handler():
     """Set up graceful cancellation on Ctrl+C."""
     executor = None
-    
+
     def signal_handler(signum, frame):
         if executor and not executor.is_cancelled():
             print("\nReceived interrupt signal, cancelling evaluation...")
             executor.cancel()
             print("Cancellation requested. Waiting for graceful shutdown...")
         sys.exit(0)
-    
+
     # Register signal handler
     signal.signal(signal.SIGINT, signal_handler)
-    
-    return lambda exec: setattr(signal_handler, 'executor', exec)
+
+    return lambda exec: setattr(signal_handler, "executor", exec)
+
 
 # Usage
 set_executor = setup_cancellation_handler()
@@ -155,19 +159,20 @@ import uuid
 app = Flask(__name__)
 active_evaluations = {}
 
-@app.route('/evaluate', methods=['POST'])
+
+@app.route("/evaluate", methods=["POST"])
 def start_evaluation():
     # Create unique evaluation ID
     eval_id = str(uuid.uuid4())
-    
+
     # Get dataset and metrics from request
     dataset = get_dataset_from_request(request)
     metrics = get_metrics_from_request(request)
-    
+
     # Start cancellable evaluation
     executor = evaluate(dataset=dataset, metrics=metrics, return_executor=True)
     active_evaluations[eval_id] = executor
-    
+
     # Start evaluation in background
     def run_eval():
         try:
@@ -178,12 +183,13 @@ def start_evaluation():
             store_error(eval_id, str(e))
         finally:
             active_evaluations.pop(eval_id, None)
-    
+
     threading.Thread(target=run_eval).start()
-    
+
     return {"evaluation_id": eval_id, "status": "started"}
 
-@app.route('/evaluate/<eval_id>/cancel', methods=['POST'])
+
+@app.route("/evaluate/<eval_id>/cancel", methods=["POST"])
 def cancel_evaluation(eval_id):
     executor = active_evaluations.get(eval_id)
     if executor:
@@ -199,12 +205,14 @@ def cancel_evaluation(eval_id):
 ```py
 executor = evaluate(dataset=dataset, metrics=metrics, return_executor=True)
 
+
 # Start in background
 def monitor_evaluation():
     while not executor.is_cancelled():
         print("Evaluation still running...")
         time.sleep(5)
     print("Evaluation was cancelled")
+
 
 threading.Thread(target=monitor_evaluation).start()
 
@@ -236,22 +244,23 @@ except Exception as e:
 class EvaluationManager:
     def __init__(self):
         self.executors = []
-    
+
     def start_evaluation(self, dataset, metrics):
         executor = evaluate(dataset=dataset, metrics=metrics, return_executor=True)
         self.executors.append(executor)
         return executor
-    
+
     def cancel_all(self):
         """Cancel all running evaluations."""
         for executor in self.executors:
             if not executor.is_cancelled():
                 executor.cancel()
         print(f"Cancelled {len(self.executors)} evaluations")
-    
+
     def cleanup_completed(self):
         """Remove completed executors."""
         self.executors = [ex for ex in self.executors if not ex.is_cancelled()]
+
 
 # Usage
 manager = EvaluationManager()
@@ -269,7 +278,9 @@ manager.cancel_all()
 ### 1. Always Use Timeouts in Production
 ```py
 # Good: Always set reasonable timeouts
-results, error = evaluate_with_timeout(dataset, metrics, timeout_seconds=1800)  # 30 minutes
+results, error = evaluate_with_timeout(
+    dataset, metrics, timeout_seconds=1800
+)  # 30 minutes
 
 # Avoid: Indefinite blocking
 results = executor.results()  # Could block forever
@@ -359,6 +370,7 @@ time.sleep(2)  # Allow tasks to detect cancellation
 
 # Force cleanup if needed
 import asyncio
+
 try:
     loop = asyncio.get_running_loop()
     for task in asyncio.all_tasks(loop):

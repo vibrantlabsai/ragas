@@ -24,8 +24,8 @@ result = await metric.ascore(
     response="The Tesla Model X is an electric SUV.",
     retrieved_contexts=[
         "path/to/tesla_image.jpg",  # Image context
-        "Tesla manufactures electric vehicles."  # Text context
-    ]
+        "Tesla manufactures electric vehicles.",  # Text context
+    ],
 )
 print(f"Relevance Score: {result.value}")  # 1.0 (relevant) or 0.0 (not relevant)
 ```
@@ -40,12 +40,10 @@ from ragas.dataset_schema import SingleTurnSample
 from ragas.metrics import MultiModalRelevance
 
 sample = SingleTurnSample(
-        user_input="What about the Tesla Model X?",
-        response="Cats are cute.",
-        retrieved_contexts=[
-            "custom_eval/multimodal/images/tesla.jpg"
-        ]
-    )
+    user_input="What about the Tesla Model X?",
+    response="Cats are cute.",
+    retrieved_contexts=["custom_eval/multimodal/images/tesla.jpg"],
+)
 scorer = MultiModalRelevance()
 await scorer.single_turn_ascore(sample)
 ```

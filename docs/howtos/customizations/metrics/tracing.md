@@ -30,7 +30,7 @@ from ragas.metrics import LLMContextRecall
 dataset = load_dataset("vibrantlabsai/amnesty_qa", "english_v3")
 
 dataset = EvaluationDataset.load_from_hf(dataset["eval"])
-evaluate(dataset, metrics=[LLMContextRecall()],callbacks=[tracer])
+evaluate(dataset, metrics=[LLMContextRecall()], callbacks=[tracer])
 ```
 
 ```text

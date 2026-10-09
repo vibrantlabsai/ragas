@@ -22,7 +22,7 @@ scorer = SemanticSimilarity(embeddings=embeddings)
 # Evaluate
 result = await scorer.ascore(
     reference="The Eiffel Tower is located in Paris. It has a height of 1000ft.",
-    response="The Eiffel Tower is located in Paris."
+    response="The Eiffel Tower is located in Paris.",
 )
 print(f"Semantic Similarity Score: {result.value}")
 ```
@@ -39,7 +39,7 @@ Semantic Similarity Score: 0.8151
     ```python
     result = scorer.score(
         reference="The Eiffel Tower is located in Paris. It has a height of 1000ft.",
-        response="The Eiffel Tower is located in Paris."
+        response="The Eiffel Tower is located in Paris.",
     )
     ```
 
@@ -78,7 +78,7 @@ from ragas.embeddings import LangchainEmbeddingsWrapper
 
 sample = SingleTurnSample(
     response="The Eiffel Tower is located in Paris.",
-    reference="The Eiffel Tower is located in Paris. It has a height of 1000ft."
+    reference="The Eiffel Tower is located in Paris. It has a height of 1000ft.",
 )
 
 scorer = SemanticSimilarity(embeddings=LangchainEmbeddingsWrapper(evaluator_embedding))

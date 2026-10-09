@@ -124,13 +124,19 @@ It is better to sample real data from your application to create the dataset. If
 def load_dataset():
     """Load the dataset from CSV file. Downloads from GitHub if not found locally."""
     import urllib.request
+
     current_dir = os.path.dirname(os.path.abspath(__file__))
     dataset_path = os.path.join(current_dir, "datasets", "discount_benchmark.csv")
     # Download dataset from GitHub if it doesn't exist locally
     if not os.path.exists(dataset_path):
         os.makedirs(os.path.dirname(dataset_path), exist_ok=True)
-        urllib.request.urlretrieve("https://raw.githubusercontent.com/vibrantlabsai/ragas/main/examples/ragas_examples/benchmark_llm/datasets/discount_benchmark.csv", dataset_path)
-    return Dataset.load(name="discount_benchmark", backend="local/csv", root_dir=current_dir)
+        urllib.request.urlretrieve(
+            "https://raw.githubusercontent.com/vibrantlabsai/ragas/main/examples/ragas_examples/benchmark_llm/datasets/discount_benchmark.csv",
+            dataset_path,
+        )
+    return Dataset.load(
+        name="discount_benchmark", backend="local/csv", root_dir=current_dir
+    )
 ```
 
 The dataset loader checks if the CSV file exists locally. If not found, it automatically downloads it from GitHub. 
@@ -144,20 +150,20 @@ It is generally better to use a simple metric. You should use a metric relevant 
 def discount_accuracy(prediction: str, expected_discount):
     """Check if the discount prediction is correct."""
     import json
-    
+
     parsed_json = json.loads(prediction)
     predicted_discount = parsed_json.get("discount_percentage")
     expected_discount_int = int(expected_discount)
-    
+
     if predicted_discount == expected_discount_int:
         return MetricResult(
-            value="correct", 
-            reason=f"Correctly calculated discount={expected_discount_int}%"
+            value="correct",
+            reason=f"Correctly calculated discount={expected_discount_int}%",
         )
     else:
         return MetricResult(
             value="incorrect",
-            reason=f"Expected discount={expected_discount_int}%; Got discount={predicted_discount}%"
+            reason=f"Expected discount={expected_discount_int}%; Got discount={predicted_discount}%",
         )
 ```
 
@@ -170,27 +176,26 @@ Each model evaluation follows this experiment pattern:
 async def benchmark_experiment(row, model_name: str):
     # Get model response
     response = await run_prompt(row["customer_profile"], model=model_name)
-    
+
     # Parse response (strict JSON mode expected)
     try:
         parsed_json = json.loads(response)
-        predicted_discount = parsed_json.get('discount_percentage')
+        predicted_discount = parsed_json.get("discount_percentage")
     except Exception:
         predicted_discount = None
-    
+
     # Score the response
     score = discount_accuracy.score(
-        prediction=response,
-        expected_discount=row["expected_discount"]
+        prediction=response, expected_discount=row["expected_discount"]
     )
-    
+
     return {
         **row,
         "model": model_name,
         "response": response,
         "predicted_discount": predicted_discount,
         "score": score.value,
-        "score_reason": score.reason
+        "score_reason": score.reason,
     }
 ```
 
@@ -210,24 +215,24 @@ print(f"Dataset loaded with {len(dataset)} samples")
 
 # Run baseline experiment
 baseline_results = await benchmark_experiment.arun(
-    dataset,
-    name="gpt-4.1-nano-2025-04-14",
-    model_name="gpt-4.1-nano-2025-04-14"
+    dataset, name="gpt-4.1-nano-2025-04-14", model_name="gpt-4.1-nano-2025-04-14"
 )
 
 # Calculate and display accuracy
-baseline_accuracy = sum(1 for r in baseline_results if r["score"] == "correct") / len(baseline_results)
+baseline_accuracy = sum(1 for r in baseline_results if r["score"] == "correct") / len(
+    baseline_results
+)
 print(f"Baseline Accuracy: {baseline_accuracy:.2%}")
 
 # Run candidate experiment
 candidate_results = await benchmark_experiment.arun(
-    dataset,
-    name="gpt-5-nano-2025-08-07",
-    model_name="gpt-5-nano-2025-08-07"
+    dataset, name="gpt-5-nano-2025-08-07", model_name="gpt-5-nano-2025-08-07"
 )
 
 # Calculate and display accuracy
-candidate_accuracy = sum(1 for r in candidate_results if r["score"] == "correct") / len(candidate_results)
+candidate_accuracy = sum(1 for r in candidate_results if r["score"] == "correct") / len(
+    candidate_results
+)
 print(f"Candidate Accuracy: {candidate_accuracy:.2%}")
 ```
 
@@ -261,7 +266,7 @@ from ragas_examples.benchmark_llm.evals import compare_inputs_to_output
 output_path = compare_inputs_to_output(
     inputs=[
         "experiments/gpt-4.1-nano-2025-04-14.csv",
-        "experiments/gpt-5-nano-2025-08-07.csv"
+        "experiments/gpt-5-nano-2025-08-07.csv",
     ]
 )
 

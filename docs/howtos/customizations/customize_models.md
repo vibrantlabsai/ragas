@@ -21,7 +21,7 @@ client = OpenAI(api_key="your-key")
 llm = llm_factory(
     "gpt-4o",
     client=client,
-    system_prompt="You are a helpful assistant that evaluates RAG systems."
+    system_prompt="You are a helpful assistant that evaluates RAG systems.",
 )
 ```
 

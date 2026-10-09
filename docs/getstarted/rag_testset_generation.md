@@ -95,7 +95,10 @@ for doc in docs:
     kg.nodes.append(
         Node(
             type=NodeType.DOCUMENT,
-            properties={"page_content": doc.page_content, "document_metadata": doc.metadata}
+            properties={
+                "page_content": doc.page_content,
+                "document_metadata": doc.metadata,
+            },
         )
     )
 ```
@@ -116,7 +119,9 @@ from ragas.testset.transforms import default_transforms, apply_transforms
 transformer_llm = generator_llm
 embedding_model = generator_embeddings
 
-trans = default_transforms(documents=docs, llm=transformer_llm, embedding_model=embedding_model)
+trans = default_transforms(
+    documents=docs, llm=transformer_llm, embedding_model=embedding_model
+)
 apply_transforms(kg, trans)
 ```
 
@@ -140,7 +145,9 @@ Now we will use the `loaded_kg` to create the [TestsetGenerator][ragas.testset.s
 ```python
 from ragas.testset import TestsetGenerator
 
-generator = TestsetGenerator(llm=generator_llm, embedding_model=embedding_model, knowledge_graph=loaded_kg)
+generator = TestsetGenerator(
+    llm=generator_llm, embedding_model=embedding_model, knowledge_graph=loaded_kg
+)
 ```
 
 We can also define the distribution of queries we would like to generate. Here lets use the default distribution.

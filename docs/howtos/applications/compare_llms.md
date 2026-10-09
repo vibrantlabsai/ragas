@@ -40,10 +40,10 @@ from ragas.testset.generator import TestsetGenerator
 from ragas.testset.evolutions import simple, reasoning, multi_context
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
-os.environ['OPENAI_API_KEY'] = 'Your OPEN AI key'
+os.environ["OPENAI_API_KEY"] = "Your OPEN AI key"
 
 # load documents
-reader = SimpleDirectoryReader("./arxiv-papers/",num_files_limit=30)
+reader = SimpleDirectoryReader("./arxiv-papers/", num_files_limit=30)
 documents = reader.load_data()
 
 # generator with openai models
@@ -51,20 +51,12 @@ generator_llm = ChatOpenAI(model="gpt-4o-mini")
 critic_llm = ChatOpenAI(model="gpt-4o")
 embeddings = OpenAIEmbeddings()
 
-generator = TestsetGenerator.from_langchain(
-    generator_llm,
-    critic_llm,
-    embeddings
-)
+generator = TestsetGenerator.from_langchain(generator_llm, critic_llm, embeddings)
 
-distributions = {
-    simple: 0.5,
-    multi_context: 0.4,
-    reasoning: 0.1
-}
+distributions = {simple: 0.5, multi_context: 0.4, reasoning: 0.1}
 
 # generate testset
-testset = generator.generate_with_llama_index_docs(documents, 100,distributions)
+testset = generator.generate_with_llama_index_docs(documents, 100, distributions)
 testset.to_pandas()
 ```
 
@@ -73,8 +65,8 @@ testset.to_pandas()
 </p>
 
 ```python
-test_questions = test_df['question'].values.tolist()
-test_answers = [[item] for item in test_df['answer'].values.tolist()]
+test_questions = test_df["question"].values.tolist()
+test_answers = [[item] for item in test_df["answer"].values.tolist()]
 ```
 
 
@@ -97,31 +89,33 @@ nest_asyncio.apply()
 
 def build_query_engine(llm):
     vector_index = VectorStoreIndex.from_documents(
-        documents, service_context=ServiceContext.from_defaults(chunk_size=512, llm=llm),
+        documents,
+        service_context=ServiceContext.from_defaults(chunk_size=512, llm=llm),
         embed_model=HuggingFaceInferenceAPIEmbedding,
     )
 
     query_engine = vector_index.as_query_engine(similarity_top_k=2)
     return query_engine
 
+
 # Function to evaluate as Llama index does not support async evaluation for HFInference API
 def generate_responses(query_engine, test_questions, test_answers):
-  responses = [query_engine.query(q) for q in test_questions]
+    responses = [query_engine.query(q) for q in test_questions]
 
-  answers = []
-  contexts = []
-  for r in responses:
-    answers.append(r.response)
-    contexts.append([c.node.get_content() for c in r.source_nodes])
-  dataset_dict = {
+    answers = []
+    contexts = []
+    for r in responses:
+        answers.append(r.response)
+        contexts.append([c.node.get_content() for c in r.source_nodes])
+    dataset_dict = {
         "question": test_questions,
         "answer": answers,
         "contexts": contexts,
-  }
-  if test_answers is not None:
-    dataset_dict["ground_truth"] = test_answers
-  ds = Dataset.from_dict(dataset_dict)
-  return ds
+    }
+    if test_answers is not None:
+        dataset_dict["ground_truth"] = test_answers
+    ds = Dataset.from_dict(dataset_dict)
+    return ds
 ```
 
 ## Import metrics from ragas
@@ -151,8 +145,7 @@ For the first LLM, I will be using HuggingFace [zephyr-7b-alpha](https://hugging
 ```python
 # Use zephyr model using HFInference API
 zephyr_llm = HuggingFaceInferenceAPI(
-    model_name="HuggingFaceH4/zephyr-7b-alpha",
-    token="Your Hugging Face token"
+    model_name="HuggingFaceH4/zephyr-7b-alpha", token="Your Hugging Face token"
 )
 query_engine1 = build_query_engine(zephyr_llm)
 result_ds = generate_responses(query_engine1, test_questions, test_answers)
@@ -165,7 +158,7 @@ result_zephyr
 ```
 
 ```python
-{'faithfulness': 0.8365, 'answer_relevancy': 0.8831, 'answer_correctness': 0.6605}
+{"faithfulness": 0.8365, "answer_relevancy": 0.8831, "answer_correctness": 0.6605}
 ```
 
 ## Evaluate Falcon-7B-Instruct LLM
@@ -173,8 +166,7 @@ For the second model to evaluate, I am using [Falcon-7B-Instruct](https://huggin
 
 ```python
 falcon_llm = HuggingFaceInferenceAPI(
-    model_name="tiiuae/falcon-7b-instruct",
-    token="Your Huggingface token"
+    model_name="tiiuae/falcon-7b-instruct", token="Your Huggingface token"
 )
 query_engine2 = build_query_engine(falcon_llm)
 result_ds_falcon = generate_responses(query_engine2, test_questions, test_answers)
@@ -187,7 +179,7 @@ result
 ```
 
 ```python
-{'faithfulness': 0.6909, 'answer_relevancy': 0.8651, 'answer_correctness': 0.5850}
+{"faithfulness": 0.6909, "answer_relevancy": 0.8651, "answer_correctness": 0.5850}
 ```
 
 ## Compare Scores
@@ -200,21 +192,28 @@ Refer to the complete Colab notebook [here](https://colab.research.google.com/dr
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def analysis(zephyr_df, falcon_df):
-  sns.set_style("whitegrid")
-  fig, axs = plt.subplots(1,3, figsize=(12, 5))
-  for i,col in enumerate(zephyr_df.columns):
-    sns.kdeplot(data=[zephyr_df[col].values,falcon_df[col].values],legend=False,ax=axs[i],fill=True)
-    axs[i].set_title(f'{col} scores distribution')
-    axs[i].legend(labels=["zephyr", "falcon"])
-  plt.tight_layout()
-  plt.show()
+    sns.set_style("whitegrid")
+    fig, axs = plt.subplots(1, 3, figsize=(12, 5))
+    for i, col in enumerate(zephyr_df.columns):
+        sns.kdeplot(
+            data=[zephyr_df[col].values, falcon_df[col].values],
+            legend=False,
+            ax=axs[i],
+            fill=True,
+        )
+        axs[i].set_title(f"{col} scores distribution")
+        axs[i].legend(labels=["zephyr", "falcon"])
+    plt.tight_layout()
+    plt.show()
+
 
 result_zephyr_df = result_zephyr.to_pandas()
 result_falcon_df = result.to_pandas()
 analysis(
-    result_zephyr_df[['faithfulness', 'answer_relevancy', 'answer_correctness']],
-    result_falcon_df[['faithfulness', 'answer_relevancy', 'answer_correctness']]
+    result_zephyr_df[["faithfulness", "answer_relevancy", "answer_correctness"]],
+    result_falcon_df[["faithfulness", "answer_relevancy", "answer_correctness"]],
 )
 ```
 
