@@ -16,7 +16,7 @@ from langchain_core.language_models import BaseLanguageModel
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.prompt_values import PromptValue
 from PIL import Image
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from typing_extensions import TypedDict
 
 from ragas.callbacks import ChainType, new_group
@@ -26,6 +26,7 @@ from ragas.prompt.pydantic_prompt import (
     RagasOutputParser,
     is_langchain_llm,
 )
+from ragas.prompt.utils import extract_json
 
 if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
@@ -197,7 +198,11 @@ class ImageTextPrompt(PydanticPrompt, t.Generic[InputModel, OutputModel]):
                 # For the parser, we need a BaseRagasLLM, so if it's a LangChain LLM, we need to handle this
                 if is_langchain_llm(llm):
                     # Skip parsing retry for LangChain LLMs since parser expects BaseRagasLLM
-                    answer = self.output_model.model_validate_json(output_string)
+                    try:
+                        answer = self.output_model.model_validate_json(output_string)
+                    except ValidationError:
+                        jsonstr = extract_json(output_string)
+                        answer = self.output_model.model_validate_json(jsonstr)
                 else:
                     ragas_llm = t.cast(BaseRagasLLM, llm)
                     answer = await parser.parse_output_string(

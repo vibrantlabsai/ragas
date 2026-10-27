@@ -212,3 +212,11 @@ class TestExtractJson:
         """
         expected = """{"text": "how does the provided commands be used to manage and troubleshoot namespaces in a Kubernetes environment?"}"""
         assert extract_json(text) == expected
+
+    def test_extract_json_braces_in_strings(self):
+        text = '{"statements": ["Use the } delimiter to close an object", "Keep this { too"]}'
+        assert extract_json(text) == text
+
+    def test_extract_json_escaped_quotes_in_strings(self):
+        text = r'{"statements": ["He said \"use } now\" here"]}'
+        assert extract_json(text) == text
