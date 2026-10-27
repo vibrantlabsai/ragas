@@ -34,11 +34,13 @@ Ragas provides a `Dataset` class to work with evaluation datasets. Here's how yo
 
 ### Creating a Dataset
 
+This example uses `local/jsonl` because the metadata is a nested dictionary.
+
 ```python
 from ragas import Dataset
 
 # Create a new dataset
-dataset = Dataset(name="my_evaluation", backend="local/csv", root_dir="./data")
+dataset = Dataset(name="my_evaluation", backend="local/jsonl", root_dir="./data")
 
 # Add a sample to the dataset
 dataset.append({
@@ -47,6 +49,8 @@ dataset.append({
     "expected_answer": "Paris",
     "metadata": {"complexity": "simple", "language": "en"}
 })
+
+dataset.save()
 ```
 
 ### Loading an Existing Dataset
@@ -55,9 +59,11 @@ dataset.append({
 # Load an existing dataset
 dataset = Dataset.load(
     name="my_evaluation",
-    backend="local/csv",
+    backend="local/jsonl",
     root_dir="./data"
 )
+
+print(dataset[0]["metadata"]["complexity"])  # simple
 ```
 
 ### Dataset Structure
@@ -85,10 +91,18 @@ Datasets in Ragas are flexible and can contain any fields you need for your eval
 
 ### Local Storage
 
-For local development and small datasets, you can use CSV files:
+For flat data or spreadsheet editing, you can use CSV:
 
 ```python
 dataset = Dataset(name="my_eval", backend="local/csv", root_dir="./datasets")
+```
+
+The `local/csv` backend reloads every field as a string. Lists and dictionaries are not restored automatically.
+
+Use `local/jsonl` for nested metadata or lists such as `retrieved_contexts`:
+
+```python
+dataset = Dataset(name="my_eval", backend="local/jsonl", root_dir="./datasets")
 ```
 
 ### Cloud Storage
@@ -119,7 +133,7 @@ Datasets integrate seamlessly with Ragas evaluation workflows:
 from ragas import experiment, Dataset
 
 # Load your dataset
-dataset = Dataset.load(name="my_evaluation", backend="local/csv", root_dir="./data")
+dataset = Dataset.load(name="my_evaluation", backend="local/jsonl", root_dir="./data")
 
 # Define your experiment
 @experiment()
