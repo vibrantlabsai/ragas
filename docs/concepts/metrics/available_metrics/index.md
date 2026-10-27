@@ -11,6 +11,7 @@ Each metric are essentially paradigms that are designed to evaluate a particular
 - [Noise Sensitivity](noise_sensitivity.md)
 - [Response Relevancy](answer_relevance.md)
 - [Faithfulness](faithfulness.md)
+- [Filter Correctness](filter_correctness.md)
 - [Multimodal Faithfulness](multi_modal_faithfulness.md)
 - [Multimodal Relevance](multi_modal_relevance.md)
 
