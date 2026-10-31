@@ -1,9 +1,12 @@
 """Local JSONL backend implementation for projects and datasets."""
 
 import json
+import os
+import stat
 import typing as t
 from datetime import date, datetime
 from pathlib import Path
+from uuid import uuid4
 
 from pydantic import BaseModel
 
@@ -36,6 +39,7 @@ class LocalJSONLBackend(BaseBackend):
         - Handles malformed JSON lines gracefully (skips with warning)
         - UTF-8 encoding for international text
         - Compact JSON formatting (no extra whitespace)
+        - Serialization and staging-write errors preserve the previous file
 
     Best For:
         - Complex data structures with nesting
@@ -129,29 +133,39 @@ class LocalJSONLBackend(BaseBackend):
         data: t.List[t.Dict[str, t.Any]],
         data_model: t.Optional[t.Type[BaseModel]],
     ) -> None:
-        """Save data to JSONL file, creating directory if needed."""
+        """Replace a JSONL file only after all rows have been written successfully."""
         file_path = self._get_file_path(data_type, name)
 
         # Create directory if it doesn't exist
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Handle empty data
-        if not data:
-            # Create empty JSONL file
-            with open(file_path, "w", encoding="utf-8") as f:
-                pass
-            return
+        try:
+            existing_mode = stat.S_IMODE(file_path.stat().st_mode)
+        except FileNotFoundError:
+            existing_mode = None
+        else:
+            # Replacement needs directory access, but must also respect the
+            # existing artifact's write authorization without truncating it.
+            os.close(os.open(file_path, os.O_WRONLY))
 
-        # Write data to JSONL
-        with open(file_path, "w", encoding="utf-8") as f:
-            for item in data:
-                # Serialize datetime objects
-                serialized_item = self._serialize_datetime(item)
-                # Write as JSON line
-                json_line = json.dumps(
-                    serialized_item, ensure_ascii=False, separators=(",", ":")
-                )
-                f.write(json_line + "\n")
+        # Keep the staging file on the same filesystem for atomic replacement.
+        # Exclusive creation preserves the normal umask for new artifacts without
+        # risking deletion of another writer's file if a name ever collides.
+        temporary_path = file_path.parent / f".ragas-{uuid4().hex}.tmp"
+        temporary_file = open(temporary_path, "x", encoding="utf-8")
+        try:
+            with temporary_file as f:
+                if existing_mode is not None:
+                    os.chmod(temporary_path, existing_mode)
+                for item in data:
+                    serialized_item = self._serialize_datetime(item)
+                    json_line = json.dumps(
+                        serialized_item, ensure_ascii=False, separators=(",", ":")
+                    )
+                    f.write(json_line + "\n")
+            os.replace(temporary_path, file_path)
+        finally:
+            temporary_path.unlink(missing_ok=True)
 
     def _list(self, data_type: str) -> t.List[str]:
         """List all available datasets or experiments."""
