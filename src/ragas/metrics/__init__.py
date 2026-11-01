@@ -93,6 +93,12 @@ from ragas.metrics.base import (
     SimpleLLMMetric as LLMMetric,
     SingleTurnMetric,
 )
+from ragas.metrics._ir_ranking import (
+    ContextHitRate,
+    ContextMAP,
+    ContextMRR,
+    ContextNDCG,
+)
 from ragas.metrics.discrete import DiscreteMetric, discrete_metric
 from ragas.metrics.numeric import NumericMetric, numeric_metric
 from ragas.metrics.ranking import RankingMetric, ranking_metric
@@ -117,6 +123,11 @@ __all__ = [
     "discrete_metric",
     "numeric_metric",
     "ranking_metric",
+    # Information Retrieval Ranking Metrics
+    "ContextNDCG",
+    "ContextMRR",
+    "ContextMAP",
+    "ContextHitRate",
     # Note: Specific metric classes and instances are deprecated from this module
     # and should be imported from ragas.metrics.collections instead.
     # They remain accessible via __getattr__ for backwards compatibility.
