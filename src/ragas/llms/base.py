@@ -9,8 +9,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import instructor
-from langchain_community.chat_models.vertexai import ChatVertexAI
-from langchain_community.llms import VertexAI
+try:
+    from langchain_community.chat_models.vertexai import ChatVertexAI
+    from langchain_community.llms import VertexAI
+except ImportError:
+    ChatVertexAI = None
+    VertexAI = None
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.outputs import ChatGeneration, Generation, LLMResult
 from langchain_openai.chat_models import AzureChatOpenAI, ChatOpenAI
