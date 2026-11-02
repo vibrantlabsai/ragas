@@ -141,8 +141,9 @@ class TestToolCallAccuracy:
         with pytest.warns(UserWarning, match="Length mismatch"):
             score = await tool_call_accuracy._multi_turn_ascore(sample, mock_callbacks)
 
-        # Should be 0 because sequences don't align (different lengths)
-        assert score == 0.0
+        # Overlapping portion (first call) aligns and its args match:
+        # mean arg score 1.0, coverage penalty 1/2 for the extra prediction.
+        assert score == 0.5
 
     @pytest.mark.asyncio
     async def test_length_mismatch_fewer_predicted(
@@ -168,7 +169,36 @@ class TestToolCallAccuracy:
         with pytest.warns(UserWarning, match="Length mismatch"):
             score = await tool_call_accuracy._multi_turn_ascore(sample, mock_callbacks)
 
-        # Should be 0 because sequences don't align (different lengths)
+        # Overlapping portion (first call) aligns and its args match:
+        # mean arg score 1.0, coverage penalty 1/2 for the missing call.
+        assert score == 0.5
+
+    @pytest.mark.asyncio
+    async def test_length_mismatch_overlap_misaligned(
+        self, tool_call_accuracy, mock_callbacks
+    ):
+        """Strict order: a misaligned overlapping portion still scores 0."""
+        ref_tool_calls = [ToolCall(name="search", args={"query": "python"})]
+
+        pred_tool_calls = [
+            ToolCall(name="filter", args={"type": "recent"}),
+            ToolCall(name="search", args={"query": "python"}),
+        ]
+
+        sample = MultiTurnSample(
+            user_input=[AIMessage(content="Working...", tool_calls=pred_tool_calls)],
+            reference_tool_calls=ref_tool_calls,
+        )
+
+        tool_call_accuracy.arg_comparison_metric.single_turn_ascore = AsyncMock(
+            return_value=1.0
+        )
+
+        with pytest.warns(UserWarning, match="Length mismatch"):
+            score = await tool_call_accuracy._multi_turn_ascore(sample, mock_callbacks)
+
+        # The compared portion (first predicted call) is a different tool,
+        # so the sequence is not aligned and the score stays 0.
         assert score == 0.0
 
     @pytest.mark.asyncio
@@ -369,3 +399,47 @@ class TestToolCallAccuracy:
         different_call = ToolCall(name="UVIndex", args={"location": "Paris"})
         key_3 = ToolCallAccuracy._sorted_key_for_tool_call(different_call)
         assert key_1 != key_3
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "strict_order,pred_calls,ref_calls,expected",
+        [
+            # equal length: unchanged behavior
+            (
+                True,
+                [("a", {"x": 1}), ("b", {"y": 2})],
+                [("a", {"x": 1}), ("b", {"y": 2})],
+                1.0,
+            ),
+            (True, [("b", {}), ("a", {})], [("a", {}), ("b", {})], 0.0),
+            (False, [("b", {}), ("a", {})], [("a", {}), ("b", {})], 1.0),
+            # length mismatch: overlap aligned -> partial credit (#3079),
+            # extra predictions still penalized (#1893)
+            (True, [("a", {"x": 1}), ("b", {})], [("a", {"x": 1})], 0.5),
+            (True, [("a", {"x": 1})], [("a", {"x": 1}), ("b", {})], 0.5),
+            (False, [("a", {"x": 1}), ("b", {})], [("a", {"x": 1})], 0.5),
+            # misaligned overlapping portion still scores 0
+            (True, [("b", {}), ("a", {})], [("a", {})], 0.0),
+            # duplicates
+            (True, [("a", {}), ("a", {})], [("a", {})], 0.5),
+            (True, [("a", {}), ("a", {})], [("a", {}), ("a", {})], 1.0),
+            # flexible mode pairs positionally after sorting: a reference
+            # subset past the first min-length positions does not match
+            (False, [("a", {}), ("b", {}), ("c", {})], [("b", {}), ("c", {})], 0.0),
+        ],
+    )
+    async def test_scoring_matrix(self, strict_order, pred_calls, ref_calls, expected):
+        """Regression matrix for alignment, length mismatch, and duplicates."""
+        metric = ToolCallAccuracy(strict_order=strict_order)
+        pred = [ToolCall(name=name, args=args) for name, args in pred_calls]
+        ref = [ToolCall(name=name, args=args) for name, args in ref_calls]
+        sample = MultiTurnSample(
+            user_input=[AIMessage(content="Working...", tool_calls=pred)],
+            reference_tool_calls=ref,
+        )
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            score = await metric._multi_turn_ascore(sample, None)
+        assert score == expected
