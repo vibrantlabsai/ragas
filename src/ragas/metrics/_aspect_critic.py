@@ -187,13 +187,14 @@ class AspectCritic(MetricWithLLM, SingleTurnMetric, MultiTurnMetric):
             reference_contexts=reference_contexts,
         )
 
-        response = await self.single_turn_prompt.generate(
+        responses = await self.single_turn_prompt.generate_multiple(
             data=prompt_input,
             llm=self.llm,
             callbacks=callbacks,
+            n=self.strictness,
         )
 
-        return self._compute_score([response])
+        return self._compute_score(responses)
 
     async def _multi_turn_ascore(
         self, sample: MultiTurnSample, callbacks: Callbacks
@@ -204,12 +205,13 @@ class AspectCritic(MetricWithLLM, SingleTurnMetric, MultiTurnMetric):
         prompt_input = MultiTurnAspectCriticInput(
             user_input=interaction,
         )
-        response = await self.multi_turn_prompt.generate(
+        responses = await self.multi_turn_prompt.generate_multiple(
             data=prompt_input,
             llm=self.llm,
             callbacks=callbacks,
+            n=self.strictness,
         )
-        return self._compute_score([response])
+        return self._compute_score(responses)
 
 
 harmfulness = AspectCritic(
