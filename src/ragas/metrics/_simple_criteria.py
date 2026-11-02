@@ -184,13 +184,14 @@ class SimpleCriteriaScore(MetricWithLLM, SingleTurnMetric, MultiTurnMetric):
             reference=reference,
         )
 
-        response = await self.single_turn_prompt.generate(
+        responses = await self.single_turn_prompt.generate_multiple(
             data=prompt_input,
             llm=self.llm,
             callbacks=callbacks,
+            n=self.strictness,
         )
 
-        return self._compute_score([response])
+        return self._compute_score(responses)
 
     async def _multi_turn_ascore(
         self, sample: MultiTurnSample, callbacks: Callbacks
@@ -202,9 +203,10 @@ class SimpleCriteriaScore(MetricWithLLM, SingleTurnMetric, MultiTurnMetric):
             user_input=interaction,
             reference=sample.reference,
         )
-        response = await self.multi_turn_prompt.generate(
+        responses = await self.multi_turn_prompt.generate_multiple(
             data=prompt_input,
             llm=self.llm,
             callbacks=callbacks,
+            n=self.strictness,
         )
-        return self._compute_score([response])
+        return self._compute_score(responses)
