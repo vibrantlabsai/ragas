@@ -14,6 +14,10 @@ Each metric are essentially paradigms that are designed to evaluate a particular
 - [Multimodal Faithfulness](multi_modal_faithfulness.md)
 - [Multimodal Relevance](multi_modal_relevance.md)
 
+## Consistency
+- [Answer Consistency](consistency.md#answer-consistency)
+- [Retrieval Consistency](consistency.md#retrieval-consistency)
+
 ## Nvidia Metrics
 - [Answer Accuracy](nvidia_metrics.md#answer-accuracy)
 - [Context Relevance](nvidia_metrics.md#context-relevance)
