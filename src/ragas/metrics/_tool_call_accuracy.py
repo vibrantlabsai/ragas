@@ -151,8 +151,17 @@ class ToolCallAccuracy(MultiTurnMetric):
                 f"tool calls will be compared."
             )
 
-        tool_call_pred_sequence = [tool_call.name for tool_call in pred_tool_calls]
-        tool_call_ref_sequence = [tool_call.name for tool_call in reference_tool_calls]
+        # Compare only the overlapping portion on length mismatch, as documented:
+        # the score loop pairs calls with zip() and applies a coverage penalty, so
+        # alignment must be checked over the same compared calls. Comparing the
+        # full unequal-length sequences would always fail and zero the score.
+        compared_count = min(len(pred_tool_calls), len(reference_tool_calls))
+        tool_call_pred_sequence = [
+            tool_call.name for tool_call in pred_tool_calls[:compared_count]
+        ]
+        tool_call_ref_sequence = [
+            tool_call.name for tool_call in reference_tool_calls[:compared_count]
+        ]
 
         sequence_aligned = int(
             self.is_sequence_aligned(tool_call_pred_sequence, tool_call_ref_sequence)
@@ -160,7 +169,6 @@ class ToolCallAccuracy(MultiTurnMetric):
 
         # Calculate score based on paired tool calls (without nested loop)
         score = 0.0
-        compared_count = min(len(pred_tool_calls), len(reference_tool_calls))
 
         for ref_tool_call, pred_tool_call in zip(reference_tool_calls, pred_tool_calls):
             if ref_tool_call.name == pred_tool_call.name:
@@ -169,10 +177,14 @@ class ToolCallAccuracy(MultiTurnMetric):
                 )
                 score += arg_score
 
-        score /= len(reference_tool_calls)
+        score /= compared_count
 
-        if compared_count < len(reference_tool_calls):
-            coverage_penalty = compared_count / len(reference_tool_calls)
+        # Penalize length mismatch in both directions (#1893: extra predicted
+        # calls must lower the score; #3079: partial credit for correct calls).
+        if len(pred_tool_calls) != len(reference_tool_calls):
+            coverage_penalty = compared_count / max(
+                len(pred_tool_calls), len(reference_tool_calls)
+            )
             score *= coverage_penalty
 
         return score * sequence_aligned
