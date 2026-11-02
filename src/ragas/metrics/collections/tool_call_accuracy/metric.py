@@ -139,9 +139,16 @@ class ToolCallAccuracy(BaseMetric):
                 f"tool calls will be compared."
             )
 
-        # Extract sequences and check alignment
-        tool_call_pred_sequence = [tc.name for tc in pred_tool_calls]
-        tool_call_ref_sequence = [tc.name for tc in reference_tool_calls]
+        # Extract sequences and check alignment. On length mismatch, compare
+        # only the overlapping portion: the score loop below pairs calls with
+        # zip() and applies a coverage penalty, so alignment must be checked
+        # over the same compared calls. Comparing the full unequal-length
+        # sequences would always fail and zero the score.
+        compared_count = min(len(pred_tool_calls), len(reference_tool_calls))
+        tool_call_pred_sequence = [tc.name for tc in pred_tool_calls[:compared_count]]
+        tool_call_ref_sequence = [
+            tc.name for tc in reference_tool_calls[:compared_count]
+        ]
 
         sequence_aligned = int(
             self._is_sequence_aligned(tool_call_pred_sequence, tool_call_ref_sequence)
@@ -149,19 +156,22 @@ class ToolCallAccuracy(BaseMetric):
 
         # Calculate argument accuracy for matching tool calls
         score = 0.0
-        compared_count = min(len(pred_tool_calls), len(reference_tool_calls))
 
         for ref_tool_call, pred_tool_call in zip(reference_tool_calls, pred_tool_calls):
             if ref_tool_call.name == pred_tool_call.name:
                 arg_score = exact_match_args(pred_tool_call.args, ref_tool_call.args)
                 score += arg_score
 
-        # Normalize by reference length
-        score /= len(reference_tool_calls)
+        # Normalize by the number of compared (paired) calls
+        score /= compared_count
 
-        # Apply coverage penalty for length mismatch
-        if compared_count < len(reference_tool_calls):
-            coverage_penalty = compared_count / len(reference_tool_calls)
+        # Apply a coverage penalty for length mismatch in both directions
+        # (#1893: extra predicted calls must lower the score; #3079: partial
+        # credit for correct calls).
+        if len(pred_tool_calls) != len(reference_tool_calls):
+            coverage_penalty = compared_count / max(
+                len(pred_tool_calls), len(reference_tool_calls)
+            )
             score *= coverage_penalty
 
         # Apply sequence alignment factor
