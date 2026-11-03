@@ -470,6 +470,14 @@ class TestsetGenerator:
         4. Generate samples for each scenario.
         5. Compile the results into an EvaluationDataset.
         """
+        if testset_size is None or testset_size <= 0:
+            # The pipeline used to run the whole generation for personas, scenarios
+            # and samples and then hand back an empty Testset, with no hint that the
+            # size asked for was the reason.
+            raise ValueError(
+                f"testset_size must be a positive integer, got {testset_size!r}"
+            )
+
         if run_config is not None:
             # Only BaseRagasLLM has set_run_config method, not InstructorBaseRagasLLM
             if isinstance(self.llm, BaseRagasLLM):
