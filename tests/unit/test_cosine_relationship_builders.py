@@ -431,3 +431,86 @@ async def test_apply_transforms_summary_cosine_similarity_builder(simple_kg):
         and str(r.target.id) == "437c8c08-cef6-4ebf-a35f-93d6168b61a4"
         for r in kg.relationships
     )
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+@pytest.mark.parametrize("chunk_embedding", [None, [1.0, 0.0], [1.0]])
+def test_summary_similarity_pipeline_keeps_document_endpoints(
+    parallel, chunk_embedding
+):
+    """Scheduling must preserve the subclass's document-only graph semantics."""
+    import asyncio
+
+    from ragas.testset.transforms.engine import Parallel, apply_transforms
+
+    first = Node(type=NodeType.DOCUMENT, properties={"summary_embedding": [1.0, 0.0]})
+    chunk = Node(type=NodeType.CHUNK, properties={})
+    if chunk_embedding is not None:
+        chunk.properties["summary_embedding"] = chunk_embedding
+    second = Node(type=NodeType.DOCUMENT, properties={"summary_embedding": [1.0, 0.0]})
+    kg = KnowledgeGraph(nodes=[first, chunk, second])
+    previous = Relationship(source=first, target=chunk, type="child")
+    kg.relationships.append(previous)
+    builder = SummaryCosineSimilarityBuilder(threshold=0.5)
+    expected = asyncio.run(builder.transform(kg))
+
+    apply_transforms(kg, Parallel(builder) if parallel else builder)
+
+    assert kg.relationships[0] is previous
+    assert len(kg.relationships) == len(expected) + 1 == 2
+    actual = kg.relationships[1]
+    assert actual.source is first
+    assert actual.target is second
+    assert actual.type == expected[0].type
+    assert actual.properties == expected[0].properties
+    assert actual.bidirectional
+    assert kg.nodes == [first, chunk, second]
+
+
+def test_summary_similarity_plan_applies_custom_filter_before_validation():
+    import asyncio
+
+    from ragas.testset.transforms.engine import apply_transforms
+
+    first = Node(type=NodeType.DOCUMENT, properties={"custom": [1.0, 0.0]})
+    rejected = Node(type=NodeType.DOCUMENT, properties={})
+    chunk = Node(type=NodeType.CHUNK, properties={})
+    second = Node(type=NodeType.DOCUMENT, properties={"custom": [1.0, 0.0]})
+    kg = KnowledgeGraph(nodes=[first, rejected, chunk, second])
+    builder = SummaryCosineSimilarityBuilder(
+        property_name="custom",
+        new_property_name="document_similarity",
+        threshold=0.5,
+        filter_nodes=lambda node: node.id != rejected.id,
+    )
+    expected = asyncio.run(builder.transform(builder.filter(kg)))
+    apply_transforms(kg, builder)
+    assert len(kg.relationships) == len(expected) == 1
+    relationship = kg.relationships[0]
+    assert relationship.source is first and relationship.target is second
+    assert relationship.type == "document_similarity"
+    assert relationship.properties == expected[0].properties
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("missing_document", [False, True])
+async def test_invalid_summary_plan_does_not_append_relationships(missing_document):
+    first = Node(type=NodeType.DOCUMENT, properties={"summary_embedding": [1.0, 0.0]})
+    chunk = Node(type=NodeType.CHUNK, properties={"summary_embedding": [1.0, 0.0]})
+    invalid = Node(type=NodeType.DOCUMENT, properties={})
+    kg = KnowledgeGraph(nodes=[first, chunk, invalid] if missing_document else [chunk])
+    prior = Relationship(source=first, target=chunk, type="child")
+    kg.relationships.append(prior)
+    builder = SummaryCosineSimilarityBuilder()
+    # Both public paths must report the same invalid selected document set.
+    message = (
+        "has no summary_embedding" if missing_document else "No nodes have a valid"
+    )
+    with pytest.raises(ValueError, match=message):
+        await builder.transform(kg)
+    with pytest.raises(ValueError, match=message):
+        plan = builder.generate_execution_plan(kg)
+        for coroutine in plan:
+            await coroutine
+    assert kg.relationships == [prior]
+    assert kg.relationships[0] is prior
