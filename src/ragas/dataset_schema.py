@@ -202,12 +202,18 @@ class RagasDataset(ABC, t.Generic[Sample]):
         pass
 
     def validate_samples(self, samples: t.List[Sample]) -> t.List[Sample]:
-        """Validates that all samples are of the same type."""
+        """Validates that all samples are BaseSample instances of the same type."""
         if len(samples) == 0:
             return samples
 
         first_sample_type = type(samples[0])
         for i, sample in enumerate(samples):
+            if not isinstance(sample, BaseSample):
+                raise ValueError(
+                    f"Sample at index {i} is of type {type(sample)}, expected an "
+                    "instance of BaseSample (e.g. SingleTurnSample, MultiTurnSample, "
+                    "TestsetSample)"
+                )
             if not isinstance(sample, first_sample_type):
                 raise ValueError(
                     f"Sample at index {i} is of type {type(sample)}, expected {first_sample_type}"
