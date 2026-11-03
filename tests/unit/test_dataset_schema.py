@@ -224,3 +224,14 @@ def test_multiturn_sample_validate_user_input_valid_types():
     assert len(sample.user_input) == 2
     assert isinstance(sample.user_input[0], HumanMessage)
     assert isinstance(sample.user_input[1], AIMessage)
+
+
+def test_a_sample_that_is_not_a_base_sample_is_named():
+    with pytest.raises(ValueError, match="expected an instance of BaseSample"):
+        EvaluationDataset(samples=["not a sample", "also not a sample"])
+
+
+def test_samples_of_a_single_type_still_build():
+    dataset = EvaluationDataset(samples=[SingleTurnSample(user_input="hi", response="hello")])
+
+    assert len(dataset.samples) == 1
