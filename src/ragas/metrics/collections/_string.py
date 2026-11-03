@@ -64,6 +64,13 @@ class ExactMatch(BaseMetric):
         Returns:
             MetricResult with 1.0 if exact match, 0.0 otherwise
         """
+        assert isinstance(reference, str), (
+            "ExactMatch expects a valid reference string"
+        )
+        assert isinstance(response, str), (
+            "ExactMatch expects a valid response string"
+        )
+
         score = float(reference == response)
         return MetricResult(value=score)
 
