@@ -167,7 +167,6 @@ class NonLLMStringSimilarity(BaseMetric):
     ):
         """Initialize NonLLMStringSimilarity metric."""
         super().__init__(name=name, **base_kwargs)
-        self.distance_measure = distance_measure
 
         try:
             from rapidfuzz import distance
@@ -176,6 +175,27 @@ class NonLLMStringSimilarity(BaseMetric):
                 "rapidfuzz is required for string distance. "
                 "Please install it using `pip install rapidfuzz`"
             )
+
+        # Validate after the optional import so that a missing rapidfuzz still
+        # raises ImportError, and accept the enum value ("levenshtein") as a
+        # convenience; anything else would only fail at scoring time with a
+        # bare KeyError that never lists the valid options.
+        if isinstance(distance_measure, str):
+            try:
+                distance_measure = DistanceMeasure(distance_measure)
+            except ValueError:
+                valid_options = [measure.value for measure in DistanceMeasure]
+                raise ValueError(
+                    f"distance_measure {distance_measure!r} is not valid. "
+                    f"Valid options are: {valid_options}"
+                )
+        if not isinstance(distance_measure, DistanceMeasure):
+            valid_options = [measure.value for measure in DistanceMeasure]
+            raise ValueError(
+                f"distance_measure must be a DistanceMeasure or one of "
+                f"{valid_options}, got {type(distance_measure).__name__}"
+            )
+        self.distance_measure = distance_measure
 
         self.distance_measure_map = {
             DistanceMeasure.LEVENSHTEIN: distance.Levenshtein,
