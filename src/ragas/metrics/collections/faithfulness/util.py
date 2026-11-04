@@ -57,7 +57,9 @@ class StatementFaithfulnessAnswer(BaseModel):
 
     statement: str = Field(..., description="the original statement, word-by-word")
     reason: str = Field(..., description="the reason of the verdict")
-    verdict: int = Field(..., description="the verdict(0/1) of the faithfulness")
+    verdict: int = Field(
+        ..., ge=0, le=1, description="the verdict(0/1) of the faithfulness"
+    )
 
 
 class NLIStatementInput(BaseModel):
