@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prompt-optimization"
+version = "0.1.0"
+description = "Optimize a RAG app's prompt with DSPy (few-shot + MIPROv2) and verify the gain with Ragas"
+requires-python = ">=3.10"
+dependencies = [
+    "ragas[dspy]>=0.4.0",
+    "anthropic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+ragas-prompt-optimization = "optimize:main"
+ragas-prompt-optimization-eval = "evals:main"
+
+[tool.setuptools]
+py-modules = ["optimize", "evals"]

@@ -36,18 +36,26 @@ class ExactMatch(BaseMetric):
         ...     {"reference": "Text 2", "response": "Different"},
         ... ])
 
+        >>> # Ignore case, punctuation and articles (SQuAD-style)
+        >>> lenient = ExactMatch(normalize=True)
+
     Attributes:
         name: The metric name
+        normalize: If True, compare SQuAD-normalized text (lowercase, no
+            punctuation, no articles, collapsed whitespace). Default False
+            keeps strict string equality.
         allowed_values: Score range (0.0 to 1.0)
     """
 
     def __init__(
         self,
         name: str = "exact_match",
+        normalize: bool = False,
         **base_kwargs,
     ):
         """Initialize ExactMatch metric."""
         super().__init__(name=name, **base_kwargs)
+        self.normalize = normalize
 
     async def ascore(
         self,
@@ -64,7 +72,14 @@ class ExactMatch(BaseMetric):
         Returns:
             MetricResult with 1.0 if exact match, 0.0 otherwise
         """
-        score = float(reference == response)
+        if self.normalize:
+            from ragas.metrics.collections.token_overlap.metric import (
+                normalize_answer,
+            )
+
+            score = float(normalize_answer(reference) == normalize_answer(response))
+        else:
+            score = float(reference == response)
         return MetricResult(value=score)
 
 

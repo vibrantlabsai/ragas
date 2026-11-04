@@ -57,6 +57,8 @@ ragas-improve-rag = "ragas_examples.improve_rag.evals:main"
 ragas-text2sql-evals = "ragas_examples.text2sql.evals:main"
 ragas-llamaindex-agent-evals = "ragas_examples.llamaIndex_agent_evals.evals:main"
 ragas-judge-alignment = "ragas_examples.judge_alignment.evals:main"
+ragas-prompt-optimization = "ragas_examples.prompt_optimization.optimize:main"
+ragas-prompt-optimization-eval = "ragas_examples.prompt_optimization.evals:main"
 
 [project.urls]
 Homepage = "https://github.com/vibrantlabsai/ragas"

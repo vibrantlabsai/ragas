@@ -529,6 +529,11 @@ def quickstart(
             "description": "Benchmark and compare different LLM models on discount calculation tasks",
             "source_path": "ragas_examples/benchmark_llm",
         },
+        "prompt_optimization": {
+            "name": "Prompt Optimization",
+            "description": "Optimize a RAG prompt with DSPy (few-shots + MIPROv2) and verify the gain with Ragas evals",
+            "source_path": "ragas_examples/prompt_optimization",
+        },
     }
 
     # If no template specified, list available templates

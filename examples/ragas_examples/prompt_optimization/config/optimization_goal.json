@@ -1,0 +1,6 @@
+{
+  "target_metric": "token_f1",
+  "target_value": 0.9,
+  "floors": {"token_recall": 0.80, "exact_match": "baseline"},
+  "floor_tolerance": 0.0
+}

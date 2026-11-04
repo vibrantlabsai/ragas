@@ -44,6 +44,7 @@ from ragas.metrics.collections.quoted_spans import QuotedSpansAlignment
 from ragas.metrics.collections.response_groundedness import ResponseGroundedness
 from ragas.metrics.collections.sql_semantic_equivalence import SQLSemanticEquivalence
 from ragas.metrics.collections.summary_score import SummaryScore
+from ragas.metrics.collections.token_overlap import TokenOverlap
 from ragas.metrics.collections.tool_call_accuracy import ToolCallAccuracy
 from ragas.metrics.collections.tool_call_f1 import ToolCallF1
 from ragas.metrics.collections.topic_adherence import TopicAdherence
@@ -77,6 +78,7 @@ __all__ = [
     "SemanticSimilarity",
     "StringPresence",
     "SummaryScore",
+    "TokenOverlap",
     # Agent & Tool metrics
     "AgentGoalAccuracy",
     "AgentGoalAccuracyWithReference",

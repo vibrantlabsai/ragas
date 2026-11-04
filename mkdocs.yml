@@ -111,6 +111,7 @@ nav:
           - Prompt Evaluation:
             - Iterate and Improve Prompts: howtos/applications/iterate_prompt.md
             - Systematic Prompt Optimization: howtos/applications/prompt_optimization.md
+            - Optimize a RAG App's Prompt: howtos/applications/optimize_rag_prompt.md
           - Metrics:
             - Cost Analysis: howtos/applications/_cost.md
             - Evaluating Multi-turn Conversations: howtos/applications/evaluating_multi_turn_conversations.md
