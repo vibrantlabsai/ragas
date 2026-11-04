@@ -801,6 +801,12 @@ class InstructorLLM(InstructorBaseRagasLLM):
         self.model = model
         self.provider = provider
 
+        # Remember which sampling args the caller chose explicitly, so provider
+        # mappings can drop library defaults that a provider rejects.
+        self._explicit_model_args: t.Set[str] = set(kwargs)
+        if model_args is not None:
+            self._explicit_model_args |= set(model_args.model_fields_set)
+
         # Use deterministic defaults if no model_args provided
         if model_args is None:
             model_args = InstructorModelArgs()
@@ -826,7 +832,7 @@ class InstructorLLM(InstructorBaseRagasLLM):
         Each provider may have different parameter requirements:
         - Google: Wraps parameters in generation_config and renames max_tokens
         - OpenAI/Azure: Maps max_tokens to max_completion_tokens for o-series models
-        - Anthropic: No special handling required (pass-through)
+        - Anthropic: Drops default sampling params (see _map_anthropic_params)
         - LiteLLM: No special handling required (routes internally, pass-through)
         """
         provider_lower = self.provider.lower()
@@ -835,9 +841,27 @@ class InstructorLLM(InstructorBaseRagasLLM):
             return self._map_google_params()
         elif provider_lower in ("openai", "azure"):
             return self._map_openai_params()
+        elif provider_lower == "anthropic":
+            return self._map_anthropic_params()
         else:
-            # Anthropic, LiteLLM, and other providers - pass through unchanged
+            # LiteLLM and other providers - pass through unchanged
             return self.model_args.copy()
+
+    def _map_anthropic_params(self) -> t.Dict[str, t.Any]:
+        """Map parameters for Anthropic Claude models.
+
+        Current Claude models reject non-default sampling values
+        (``temperature``, ``top_p``) with a 400 error, and newer API versions
+        reject them on every model. The ragas defaults (temperature=0.01,
+        top_p=0.1) are therefore dropped. Values the caller set explicitly are
+        kept, so older models that still accept them can use them.
+        """
+        mapped_args = self.model_args.copy()
+        explicit = getattr(self, "_explicit_model_args", set())
+        for key in ("temperature", "top_p"):
+            if key not in explicit:
+                mapped_args.pop(key, None)
+        return mapped_args
 
     def _map_openai_params(self) -> t.Dict[str, t.Any]:
         """Map parameters for OpenAI/Azure reasoning models with special constraints.

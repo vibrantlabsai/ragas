@@ -203,3 +203,13 @@ text2sql_logs
 mlartifacts
 mlflow.db
 plan
+
+# prompt_optimization tool run outputs
+examples/ragas_examples/prompt_optimization/runs/
+# Added by code-review-graph
+.code-review-graph/
+local_files/
+##adding envs
+.env
+.mcp.json
+
