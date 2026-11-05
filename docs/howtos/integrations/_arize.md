@@ -7,8 +7,10 @@ Building a baseline for a RAG pipeline is not usually difficult, but enhancing i
 This article covers how to evaluate, visualize and analyze your RAG using a combination of open-source libraries.  We will be using:
 
 - [Ragas](https://docs.ragas.io/en/stable/) for synthetic test data generation and evaluation
-- Arize AI’s [Phoenix](https://docs.arize.com/phoenix) for tracing, visualization, and cluster analysis
+- [Arize Phoenix](https://arize.com/phoenix/), the open-source option from [Arize AI](https://arize.com/?utm_source=ragas-docs&utm_medium=partner&utm_campaign=partner-docs&utm_content=arize-integration), for tracing, visualization, and cluster analysis
 - [LlamaIndex](https://docs.llamaindex.ai/en/stable/) for building RAG pipelines
+
+This workflow uses Phoenix for local, open-source inspection. Teams that need managed cloud or enterprise self-hosted observability and evaluation for production AI systems can use [Arize AX](https://arize.com/products/ax/). For more background on evaluation patterns, see Arize's [LLM evaluation guide](https://arize.com/resources/llm-evaluation/) and [agent evaluation guide](https://arize.com/ai-agents/agent-evaluation/).
 
 For the purpose of this article, we’ll be using data from arXiv papers about prompt-engineering to build the RAG pipeline.
 
