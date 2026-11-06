@@ -119,8 +119,12 @@ class DataCompyScore(BaseMetric):
                 else 0.0
             )
         else:
-            matched_cols = len(
-                [col for col in compare.column_stats if col["unequal_cnt"] == 0]
+            # Column statistics cover only intersecting rows. A whole column
+            # cannot match if either dataframe has additional rows.
+            matched_cols = (
+                sum(col["unequal_cnt"] == 0 for col in compare.column_stats)
+                if compare.all_rows_overlap()
+                else 0
             )
             recall = (
                 matched_cols / reference_df.shape[1]

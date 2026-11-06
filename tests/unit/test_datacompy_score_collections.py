@@ -122,6 +122,41 @@ class TestDataCompyScoreCollections:
         assert 0.66 <= result.value <= 0.67
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("score_type", ["precision", "recall", "f1"])
+    @pytest.mark.parametrize(
+        "response",
+        [
+            "id,name\n1,Alice",
+            "id,name\n1,Alice\n2,Bob\n3,Charlie",
+            "id,name",
+        ],
+        ids=["missing-row", "extra-row", "headers-only"],
+    )
+    async def test_columns_require_all_rows_to_match(self, score_type, response):
+        """Matching an intersection of rows does not match an entire column."""
+        metric = DataCompyScore(mode="columns", metric=score_type)
+        reference = "id,name\n1,Alice\n2,Bob"
+
+        result = await metric.ascore(reference=reference, response=response)
+
+        assert result.value == 0.0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("score_type", "expected"),
+        [("precision", 1.0), ("recall", 2 / 3), ("f1", 0.8)],
+    )
+    async def test_columns_with_missing_column(self, score_type, expected):
+        """Complete matching columns still receive credit independently."""
+        metric = DataCompyScore(mode="columns", metric=score_type)
+        reference = "id,name,age\n1,Alice,30\n2,Bob,25"
+        response = "id,name\n1,Alice\n2,Bob"
+
+        result = await metric.ascore(reference=reference, response=response)
+
+        assert result.value == pytest.approx(expected)
+
+    @pytest.mark.asyncio
     async def test_invalid_reference_type(self):
         """Test that non-string reference raises ValueError."""
         metric = DataCompyScore()

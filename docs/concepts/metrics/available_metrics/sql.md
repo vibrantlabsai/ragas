@@ -55,6 +55,11 @@ metric = DataCompyScore(mode="columns", metric="recall")
 result = await metric.ascore(response=data1, reference=data2)
 ```
 
+In `columns` mode, a column matches only when its values match across all rows,
+aligned by row index. Missing or extra rows prevent a full column match, even if
+the overlapping rows are identical. Use `rows` mode to award partial credit for
+matching rows in results of different lengths.
+
 ---
 
 ### DataCompyScore (Legacy)
