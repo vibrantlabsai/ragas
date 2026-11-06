@@ -66,7 +66,7 @@ dspy = ["dspy-ai>=2.4.0"]
 
 # Minimal dev dependencies for fast development setup (used by make install-minimal)
 dev-minimal = [
-    "ruff",
+    "ruff<0.16",  # 0.16 started formatting code blocks in Markdown files
     "pyright>=1.1.403",
     "pre-commit>=4.3.0",
     "pytest",
@@ -155,7 +155,7 @@ testpaths = ["tests"]
 # Full dev dependencies with all features (used by make install)
 dev = [
     # Core dev tools (shared with minimal)
-    "ruff",
+    "ruff<0.16",  # 0.16 started formatting code blocks in Markdown files
     "pyright>=1.1.403",
     "pre-commit>=4.3.0",
     "pytest",
@@ -166,7 +166,16 @@ dev = [
     "nbmake",
     "notebook",
     "unstructured[md]",
-    "arize-phoenix>=6.1.0",
+    # These releases evaluate `X | None` at runtime, which fails on Python 3.9
+    "banks<2.4.4; python_version < '3.10'",
+    "llama-index-core<0.14.15; python_version < '3.10'",
+    # langchain-community 0.4 removed chat_models.vertexai, imported by ragas.llms.base
+    "langchain-community<0.4",
+    # langfuse 4 stopped accepting htmlPath in TraceWithFullDetails, breaking sync_trace
+    "langfuse<4",
+    # haystack-ai 3 and the numpy 2.4 stubs fail `make type`
+    "haystack-ai<3",
+    "numpy<2.4",
     "openinference-instrumentation-langchain>=0.1.29",
     # Include all optional features
     "ragas[all,tracing,gdrive,ai-frameworks]",

@@ -17,12 +17,11 @@ jobs:
 
     steps:
       - name: Checkout repository
+        # pull_request_target runs with base-repo secrets, so stay on the base branch
+        # and read the PR through `gh pr diff` instead of checking out fork code.
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
+          persist-credentials: false
 
       - name: Analyze PR for documentation needs
         id: analyze
@@ -78,22 +77,22 @@ jobs:
 
       - name: Parse analysis result
         id: parse
+        env:
+          STRUCTURED_OUTPUT: ${{ steps.analyze.outputs.structured_output }}
         run: |
-          # Use heredoc to safely handle JSON with special characters
-          cat <<'EOF' > /tmp/output.json
-          ${{ steps.analyze.outputs.structured_output }}
-          EOF
+          # The output is derived from untrusted PR content, so pass it through env
+          printf '%s\n' "$STRUCTURED_OUTPUT" > /tmp/output.json
 
           echo "structured_output=$(cat /tmp/output.json)"
           NEEDS_UPDATE=$(jq -r '.needs_update' /tmp/output.json)
-          REASON=$(jq -r '.reason' /tmp/output.json)
           echo "needs_update=$NEEDS_UPDATE" >> $GITHUB_OUTPUT
 
-          # Use multiline string format for reason to handle special characters
+          # Use a random delimiter so the reason cannot end the multiline value early
+          DELIMITER="reason_$(openssl rand -hex 16)"
           {
-            echo 'reason<<EOF'
+            echo "reason<<$DELIMITER"
             jq -r '.reason' /tmp/output.json
-            echo 'EOF'
+            echo "$DELIMITER"
           } >> $GITHUB_OUTPUT
 
       - name: Add label and comment if docs needed
@@ -105,15 +104,17 @@ jobs:
           # Comment with instructions
           gh pr comment ${{ github.event.pull_request.number }} --body "📝 **Documentation update may be needed**
 
-          ${{ steps.parse.outputs.reason }}
+          $REASON
 
           **To apply documentation updates:** Add the \`update-docs\` label to this PR."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REASON: ${{ steps.parse.outputs.reason }}
 
       - name: Comment if no docs needed
         if: steps.parse.outputs.needs_update == 'false'
         run: |
-          gh pr comment ${{ github.event.pull_request.number }} --body "✅ No documentation update needed — ${{ steps.parse.outputs.reason }}"
+          gh pr comment ${{ github.event.pull_request.number }} --body "✅ No documentation update needed — $REASON"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REASON: ${{ steps.parse.outputs.reason }}
