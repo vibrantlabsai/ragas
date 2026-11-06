@@ -74,6 +74,7 @@ dev-minimal = [
     "pytest-asyncio",
     "nbmake",
     "build>=1.3.0",
+    "oci>=2.160.1",
 ]
 
 # Test only dependencies
@@ -169,7 +170,7 @@ dev = [
     "arize-phoenix>=6.1.0",
     "openinference-instrumentation-langchain>=0.1.29",
     # Include all optional features
-    "ragas[all,tracing,gdrive,ai-frameworks]",
+    "ragas[all,tracing,gdrive,ai-frameworks,oci]",
 ]
 docs = [
     "mkdocs>=1.6.1",

@@ -22,7 +22,7 @@ def main():
     """Main function demonstrating OCI Gen AI integration."""
     
     # Configuration - Update these values for your environment
-    MODEL_ID = os.getenv("OCI_MODEL_ID", "cohere.command")
+    MODEL_ID = os.getenv("OCI_MODEL_ID", "cohere.command-a-03-2025")
     COMPARTMENT_ID = os.getenv("OCI_COMPARTMENT_ID", "ocid1.compartment.oc1..example")
     ENDPOINT_ID = os.getenv("OCI_ENDPOINT_ID", None)  # Optional
     
@@ -95,7 +95,7 @@ def test_llm_connection():
     """Test basic LLM connection and generation."""
     print("🧪 Testing OCI Gen AI connection...")
     
-    MODEL_ID = os.getenv("OCI_MODEL_ID", "cohere.command")
+    MODEL_ID = os.getenv("OCI_MODEL_ID", "cohere.command-a-03-2025")
     COMPARTMENT_ID = os.getenv("OCI_COMPARTMENT_ID", "ocid1.compartment.oc1..example")
     
     try:
@@ -126,7 +126,7 @@ if __name__ == "__main__":
     if not os.getenv("OCI_COMPARTMENT_ID"):
         print("⚠️  OCI_COMPARTMENT_ID not set. Using example value.")
         print("Set environment variables for your OCI configuration:")
-        print("  export OCI_MODEL_ID='cohere.command'")
+        print("  export OCI_MODEL_ID='cohere.command-a-03-2025'")
         print("  export OCI_COMPARTMENT_ID='ocid1.compartment.oc1..your-compartment'")
         print("  export OCI_ENDPOINT_ID='ocid1.endpoint.oc1..your-endpoint'  # Optional")
         print()
