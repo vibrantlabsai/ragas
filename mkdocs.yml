@@ -21,6 +21,7 @@ nav:
   - 📚 Core Concepts:
       - concepts/index.md
       - Experimentation: concepts/experimentation.md
+      - Comparing Experiments: concepts/comparing_experiments.md
       - Datasets: concepts/datasets.md
       - Metrics:
           - concepts/metrics/index.md

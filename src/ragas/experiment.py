@@ -13,9 +13,31 @@ from ragas.backends.base import BaseBackend
 from ragas.dataset import Dataset, DataTable
 from ragas.utils import find_git_root, memorable_names
 
+if t.TYPE_CHECKING:
+    from ragas.comparison import ComparisonLimits, ComparisonPlan, ComparisonReport
+
 
 class Experiment(DataTable):
     DATATABLE_TYPE = "Experiment"
+
+    def compare(
+        self,
+        baseline: "Experiment",
+        *,
+        plan: "ComparisonPlan",
+        limits: t.Optional["ComparisonLimits"] = None,
+    ) -> "ComparisonReport":
+        """Compare this candidate with a baseline using explicit case identities.
+
+        The operation is pure: it reads the currently loaded rows and does not
+        run experiments or access a backend. Exceptions omitted by ``arun``
+        cannot be reconstructed; use a plan with expected cases to account for
+        missing results on both sides. See :mod:`ragas.comparison` for coverage
+        and statistical assumptions.
+        """
+        from ragas.comparison import compare
+
+        return compare(baseline, self, plan=plan, limits=limits)
 
 
 def version_experiment(
