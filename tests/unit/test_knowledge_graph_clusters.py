@@ -815,12 +815,13 @@ def test_performance_find_n_indirect_clusters_max_density():
         nodes, relationships = create_web_of_similarities(node_count=size)
         kg: KnowledgeGraph = build_knowledge_graph(nodes, relationships)
 
-        # Measure execution time
-        start_time = time.time()
-        clusters: list[set[Node]] = kg.find_n_indirect_clusters(n=size, depth_limit=4)
-        end_time = time.time()
-
-        execution_time = end_time - start_time
+        # Keep the fastest of three runs so a busy runner cannot skew the ratios
+        execution_time = float("inf")
+        clusters: list[set[Node]] = []
+        for _ in range(3):
+            start_time = time.perf_counter()
+            clusters = kg.find_n_indirect_clusters(n=size, depth_limit=4)
+            execution_time = min(execution_time, time.perf_counter() - start_time)
 
         # Store results
         results.append(
