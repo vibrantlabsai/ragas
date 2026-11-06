@@ -21,15 +21,18 @@ except Exception:  # pragma: no cover - absence is okay
     _oci = None  # type: ignore
 
 try:  # pragma: no cover - environment dependent
-    from oci.generative_ai import (
-        GenerativeAiClient as _GenerativeAiClient,  # type: ignore
+    from oci.generative_ai_inference import (
+        GenerativeAiInferenceClient as _GenerativeAiInferenceClient,  # type: ignore
+        models as _oci_models,  # type: ignore
     )
 except Exception:  # pragma: no cover
-    _GenerativeAiClient = None  # type: ignore
+    _GenerativeAiInferenceClient = None  # type: ignore
+    _oci_models = None  # type: ignore
 
 # Expose for tests to patch
 oci = _oci  # type: ignore
-GenerativeAiClient = _GenerativeAiClient  # type: ignore
+GenerativeAiInferenceClient = _GenerativeAiInferenceClient  # type: ignore
+oci_models = _oci_models  # type: ignore
 
 
 class OCIGenAIWrapper(BaseRagasLLM):
@@ -55,10 +58,12 @@ class OCIGenAIWrapper(BaseRagasLLM):
         Initialize OCI Gen AI wrapper.
 
         Args:
-            model_id: The OCI model ID to use for generation
+            model_id: The OCI model ID to use for generation. IDs starting with
+                "cohere." use Cohere's chat format, all others the generic format.
+                Keep this set when using endpoint_id, since it selects the format.
             compartment_id: The OCI compartment ID
             config: OCI configuration dictionary (optional, uses default if not provided)
-            endpoint_id: Optional endpoint ID for the model
+            endpoint_id: Optional endpoint ID for dedicated serving
             run_config: Ragas run configuration
             cache: Optional cache backend
         """
@@ -72,12 +77,8 @@ class OCIGenAIWrapper(BaseRagasLLM):
         # Store client/config; perform lazy initialization to keep import-optional
         self.client = client
         self._oci_config = config
-        # If no client and SDK not available and no endpoint fallback, raise early
-        if (
-            self.client is None
-            and GenerativeAiClient is None
-            and self.endpoint_id is None
-        ):  # type: ignore
+        # The SDK is required even with a custom client, as it builds the requests
+        if GenerativeAiInferenceClient is None:  # type: ignore
             raise ImportError(
                 "OCI SDK not found. Please install it with: pip install oci"
             )
@@ -143,46 +144,111 @@ class OCIGenAIWrapper(BaseRagasLLM):
         # Generic fallback
         return oci_messages + [{"role": "user", "content": str(prompt)}]
 
-    def _create_generation_request(
+    def _create_cohere_chat_request(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+        stop: t.Optional[t.List[str]],
+    ) -> t.Any:
+        """Create a chat request for Cohere models."""
+        system = [m["content"] for m in messages if m["role"] == "system"]
+        conversation = [m for m in messages if m["role"] != "system"]
+        chat_history = [
+            oci_models.CohereChatBotMessage(message=m["content"])  # type: ignore
+            if m["role"] == "assistant"
+            else oci_models.CohereUserMessage(message=m["content"])  # type: ignore
+            for m in conversation[:-1]
+        ]
+
+        return oci_models.CohereChatRequest(  # type: ignore
+            message=conversation[-1]["content"],
+            chat_history=chat_history,
+            preamble_override="\n\n".join(system) or None,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            stop_sequences=stop,
+        )
+
+    def _create_generic_chat_request(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+        stop: t.Optional[t.List[str]],
+    ) -> t.Any:
+        """Create a chat request for models using the generic format."""
+        message_classes = {
+            "system": oci_models.SystemMessage,  # type: ignore
+            "assistant": oci_models.AssistantMessage,  # type: ignore
+        }
+        oci_messages = [
+            message_classes.get(m["role"], oci_models.UserMessage)(  # type: ignore
+                content=[oci_models.TextContent(text=m["content"])]  # type: ignore
+            )
+            for m in messages
+        ]
+
+        return oci_models.GenericChatRequest(  # type: ignore
+            messages=oci_messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            stop=stop,
+        )
+
+    def _create_chat_details(
         self,
         messages: List[Dict[str, str]],
         temperature: float = 0.01,
         max_tokens: t.Optional[int] = None,
         stop: t.Optional[t.List[str]] = None,
-    ) -> t.Dict[str, t.Any]:
-        """Create generation request for OCI Gen AI using role-aware messages."""
-        request = {
-            "compartment_id": self.compartment_id,
-            "serving_mode": {"model_id": self.model_id},
-            "inference_request": {
-                "messages": messages,
-                "max_tokens": max_tokens or 1000,
-                "temperature": temperature,
-            },
-        }
-
+    ) -> t.Any:
+        """Create the ChatDetails for OCI Gen AI using role-aware messages."""
         if self.endpoint_id:
-            request["serving_mode"] = {"endpoint_id": self.endpoint_id}
+            serving_mode = oci_models.DedicatedServingMode(  # type: ignore
+                endpoint_id=self.endpoint_id
+            )
+        else:
+            serving_mode = oci_models.OnDemandServingMode(  # type: ignore
+                model_id=self.model_id
+            )
 
-        if stop:
-            request["inference_request"]["stop"] = stop
+        if self.model_id.startswith("cohere."):
+            create_chat_request = self._create_cohere_chat_request
+        else:
+            create_chat_request = self._create_generic_chat_request
 
-        return request
+        return oci_models.ChatDetails(  # type: ignore
+            compartment_id=self.compartment_id,
+            serving_mode=serving_mode,
+            chat_request=create_chat_request(
+                messages, temperature, max_tokens or 1000, stop
+            ),
+        )
+
+    def _extract_text(self, response: t.Any) -> str:
+        """Extract the generated text from an OCI chat response."""
+        chat_response = response.data.chat_response
+
+        if chat_response.api_format == "COHERE":
+            return chat_response.text or ""
+
+        if not chat_response.choices:
+            raise ValueError(f"OCI Gen AI returned no choices for {self.model_id}")
+
+        content = chat_response.choices[0].message.content or []
+        return "".join(part.text for part in content if part.type == "TEXT")
 
     def _get_client(self):
         """Lazily initialize and return the OCI client."""
         if self.client is not None:
             return self.client
-        if GenerativeAiClient is None:  # type: ignore
-            raise ImportError(
-                "OCI SDK not found. Please install it with: pip install oci"
-            )
         cfg = self._oci_config
         if cfg is None and oci is not None:  # type: ignore
             cfg = oci.config.from_file()  # type: ignore
         if cfg is None:
             cfg = {}
-        self.client = GenerativeAiClient(cfg)  # type: ignore
+        self.client = GenerativeAiInferenceClient(cfg)  # type: ignore
         return self.client
 
     def generate_text(
@@ -202,21 +268,13 @@ class OCIGenAIWrapper(BaseRagasLLM):
 
         try:
             for _ in range(n):
-                request = self._create_generation_request(
+                chat_details = self._create_chat_details(
                     messages, temperature, stop=stop
                 )
 
-                response = self._get_client().generate_text(**request)
+                response = self._get_client().chat(chat_details)
 
-                # Extract text from response
-                if hasattr(response.data, "choices") and response.data.choices:
-                    text = response.data.choices[0].message.content
-                elif hasattr(response.data, "text"):
-                    text = response.data.text
-                else:
-                    text = str(response.data)
-
-                generation = Generation(text=text)
+                generation = Generation(text=self._extract_text(response))
                 generations.append([generation])
 
             # Track usage
@@ -256,23 +314,15 @@ class OCIGenAIWrapper(BaseRagasLLM):
             loop = asyncio.get_event_loop()
 
             for _ in range(n):
-                request = self._create_generation_request(
+                chat_details = self._create_chat_details(
                     messages, temperature, stop=stop
                 )
 
                 response = await loop.run_in_executor(
-                    None, lambda: self._get_client().generate_text(**request)
+                    None, lambda: self._get_client().chat(chat_details)
                 )
 
-                # Extract text from response
-                if hasattr(response.data, "choices") and response.data.choices:
-                    text = response.data.choices[0].message.content
-                elif hasattr(response.data, "text"):
-                    text = response.data.text
-                else:
-                    text = str(response.data)
-
-                generation = Generation(text=text)
+                generation = Generation(text=self._extract_text(response))
                 generations.append([generation])
 
             # Track usage
@@ -336,13 +386,13 @@ def oci_genai_factory(
     Examples:
         # Basic usage with default config
         llm = oci_genai_factory(
-            model_id="cohere.command",
+            model_id="cohere.command-a-03-2025",
             compartment_id="ocid1.compartment.oc1..example"
         )
 
         # With custom config
         llm = oci_genai_factory(
-            model_id="cohere.command",
+            model_id="cohere.command-a-03-2025",
             compartment_id="ocid1.compartment.oc1..example",
             config={"user": "user_ocid", "key_file": "~/.oci/private_key.pem"}
         )

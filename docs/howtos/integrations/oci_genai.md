@@ -21,11 +21,14 @@ Set up your OCI configuration using one of these methods:
 oci setup config
 ```
 
-#### Option B: Environment Variables
+#### Option B: Environment Variable
+If you have no config file at the default `~/.oci/config` location, point to one with:
+
 ```bash
-export OCI_CONFIG_FILE=~/.oci/config
-export OCI_PROFILE=DEFAULT
+export OCI_CONFIG_FILE=/path/to/config
 ```
+
+This reads the file's `DEFAULT` profile. To use another profile, load it with `oci.config.from_file(profile_name="MY_PROFILE")` and pass the result as `config`.
 
 #### Option C: Manual Configuration
 ```python
@@ -41,9 +44,9 @@ config = {
 ### 2. Get Required IDs
 
 You'll need:
-- **Model ID**: The OCI model ID (e.g., `cohere.command`, `meta.llama-3-8b`)
+- **Model ID**: The OCI model ID (e.g., `cohere.command-a-03-2025`, `meta.llama-3.3-70b-instruct`)
 - **Compartment ID**: Your OCI compartment OCID
-- **Endpoint ID** (optional): If using a custom endpoint
+- **Endpoint ID** (optional): If using a dedicated endpoint
 
 ## Usage
 
@@ -56,7 +59,7 @@ from datasets import Dataset
 
 # Initialize OCI Gen AI LLM
 llm = oci_genai_factory(
-    model_id="cohere.command",
+    model_id="cohere.command-a-03-2025",
     compartment_id="ocid1.compartment.oc1..example"
 )
 
@@ -99,7 +102,7 @@ run_config = RunConfig(
 
 # Initialize with custom config and endpoint
 llm = oci_genai_factory(
-    model_id="cohere.command",
+    model_id="cohere.command-a-03-2025",
     compartment_id="ocid1.compartment.oc1..example",
     config=config,
     endpoint_id="ocid1.endpoint.oc1..example",  # Optional
@@ -112,19 +115,19 @@ llm = oci_genai_factory(
 ```python
 # Cohere Command model
 llm_cohere = oci_genai_factory(
-    model_id="cohere.command",
+    model_id="cohere.command-a-03-2025",
     compartment_id="ocid1.compartment.oc1..example"
 )
 
 # Meta Llama model
 llm_llama = oci_genai_factory(
-    model_id="meta.llama-3-8b",
+    model_id="meta.llama-3.3-70b-instruct",
     compartment_id="ocid1.compartment.oc1..example"
 )
 
 # Using with different endpoints
 llm_endpoint = oci_genai_factory(
-    model_id="cohere.command",
+    model_id="cohere.command-a-03-2025",
     compartment_id="ocid1.compartment.oc1..example",
     endpoint_id="ocid1.endpoint.oc1..example"
 )
@@ -132,12 +135,18 @@ llm_endpoint = oci_genai_factory(
 
 ## Available Models
 
-OCI Gen AI supports various models including:
+The wrapper uses the OCI Gen AI chat API, so `model_id` must be a chat model. For example:
 
-- **Cohere**: `cohere.command`, `cohere.command-light`
-- **Meta**: `meta.llama-3-8b`, `meta.llama-3-70b`
-- **Mistral**: `mistral.mistral-7b-instruct`
-- **And more**: Check OCI documentation for the latest available models
+- **Cohere**: `cohere.command-a-03-2025`
+- **Meta**: `meta.llama-3.3-70b-instruct`, `meta.llama-4-scout-17b-16e-instruct`
+- **xAI**: `xai.grok-4.3`
+- **Google**: `google.gemini-2.5-flash`
+
+Availability varies by region, so check the [OCI pretrained models list](https://docs.oracle.com/en-us/iaas/Content/generative-ai/pretrained-models.htm) for the latest models.
+
+The request format is selected from `model_id`: IDs starting with `cohere.` use the Cohere format and all others use the generic format. When using `endpoint_id`, keep `model_id` set to the ID of the model behind that endpoint.
+
+Cohere models that require the V2 chat API, such as `cohere.command-a-reasoning` and `cohere.command-a-vision`, are not supported yet.
 
 ## Error Handling
 
@@ -201,7 +210,7 @@ from datasets import Dataset
 
 # Initialize OCI Gen AI
 llm = oci_genai_factory(
-    model_id="cohere.command",
+    model_id="cohere.command-a-03-2025",
     compartment_id="ocid1.compartment.oc1..example"
 )
 
@@ -245,7 +254,7 @@ class CustomMetric(MetricWithLLM):
     def __init__(self):
         super().__init__()
         self.llm = oci_genai_factory(
-            model_id="cohere.command",
+            model_id="cohere.command-a-03-2025",
             compartment_id="ocid1.compartment.oc1..example"
         )
 
