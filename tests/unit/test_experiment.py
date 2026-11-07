@@ -426,3 +426,47 @@ class TestUtilityFunctions:
         """Test find_git_root raises error when no git repo found."""
         with pytest.raises(ValueError, match="No git repository found"):
             find_git_root(temp_dir)
+
+
+@pytest.mark.parametrize("layout", ["regular", "worktree", "nested-worktree"])
+@pytest.mark.parametrize("nested", [False, True], ids=["root", "nested"])
+def test_version_experiment_discovers_git_layout(tmp_path, monkeypatch, layout, nested):
+    """Version the current checkout, including repositories represented by a gitfile."""
+    git = pytest.importorskip("git")
+    main_path = tmp_path / "main"
+    main_repo = git.Repo.init(main_path)
+    with main_repo.config_writer() as config:
+        config.set_value("user", "name", "Ragas test")
+        config.set_value("user", "email", "ragas-test@example.com")
+    script = main_path / "experiment.py"
+    script.write_text("value = 1\n", encoding="utf-8")
+    main_repo.index.add(["experiment.py"])
+    initial = main_repo.index.commit("Initial experiment")
+
+    repo = main_repo
+    if layout in ("worktree", "nested-worktree"):
+        checkout = (
+            main_path / "linked" if layout == "nested-worktree" else tmp_path / "linked"
+        )
+        main_repo.git.worktree("add", "-b", "experiment-worktree", str(checkout))
+        repo = git.Repo(checkout)
+
+    checkout = Path(repo.working_tree_dir)
+    (checkout / "experiment.py").write_text("value = 2\n", encoding="utf-8")
+    working_directory = checkout / "nested" / "deep" if nested else checkout
+    working_directory.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(working_directory)
+
+    commit_hash = version_experiment("git-layout")
+
+    assert commit_hash != initial.hexsha
+    assert repo.head.commit.hexsha == commit_hash
+    assert repo.head.commit.parents[0].hexsha == initial.hexsha
+    assert repo.head.commit.tree["experiment.py"].data_stream.read() == b"value = 2\n"
+    assert repo.heads["ragas/git-layout"].commit.hexsha == commit_hash
+    assert not repo.is_dirty(untracked_files=False)
+    if layout != "regular":
+        assert main_repo.head.commit.hexsha == initial.hexsha
+        assert (main_path / "experiment.py").read_text(
+            encoding="utf-8"
+        ) == "value = 1\n"
