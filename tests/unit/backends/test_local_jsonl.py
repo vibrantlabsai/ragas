@@ -483,6 +483,112 @@ def print_jsonl_content(jsonl_backend, data_type, name):
         print("=== End JSONL Content ===\n")
 
 
+class TestDateLikeStringRoundTrip:
+    """Strings that look like ISO dates must round trip as strings (#2865)."""
+
+    def test_save_load_preserves_date_like_strings(self, backend):
+        """A saved string that looks like a date / datetime must stay a string."""
+        data = [
+            {
+                "id": "2026-07-20",  # ISO date shape
+                "ts": "2026-07-20T12:00:00",  # ISO datetime shape
+                "version_like": "2026-07-2",  # 9 chars, not ISO
+                "hyphenated": "hi-jk-lm-no",  # 10 chars with '-', not ISO
+                "date_with_space": "2026-07-20 12:00",  # legacy datetime shape
+            }
+        ]
+        backend.save_dataset("date_like_strings", data)
+        loaded = backend.load_dataset("date_like_strings")
+
+        for key, value in data[0].items():
+            loaded_value = loaded[0][key]
+            assert isinstance(loaded_value, str), (
+                f"{key!r} was coerced to {type(loaded_value).__name__}"
+            )
+            assert loaded_value == value
+
+    def test_date_round_trip(self, backend):
+        """A saved date object must come back as a date."""
+        data = [{"d": date(2026, 7, 20)}]
+        backend.save_dataset("date_round_trip", data)
+        loaded = backend.load_dataset("date_round_trip")
+        assert loaded[0]["d"] == date(2026, 7, 20)
+        assert type(loaded[0]["d"]) is date
+
+    def test_datetime_round_trip(self, backend):
+        """A saved datetime object must come back as a datetime."""
+        data = [
+            {
+                "naive": datetime(2026, 7, 20, 12, 0, 0),
+                "with_micros": datetime(2026, 7, 20, 12, 0, 0, 123456),
+                "aware": datetime.fromisoformat("2026-07-20T12:00:00+05:30"),
+            }
+        ]
+        backend.save_dataset("datetime_round_trip", data)
+        loaded = backend.load_dataset("datetime_round_trip")
+
+        for key, value in data[0].items():
+            assert loaded[0][key] == value, key
+            assert isinstance(loaded[0][key], datetime), key
+
+    def test_nested_date_like_strings(self, backend):
+        """Coercion must not happen inside nested dicts or lists either."""
+        data = [
+            {
+                "outer": {"created": "2026-07-20", "id": "hi-jk-lm-no"},
+                "history": [{"ts": "2026-07-20T12:00:00"}],
+                "dates": ["2026-07-20", "2026-07-21"],
+            }
+        ]
+        backend.save_dataset("nested_date_like", data)
+        loaded = backend.load_dataset("nested_date_like")
+
+        assert loaded[0]["outer"]["created"] == "2026-07-20"
+        assert loaded[0]["outer"]["id"] == "hi-jk-lm-no"
+        assert loaded[0]["history"][0]["ts"] == "2026-07-20T12:00:00"
+        assert loaded[0]["dates"] == ["2026-07-20", "2026-07-21"]
+
+    def test_nested_typed_dates_round_trip(self, backend):
+        """date / datetime objects nested in dicts and lists round trip."""
+        data = [
+            {
+                "outer": {"created": date(2026, 7, 20)},
+                "history": [{"ts": datetime(2026, 7, 20, 12, 0)}],
+            }
+        ]
+        backend.save_dataset("nested_typed_dates", data)
+        loaded = backend.load_dataset("nested_typed_dates")
+
+        assert loaded[0]["outer"]["created"] == date(2026, 7, 20)
+        assert loaded[0]["history"][0]["ts"] == datetime(2026, 7, 20, 12, 0)
+
+    def test_legacy_file_exact_iso_shapes_still_coerce(self, backend, temp_dir):
+        """Files written before tagging coerce only anchored ISO 8601 shapes."""
+        datasets_dir = Path(temp_dir) / "datasets"
+        datasets_dir.mkdir(parents=True, exist_ok=True)
+        with open(datasets_dir / "legacy.jsonl", "w", encoding="utf-8") as f:
+            f.write('{"d": "2026-07-20", "ts": "2026-07-20T12:00:00"}\n')
+            f.write('{"not_iso": "hi-jk-lm-no", "partial": "2026-07-2"}\n')
+            f.write('{"tz": "2026-07-20T12:00:00+05:30"}\n')
+
+        loaded = backend.load_dataset("legacy")
+        assert loaded[0]["d"] == date(2026, 7, 20)
+        assert loaded[0]["ts"] == datetime(2026, 7, 20, 12, 0, 0)
+        assert loaded[1]["not_iso"] == "hi-jk-lm-no"
+        assert loaded[1]["partial"] == "2026-07-2"
+        assert loaded[2]["tz"] == datetime.fromisoformat("2026-07-20T12:00:00+05:30")
+
+    def test_dict_with_discriminator_key_round_trips(self, backend):
+        """A user dict that already contains __ragas_type__ must round trip verbatim."""
+        user_dict = {"__ragas_type__": "date", "value": "not-a-real-date"}
+        data = [{"payload": user_dict, "name": "x"}]
+        backend.save_dataset("tag_collision", data)
+        loaded = backend.load_dataset("tag_collision")
+
+        assert loaded[0]["payload"] == user_dict
+        assert isinstance(loaded[0]["payload"], dict)
+
+
 if __name__ == "__main__":
     # Run some quick tests to see JSONL capabilities
     import tempfile

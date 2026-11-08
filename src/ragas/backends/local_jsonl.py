@@ -1,6 +1,7 @@
 """Local JSONL backend implementation for projects and datasets."""
 
 import json
+import re
 import typing as t
 from datetime import date, datetime
 from pathlib import Path
@@ -8,6 +9,18 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from .base import BaseBackend
+
+# Discriminator used to tag values that were Python date / datetime objects at
+# save time. Only tagged values are restored to date / datetime on load, so
+# user strings that merely look like ISO 8601 timestamps round-trip unchanged.
+_RAGAS_TYPE_KEY = "__ragas_type__"
+
+# Legacy fallback (files written before tagging existed): only coerce strings
+# whose *entire* value matches an anchored ISO 8601 date or datetime shape.
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_ISO_DATETIME_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$"
+)
 
 
 class LocalJSONLBackend(BaseBackend):
@@ -31,7 +44,8 @@ class LocalJSONLBackend(BaseBackend):
 
     Features:
         - Preserves Python data types (int, float, bool, None)
-        - Automatic datetime/date serialization to ISO format
+        - Automatic datetime/date round trip via a ``__ragas_type__``
+          discriminator (date-like strings are never coerced)
         - Supports nested dictionaries and lists
         - Handles malformed JSON lines gracefully (skips with warning)
         - UTF-8 encoding for international text
@@ -58,35 +72,90 @@ class LocalJSONLBackend(BaseBackend):
         """Get the full file path for a dataset or experiment."""
         return self._get_data_dir(data_type) / f"{name}.jsonl"
 
-    def _serialize_datetime(self, obj: t.Any) -> t.Any:
-        """Serialize datetime objects to ISO format strings."""
+    def _serialize_datetime(self, obj: t.Any, tagged: bool = True) -> t.Any:
+        """Serialize date / datetime objects to tagged dicts.
+
+        Typed values are written as ``{"__ragas_type__": "date" | "datetime",
+        "value": "<iso>"}`` so the load path can restore exactly the values
+        that were date / datetime objects at save time. Strings that would be
+        mistaken for a legacy ISO value are written with a ``"str"`` tag, and
+        user dicts that already contain the discriminator key are wrapped with
+        a ``"dict"`` tag so they round trip verbatim.
+        """
         if isinstance(obj, datetime):
-            return obj.isoformat()
+            if not tagged:
+                return obj.isoformat()
+            return {_RAGAS_TYPE_KEY: "datetime", "value": obj.isoformat()}
         elif isinstance(obj, date):
-            return obj.isoformat()
+            if not tagged:
+                return obj.isoformat()
+            return {_RAGAS_TYPE_KEY: "date", "value": obj.isoformat()}
+        elif isinstance(obj, str) and tagged and self._is_legacy_iso_string(obj):
+            return {_RAGAS_TYPE_KEY: "str", "value": obj}
         elif isinstance(obj, dict):
-            return {k: self._serialize_datetime(v) for k, v in obj.items()}
+            if tagged and _RAGAS_TYPE_KEY in obj:
+                # Never re-interpret a user dict that carries the
+                # discriminator key: wrap it (inner values serialized tag-free)
+                # so it round trips verbatim instead of being restored as a
+                # date / datetime / string on load.
+                return {
+                    _RAGAS_TYPE_KEY: "dict",
+                    "value": {
+                        k: self._serialize_datetime(v, tagged=False)
+                        for k, v in obj.items()
+                    },
+                }
+            return {k: self._serialize_datetime(v, tagged) for k, v in obj.items()}
         elif isinstance(obj, list):
-            return [self._serialize_datetime(item) for item in obj]
+            return [self._serialize_datetime(item, tagged) for item in obj]
         else:
             return obj
 
+    @staticmethod
+    def _is_legacy_iso_string(obj: str) -> bool:
+        """Return True for strings whose whole value looks like a legacy ISO date/datetime."""
+        return bool(_ISO_DATE_RE.match(obj) or _ISO_DATETIME_RE.match(obj))
+
     def _deserialize_datetime(self, obj: t.Any) -> t.Any:
-        """Attempt to deserialize ISO format strings back to datetime objects."""
+        """Restore tagged values to date / datetime; keep everything else as-is.
+
+        Only dicts carrying the ``__ragas_type__`` discriminator written by the
+        save path are converted back to date / datetime. For legacy records
+        (written before tagging existed), strings are coerced only when their
+        whole value matches an anchored ISO 8601 date or datetime shape.
+        """
         if isinstance(obj, str):
-            # Try to parse as datetime
-            try:
-                if "T" in obj and (":" in obj or "." in obj):
-                    # Looks like datetime ISO format
+            if _ISO_DATETIME_RE.match(obj):
+                try:
                     return datetime.fromisoformat(obj.replace("Z", "+00:00"))
-                elif "-" in obj and len(obj) == 10:
-                    # Looks like date ISO format (YYYY-MM-DD)
+                except (ValueError, TypeError):
+                    return obj
+            if _ISO_DATE_RE.match(obj):
+                try:
                     return datetime.fromisoformat(obj + "T00:00:00").date()
-            except (ValueError, TypeError):
-                # Not a valid datetime string, return as-is
-                pass
+                except (ValueError, TypeError):
+                    return obj
             return obj
         elif isinstance(obj, dict):
+            tag = obj.get(_RAGAS_TYPE_KEY)
+            if set(obj) == {_RAGAS_TYPE_KEY, "value"}:
+                value = obj["value"]
+                if tag == "str":
+                    return (
+                        value
+                        if isinstance(value, str)
+                        else self._deserialize_datetime(value)
+                    )
+                if tag == "dict":
+                    # Written verbatim by the save path; restore verbatim.
+                    return value
+                if tag in ("date", "datetime") and isinstance(value, str):
+                    try:
+                        if tag == "datetime":
+                            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+                        return datetime.fromisoformat(value + "T00:00:00").date()
+                    except (ValueError, TypeError):
+                        return obj
             return {k: self._deserialize_datetime(v) for k, v in obj.items()}
         elif isinstance(obj, list):
             return [self._deserialize_datetime(item) for item in obj]
