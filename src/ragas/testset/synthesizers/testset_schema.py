@@ -80,11 +80,12 @@ class Testset(RagasDataset[TestsetSample]):
     @classmethod
     def from_list(cls, data: t.List[t.Dict]) -> Testset:
         """
-        Converts a list of dictionaries to a Testset.
+        Converts a list of dictionaries to a Testset without modifying the input.
         """
         # first create the samples
         samples = []
         for sample in data:
+            sample = sample.copy()
             synthesizer_name = sample["synthesizer_name"]
             # remove the synthesizer name from the sample
             sample.pop("synthesizer_name")
