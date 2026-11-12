@@ -93,7 +93,7 @@ class SemanticSimilarity(BaseMetric):
         score = similarity.flatten()
 
         assert isinstance(score, np.ndarray), "Expects ndarray"
-        if self.threshold:
+        if self.threshold is not None:
             score = score >= self.threshold
 
         return MetricResult(value=float(score.item()))

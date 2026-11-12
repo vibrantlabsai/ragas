@@ -99,7 +99,7 @@ class SemanticSimilarity(MetricWithEmbeddings, SingleTurnMetric):
             score = similarity.flatten()
 
         assert isinstance(score, np.ndarray), "Expects ndarray"
-        if self.threshold:
+        if self.threshold is not None:
             score = score >= self.threshold
 
         return float(score.item())
