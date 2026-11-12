@@ -1,13 +1,14 @@
 name: Claude Docs Check
 
+# Runs only when a maintainer adds the `check-docs` label, so opening or pushing
+# to a pull request never spends the Anthropic API key on its own.
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened]
-    paths:
-      - "src/**/*.py"
+    types: [labeled]
 
 jobs:
   check-docs:
+    if: github.event.label.name == 'check-docs'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,7 +30,6 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          allowed_non_write_users: "*"
 
           prompt: |
             REPO: ${{ github.repository }}
@@ -104,9 +104,7 @@ jobs:
           # Comment with instructions
           gh pr comment ${{ github.event.pull_request.number }} --body "📝 **Documentation update may be needed**
 
-          $REASON
-
-          **To apply documentation updates:** Add the \`update-docs\` label to this PR."
+          $REASON"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REASON: ${{ steps.parse.outputs.reason }}
