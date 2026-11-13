@@ -216,8 +216,8 @@ def test_sync_openai_gpt5_maps_max_tokens_to_max_completion_tokens(
     assert "max_tokens" not in instructor_client.last_kwargs
 
 
-def test_sync_client_agenerate_error(mock_sync_client, monkeypatch):
-    """Test that using agenerate with sync client raises TypeError."""
+def test_sync_client_agenerate_via_to_thread(mock_sync_client, monkeypatch):
+    """Test that agenerate with sync client works via asyncio.to_thread."""
 
     def mock_from_openai(client, mode=None):
         return MockInstructor(client)
@@ -226,12 +226,12 @@ def test_sync_client_agenerate_error(mock_sync_client, monkeypatch):
 
     llm = llm_factory("gpt-4", provider="openai", client=mock_sync_client)
 
-    with pytest.raises(
-        TypeError, match="Cannot use agenerate\\(\\) with a synchronous client"
-    ):
-        import asyncio
+    import asyncio
 
-        asyncio.run(llm.agenerate("Test prompt", LLMResponseModel))
+    result = asyncio.run(llm.agenerate("Test prompt", LLMResponseModel))
+
+    assert isinstance(result, LLMResponseModel)
+    assert result.response == "Instructor response"
 
 
 def test_provider_support(monkeypatch):

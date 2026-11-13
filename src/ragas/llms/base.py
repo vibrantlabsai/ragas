@@ -992,6 +992,7 @@ class InstructorLLM(InstructorBaseRagasLLM):
         2. Instructor-wrapped Instructor clients that wrap async underlying clients
         3. Direct async clients with chat.completions.create
         4. Instructor-wrapped clients where the underlying client is in a closure
+        5. Google genai clients with create method
         """
         try:
             # Check if this is an AsyncInstructor wrapper
@@ -1010,6 +1011,10 @@ class InstructorLLM(InstructorBaseRagasLLM):
                             underlying.chat.completions.create
                         ):
                             return True
+                # For Google genai async clients
+                if hasattr(underlying, "create"):
+                    if inspect.iscoroutinefunction(underlying.create):
+                        return True
 
             # Check if this is an async client by checking for a coroutine method
             if hasattr(self.client, "chat") and hasattr(
@@ -1019,6 +1024,11 @@ class InstructorLLM(InstructorBaseRagasLLM):
                     return inspect.iscoroutinefunction(
                         self.client.chat.completions.create
                     )
+
+            # For Google genai clients, check for create method directly
+            if hasattr(self.client, "create"):
+                if inspect.iscoroutinefunction(self.client.create):
+                    return True
 
             # For instructor-wrapped clients, also check the closure of create_fn
             # This handles cases where the underlying client is stored in a closure
@@ -1040,6 +1050,10 @@ class InstructorLLM(InstructorBaseRagasLLM):
                         # Also check for acompletion (e.g., litellm Router)
                         if hasattr(obj, "acompletion"):
                             if inspect.iscoroutinefunction(obj.acompletion):
+                                return True
+                        # Also check for Google genai create method
+                        if hasattr(obj, "create"):
+                            if inspect.iscoroutinefunction(obj.create):
                                 return True
                     except (ValueError, AttributeError):
                         # cell_contents might not be accessible
@@ -1106,6 +1120,40 @@ class InstructorLLM(InstructorBaseRagasLLM):
                 loop.close()
                 asyncio.set_event_loop(None)
 
+    def _generate_sync(
+        self, prompt: str, response_model: t.Type[InstructorTypeVar]
+    ) -> InstructorTypeVar:
+        """Execute a synchronous LLM call.
+
+        This is the single source of truth for synchronous execution.
+        Both generate() and agenerate() (via asyncio.to_thread) delegate to this.
+        """
+        messages = []
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        # Map parameters based on provider requirements
+        provider_kwargs = self._map_provider_params()
+
+        if self.provider.lower() == "google":
+            result = self.client.create(
+                model=self.model,
+                messages=messages,
+                response_model=response_model,
+                **provider_kwargs,
+            )
+        else:
+            # OpenAI, Anthropic, LiteLLM
+            result = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                response_model=response_model,
+                **provider_kwargs,
+            )
+
+        return result
+
     def generate(
         self, prompt: str, response_model: t.Type[InstructorTypeVar]
     ) -> InstructorTypeVar:
@@ -1113,35 +1161,12 @@ class InstructorLLM(InstructorBaseRagasLLM):
 
         For async clients, this will run the async method in the appropriate event loop.
         """
-        messages = []
-        if self.system_prompt:
-            messages.append({"role": "system", "content": self.system_prompt})
-        messages.append({"role": "user", "content": prompt})
-
-        # If client is async, use the appropriate method to run it
         if self.is_async:
             result = self._run_async_in_current_loop(
                 self.agenerate(prompt, response_model)
             )
         else:
-            # Map parameters based on provider requirements
-            provider_kwargs = self._map_provider_params()
-
-            if self.provider.lower() == "google":
-                result = self.client.create(
-                    model=self.model,
-                    messages=messages,
-                    response_model=response_model,
-                    **provider_kwargs,
-                )
-            else:
-                # OpenAI, Anthropic, LiteLLM
-                result = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    response_model=response_model,
-                    **provider_kwargs,
-                )
+            result = self._generate_sync(prompt, response_model)
 
         # Track the usage
         track(
@@ -1161,16 +1186,14 @@ class InstructorLLM(InstructorBaseRagasLLM):
         response_model: t.Type[InstructorTypeVar],
     ) -> InstructorTypeVar:
         """Asynchronously generate a response using the configured LLM."""
+        # If client is sync, offload to a thread to avoid blocking the event loop
+        if not self.is_async:
+            return await asyncio.to_thread(self._generate_sync, prompt, response_model)
+
         messages = []
         if self.system_prompt:
             messages.append({"role": "system", "content": self.system_prompt})
         messages.append({"role": "user", "content": prompt})
-
-        # If client is not async, raise a helpful error
-        if not self.is_async:
-            raise TypeError(
-                "Cannot use agenerate() with a synchronous client. Use generate() instead."
-            )
 
         # Map parameters based on provider requirements
         provider_kwargs = self._map_provider_params()
