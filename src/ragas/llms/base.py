@@ -923,15 +923,16 @@ class InstructorLLM(InstructorBaseRagasLLM):
                 if len(model_str) == 2 or model_str[2] in ("-", "_"):
                     return True
 
-            # GPT-5 and newer generation models (gpt-5, gpt-5-*, gpt-6, gpt-7, ..., gpt-19)
-            # Pattern: "gpt-" followed by single or double digit >= 5, max 19
+            # GPT-5 and newer generation models (gpt-5, gpt-5.2, gpt-5-*, gpt-6, ..., gpt-19)
+            # Pattern: "gpt-" followed by single or double digit major version >= 5
             # TODO: Update to support gpt-20+ when OpenAI releases models beyond gpt-19
             if model_str.startswith("gpt-"):
                 version_str = (
                     model_str[4:].split("-")[0].split("_")[0]
-                )  # Get version number
+                )  # Get version number, including decimal variants like gpt-5.2
+                major_version_str = version_str.split(".")[0]
                 try:
-                    version = int(version_str)
+                    version = int(major_version_str)
                     if 5 <= version <= 19:
                         return True
                 except ValueError:
