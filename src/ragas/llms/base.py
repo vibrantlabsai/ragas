@@ -593,8 +593,8 @@ def _get_instructor_client(
     - New SDK (google-genai): Uses instructor.from_genai()
     - Old SDK (google-generativeai): Uses instructor.from_gemini()
     """
-    # Anthropic, Google and Perplexity keep instructor's own default mode unless
-    # the caller chose one, so only an explicit mode is forwarded to them.
+    # Google and Perplexity keep instructor's own default mode unless the caller
+    # chose one, so only an explicit mode is forwarded to them.
     explicit_mode_kwargs: t.Dict[str, t.Any] = {} if mode is None else {"mode": mode}
 
     if mode is None:
@@ -605,7 +605,9 @@ def _get_instructor_client(
     if provider_lower == "openai":
         return instructor.from_openai(client, mode=mode)
     elif provider_lower == "anthropic":
-        return instructor.from_anthropic(client, **explicit_mode_kwargs)
+        # instructor's default Anthropic mode forces a tool call, which current
+        # Claude models reject, so Anthropic defaults to JSON mode like OpenAI.
+        return instructor.from_anthropic(client, mode=mode)
     elif provider_lower in ("google", "gemini"):
         if _is_new_google_genai_client(client):
             return instructor.from_genai(client, **explicit_mode_kwargs)
@@ -654,9 +656,9 @@ def llm_factory(
                Pass DiskCacheBackend() for persistent caching across runs.
                Saves costs and speeds up repeated evaluations by 60x.
         mode: Instructor mode for structured outputs (default: Mode.JSON).
-              Only applies when using instructor adapter. Anthropic, Google and
-              Perplexity use instructor's own default for that provider unless
-              a mode is passed here.
+              Only applies when using instructor adapter. Google and Perplexity
+              use instructor's own default for that provider unless a mode is
+              passed here.
               Options: Mode.JSON, Mode.MD_JSON, Mode.TOOLS, Mode.JSON_SCHEMA, etc.
               Use Mode.MD_JSON for backends that don't support response_format parameter.
         **kwargs: Additional model arguments (temperature, max_tokens, top_p, etc).
