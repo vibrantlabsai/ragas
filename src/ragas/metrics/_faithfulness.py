@@ -15,6 +15,7 @@ from ragas.metrics.base import (
     SingleTurnMetric,
 )
 from ragas.prompt import PydanticPrompt
+from ragas.prompt.utils import sanitize_context
 
 if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
@@ -154,7 +155,7 @@ class Faithfulness(MetricWithLLM, SingleTurnMetric):
     ) -> NLIStatementOutput:
         assert self.llm is not None, "llm must be set to compute score"
 
-        contexts_str: str = "\n".join(row["retrieved_contexts"])
+        contexts_str: str = sanitize_context("\n".join(row["retrieved_contexts"]))
         verdicts = await self.nli_statements_prompt.generate(
             data=NLIStatementInput(context=contexts_str, statements=statements),
             llm=self.llm,
@@ -239,7 +240,7 @@ class FaithfulnesswithHHEM(Faithfulness):
         """
         create pairs of (question, answer) from the row
         """
-        premise = "\n".join(row["retrieved_contexts"])
+        premise = sanitize_context("\n".join(row["retrieved_contexts"]))
         pairs = [(premise, statement) for statement in statements]
         return pairs
 

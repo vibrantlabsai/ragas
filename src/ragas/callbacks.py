@@ -135,11 +135,17 @@ def parse_run_traces(
     traces: t.Dict[str, ChainRun],
     parent_run_id: t.Optional[str] = None,
 ) -> t.List[t.Dict[str, t.Any]]:
+    if not traces:
+        return []
+
     root_traces = [
         chain_trace
         for chain_trace in traces.values()
         if chain_trace.parent_run_id == parent_run_id
     ]
+
+    if not root_traces:
+        return []
 
     if len(root_traces) > 1:
         raise ValueError(

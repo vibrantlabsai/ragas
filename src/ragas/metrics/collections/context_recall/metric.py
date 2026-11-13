@@ -7,6 +7,7 @@ import numpy as np
 
 from ragas.metrics.collections.base import BaseMetric
 from ragas.metrics.result import MetricResult
+from ragas.prompt.utils import sanitize_context
 
 from .util import (
     ContextRecallInput,
@@ -107,7 +108,11 @@ class ContextRecall(BaseMetric):
             raise ValueError("retrieved_contexts cannot be empty")
 
         # Combine contexts into a single string
-        context = "\n".join(retrieved_contexts) if retrieved_contexts else ""
+        context = (
+            sanitize_context("\n".join(retrieved_contexts))
+            if retrieved_contexts
+            else ""
+        )
 
         # Create input data and generate prompt
         input_data = ContextRecallInput(

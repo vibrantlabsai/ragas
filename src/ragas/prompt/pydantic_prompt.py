@@ -19,7 +19,7 @@ from ragas.callbacks import ChainType, new_group
 from ragas.exceptions import RagasOutputParserException
 
 from .base import BasePrompt, StringIO
-from .utils import extract_json, get_all_strings, update_strings
+from .utils import extract_json, get_all_strings, sanitize_context, update_strings
 
 if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
@@ -349,6 +349,16 @@ class PydanticPrompt(BasePrompt, t.Generic[InputModel, OutputModel]):
         return output_models
 
     def process_input(self, input: InputModel) -> InputModel:
+        if isinstance(input, BaseModel):
+            # Defense-in-depth: sanitize context fields before embedding into prompt
+            if hasattr(input, "context") and isinstance(getattr(input, "context"), str):
+                new_input = copy.deepcopy(input)
+                setattr(
+                    new_input,
+                    "context",
+                    sanitize_context(getattr(new_input, "context")),
+                )
+                return new_input
         return input
 
     def process_output(self, output: OutputModel, input: InputModel) -> OutputModel:
@@ -523,6 +533,10 @@ fix_output_format_prompt = FixOutputFormat()
 
 
 class RagasOutputParser(PydanticOutputParser[OutputModel]):
+    def parse(self, text: str) -> OutputModel:
+        jsonstr = extract_json(text)
+        return super().parse(jsonstr)
+
     async def parse_output_string(
         self,
         output_string: str,

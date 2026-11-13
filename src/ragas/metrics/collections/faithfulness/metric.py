@@ -5,6 +5,7 @@ from typing import List
 
 from ragas.metrics.collections.base import BaseMetric
 from ragas.metrics.result import MetricResult
+from ragas.prompt.utils import sanitize_context
 
 from .util import (
     NLIStatementInput,
@@ -121,7 +122,7 @@ class Faithfulness(BaseMetric):
             return MetricResult(value=float("nan"))
 
         # Step 2: Join all contexts and evaluate statements against them
-        context_str = "\n".join(retrieved_contexts)
+        context_str = sanitize_context("\n".join(retrieved_contexts))
         verdicts = await self._create_verdicts(statements, context_str)
 
         # Step 3: Compute faithfulness score

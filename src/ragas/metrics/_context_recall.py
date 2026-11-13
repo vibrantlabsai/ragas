@@ -17,6 +17,7 @@ from ragas.metrics.base import (
     ensembler,
 )
 from ragas.prompt import PydanticPrompt
+from ragas.prompt.utils import sanitize_context
 from ragas.run_config import RunConfig
 
 if t.TYPE_CHECKING:
@@ -137,7 +138,7 @@ class LLMContextRecall(MetricWithLLM, SingleTurnMetric):
         ] = await self.context_recall_prompt.generate_multiple(
             data=QCA(
                 question=row["user_input"],
-                context="\n".join(row["retrieved_contexts"]),
+                context=sanitize_context("\n".join(row["retrieved_contexts"])),
                 answer=row["reference"],
             ),
             llm=self.llm,

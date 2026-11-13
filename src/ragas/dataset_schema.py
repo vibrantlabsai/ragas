@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import random
 import typing as t
+import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -15,6 +17,8 @@ from ragas.callbacks import parse_run_traces
 from ragas.cost import CostCallbackHandler
 from ragas.messages import AIMessage, HumanMessage, ToolCall, ToolMessage
 from ragas.utils import safe_nanmean
+
+logger = logging.getLogger(__name__)
 
 if t.TYPE_CHECKING:
     from pathlib import Path
@@ -432,28 +436,70 @@ class EvaluationResult:
     traces: t.List[t.Dict[str, t.Any]] = field(default_factory=list)
     ragas_traces: t.Dict[str, ChainRun] = field(default_factory=dict, repr=False)
     run_id: t.Optional[UUID] = None
+    nan_counts: t.Dict[str, int] = field(default_factory=dict, init=False)
+    error_rates: t.Dict[str, float] = field(default_factory=dict, init=False)
+    total_counts: t.Dict[str, int] = field(default_factory=dict, init=False)
+
+    @property
+    def error_counts(self) -> t.Dict[str, int]:
+        return self.nan_counts
 
     def __post_init__(self):
         # transform scores from list of dicts to dict of lists
-        self._scores_dict = {
-            k: [d[k] for d in self.scores] for k in self.scores[0].keys()
-        }
+        self._scores_dict = (
+            {k: [d[k] for d in self.scores] for k in self.scores[0].keys()}
+            if self.scores
+            else {}
+        )
 
         values = []
         self._repr_dict = {}
+        self.nan_counts = {}
+        self.error_rates = {}
+        self.total_counts = {}
         for metric_name in self._scores_dict.keys():
-            value = safe_nanmean(self._scores_dict[metric_name])
+            vals = self._scores_dict[metric_name]
+            total_cnt = len(vals)
+            nan_cnt = sum(
+                1
+                for v in vals
+                if v is None or (isinstance(v, (float, np.floating)) and np.isnan(v))
+            )
+            error_rate = nan_cnt / total_cnt if total_cnt > 0 else 0.0
+            self.total_counts[metric_name] = total_cnt
+            self.nan_counts[metric_name] = nan_cnt
+            self.error_rates[metric_name] = error_rate
+
+            value = safe_nanmean(vals)
             self._repr_dict[metric_name] = value
             if metric_name not in self.binary_columns:
                 value = t.cast(float, value)
                 values.append(value + 1e-10)
 
+            if nan_cnt > 0:
+                warning_msg = (
+                    f"Metric '{metric_name}' contains {nan_cnt} NaN values out of {total_cnt} samples "
+                    f"({error_rate:.1%}). Headline score ({value:0.4f}) masks these failures via nanmean."
+                )
+                logger.warning(warning_msg)
+                warnings.warn(warning_msg, UserWarning, stacklevel=2)
+
         # parse the traces
         run_id = str(self.run_id) if self.run_id is not None else None
-        self.traces = parse_run_traces(self.ragas_traces, run_id)
+        if self.ragas_traces:
+            self.traces = parse_run_traces(self.ragas_traces, run_id)
+        else:
+            self.traces = []
 
     def __repr__(self) -> str:
-        score_strs = [f"'{k}': {v:0.4f}" for k, v in self._repr_dict.items()]
+        score_strs = []
+        for k, v in self._repr_dict.items():
+            nan_cnt = self.nan_counts.get(k, 0)
+            if nan_cnt > 0:
+                total_cnt = self.total_counts.get(k, len(self._scores_dict.get(k, [])))
+                score_strs.append(f"'{k}': {v:0.4f} ({nan_cnt}/{total_cnt} NaN)")
+            else:
+                score_strs.append(f"'{k}': {v:0.4f}")
         return "{" + ", ".join(score_strs) + "}"
 
     def __getitem__(self, key: str) -> t.List[float]:

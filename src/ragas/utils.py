@@ -43,7 +43,9 @@ def get_debug_mode() -> bool:
         return False
 
 
-def safe_nanmean(arr: t.List[float]) -> float:
+def safe_nanmean(
+    arr: t.List[float], warn_on_nan: bool = False, error_threshold: float = 0.0
+) -> float:
     if len(arr) == 0:
         return np.nan  # or some other value or behavior for empty arrays
 
@@ -51,6 +53,16 @@ def safe_nanmean(arr: t.List[float]) -> float:
 
     if np.isnan(arr_numpy).all():
         return np.nan  # or some other value or behavior for all-NaN arrays
+
+    nan_count = int(np.isnan(arr_numpy).sum())
+    total_count = len(arr_numpy)
+    error_rate = nan_count / total_count if total_count > 0 else 0.0
+    if warn_on_nan and nan_count > 0 and error_rate >= error_threshold:
+        warnings.warn(
+            f"{nan_count}/{total_count} ({error_rate:.1%}) NaN values detected and ignored by nanmean.",
+            UserWarning,
+            stacklevel=2,
+        )
 
     return float(np.nanmean(arr_numpy))
 

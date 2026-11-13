@@ -1,4 +1,6 @@
 import copy
+import json
+import re
 import typing as t
 
 from pydantic import BaseModel
@@ -66,41 +68,95 @@ def update_strings(obj: t.Any, old_strings: list[str], new_strings: list[str]) -
     return copy.deepcopy(obj)
 
 
+INJECTION_PATTERNS = [
+    # System override directives: uppercase "SYSTEM OVERRIDE", or "[system override]", or "system override:" directive
+    re.compile(r"\[\s*system\s+override\s*\]:?", flags=re.IGNORECASE),
+    re.compile(r"\bSYSTEM\s+OVERRIDE\b:?"),
+    re.compile(r"\bsystem\s+override\s*:", flags=re.IGNORECASE),
+    re.compile(r"\bsystem\s+override\s*!", flags=re.IGNORECASE),
+    # Instruction bypass directives: e.g. "ignore previous instructions", "disregard all prior instructions", "forget above prompts"
+    re.compile(
+        r"\b(?:ignore|disregard|forget)\s+(?:all\s+|any\s+|the\s+)?(?:previous|prior|above)\s+(?:instructions|prompts|directives|commands)\b",
+        flags=re.IGNORECASE,
+    ),
+    # New instruction directives: e.g. "new instructions:", "new instruction:"
+    re.compile(r"\b(?:new\s+instructions?)\s*:", flags=re.IGNORECASE),
+    # Role / control token boundaries: e.g. <system>, </system>, [INST], [/INST], <<SYS>>, <</SYS>>, <|im_start|>, <|im_end|>
+    re.compile(r"<\/?(?:system|assistant|user|human)>", flags=re.IGNORECASE),
+    re.compile(r"\[\/?(?:inst|sys)\]", flags=re.IGNORECASE),
+    re.compile(r"<\/?(?:\|im_start\||\|im_end\|)>?", flags=re.IGNORECASE),
+    re.compile(r"<<\/?SYS>>", flags=re.IGNORECASE),
+]
+
+
+def sanitize_context(text: str) -> str:
+    """Sanitize retrieved context before embedding into judge prompts.
+
+    Neutralizes prompt injection directives and control delimiters (e.g.
+    'SYSTEM OVERRIDE', 'ignore previous instructions') by replacing them with
+    '[SANITIZED]' while preserving legitimate context content.
+    """
+    if not isinstance(text, str) or not text:
+        return text
+
+    sanitized = text
+    for pattern in INJECTION_PATTERNS:
+        sanitized = pattern.sub("[SANITIZED]", sanitized)
+    return sanitized
+
+
 def extract_json(text: str) -> str:
     """Identify json from a text blob by matching '[]' or '{}'.
 
-    Warning: This will identify the first json structure!"""
+    Identifies and returns the LAST valid JSON structure from the text blob."""
+    candidates: list[str] = []
+    i = 0
+    n = len(text)
 
-    # check for markdown indicator; if present, start there
-    md_json_idx = text.find("```json")
-    if md_json_idx != -1:
-        text = text[md_json_idx:]
+    while i < n:
+        if text[i] in ("{", "["):
+            open_char = text[i]
+            close_char = "}" if open_char == "{" else "]"
+            count = 0
+            start_idx = i
+            in_string = False
+            escape = False
+            j = i
+            while j < n:
+                c = text[j]
+                if escape:
+                    escape = False
+                elif c == "\\":
+                    if in_string:
+                        escape = True
+                elif c == '"':
+                    in_string = not in_string
+                elif not in_string:
+                    if c == open_char:
+                        count += 1
+                    elif c == close_char:
+                        count -= 1
+                        if count == 0:
+                            candidates.append(text[start_idx : j + 1])
+                            i = j
+                            break
+                j += 1
+        i += 1
 
-    # search for json delimiter pairs
-    left_bracket_idx = text.find("[")
-    left_brace_idx = text.find("{")
+    # Filter for valid JSON structures using json.loads
+    valid_candidates: list[str] = []
+    for cand in candidates:
+        try:
+            json.loads(cand)
+            valid_candidates.append(cand)
+        except (ValueError, TypeError):
+            continue
 
-    indices = [idx for idx in (left_bracket_idx, left_brace_idx) if idx != -1]
-    start_idx = min(indices) if indices else None
+    if valid_candidates:
+        return valid_candidates[-1]
 
-    # If no delimiter found, return the original text
-    if start_idx is None:
-        return text
-
-    # Identify the exterior delimiters defining JSON
-    open_char = text[start_idx]
-    close_char = "]" if open_char == "[" else "}"
-
-    # Initialize a count to keep track of delimiter pairs
-    count = 0
-    for i, char in enumerate(text[start_idx:], start=start_idx):
-        if char == open_char:
-            count += 1
-        elif char == close_char:
-            count -= 1
-
-        # When count returns to zero, we've found a complete structure
-        if count == 0:
-            return text[start_idx : i + 1]
+    # Fallback to the last balanced candidate if none parsed via json.loads
+    if candidates:
+        return candidates[-1]
 
     return text  # In case of unbalanced JSON, return the original text
