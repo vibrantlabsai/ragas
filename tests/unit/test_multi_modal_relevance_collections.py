@@ -11,6 +11,16 @@ from ragas.metrics.collections.multi_modal_relevance.util import (
     MultiModalRelevanceOutput,
     build_multimodal_relevance_message_content,
 )
+from ragas.prompt import multi_modal_prompt
+
+
+@pytest.fixture
+def allow_local_images(monkeypatch):
+    """Opt in to local image files (disabled by default) for the temp directory."""
+    monkeypatch.setattr(multi_modal_prompt, "ALLOW_LOCAL_FILE_ACCESS", True)
+    monkeypatch.setattr(
+        multi_modal_prompt, "ALLOWED_IMAGE_BASE_DIR", tempfile.gettempdir()
+    )
 
 
 class TestBuildMultimodalRelevanceMessageContent:
@@ -30,7 +40,7 @@ class TestBuildMultimodalRelevanceMessageContent:
         text_blocks = [c for c in content if c["type"] == "text"]
         assert len(text_blocks) >= 2  # Instruction + context
 
-    def test_build_with_mixed_content(self):
+    def test_build_with_mixed_content(self, allow_local_images):
         """Test building content with mixed text and image contexts."""
         # Create a temporary image
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
@@ -99,7 +109,7 @@ class TestBuildMultimodalRelevanceMessageContent:
         )
         assert test_response in all_text
 
-    def test_build_with_multiple_images(self):
+    def test_build_with_multiple_images(self, allow_local_images):
         """Test building content with multiple image contexts."""
         # Create temporary images
         temp_paths = []
