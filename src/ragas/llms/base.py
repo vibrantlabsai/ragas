@@ -838,7 +838,7 @@ class InstructorLLM(InstructorBaseRagasLLM):
         Each provider may have different parameter requirements:
         - Google: Wraps parameters in generation_config and renames max_tokens
         - OpenAI/Azure: Maps max_tokens to max_completion_tokens for o-series models
-        - Anthropic: No special handling required (pass-through)
+        - Anthropic: Strips top_p (deprecated for models after Claude Opus 4.6)
         - LiteLLM: No special handling required (routes internally, pass-through)
         """
         provider_lower = self.provider.lower()
@@ -847,8 +847,10 @@ class InstructorLLM(InstructorBaseRagasLLM):
             return self._map_google_params()
         elif provider_lower in ("openai", "azure"):
             return self._map_openai_params()
+        elif provider_lower == "anthropic":
+            return self._map_anthropic_params()
         else:
-            # Anthropic, LiteLLM, and other providers - pass through unchanged
+            # LiteLLM and other providers - pass through unchanged
             return self.model_args.copy()
 
     def _map_openai_params(self) -> t.Dict[str, t.Any]:
@@ -929,6 +931,24 @@ class InstructorLLM(InstructorBaseRagasLLM):
             mapped_args["temperature"] = 1.0
             mapped_args.pop("top_p", None)
 
+        return mapped_args
+
+    def _map_anthropic_params(self) -> t.Dict[str, t.Any]:
+        """Map parameters for Anthropic models.
+
+        Anthropic deprecated top_p for models released after Claude Opus 4.6.
+        Sending top_p with a value below 0.99 causes a 400 Bad Request error:
+            'temperature and top_p cannot both be specified for this model'
+
+        top_p is removed unless the caller explicitly passed a value >= 0.99,
+        which Anthropic still accepts for backwards compatibility.
+
+        See: https://platform.claude.com/docs/en/api/python/messages/create
+        """
+        mapped_args = self.model_args.copy()
+        top_p = mapped_args.get("top_p")
+        if top_p is not None and top_p < 0.99:
+            mapped_args.pop("top_p")
         return mapped_args
 
     def _map_google_params(self) -> t.Dict[str, t.Any]:
