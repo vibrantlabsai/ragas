@@ -16,6 +16,9 @@ class TokenUsage(BaseModel):
     input_tokens: int
     output_tokens: int
     model: str = ""
+    cached_tokens: int = 0
+    cache_creation_input_tokens: int = 0
+    cache_read_input_tokens: int = 0
 
     def __add__(self, y: "TokenUsage") -> "TokenUsage":
         if self.model == y.model or (self.model is None and y.model is None):
@@ -23,6 +26,13 @@ class TokenUsage(BaseModel):
                 input_tokens=self.input_tokens + y.input_tokens,
                 output_tokens=self.output_tokens + y.output_tokens,
                 model=self.model,
+                cached_tokens=self.cached_tokens + y.cached_tokens,
+                cache_creation_input_tokens=(
+                    self.cache_creation_input_tokens + y.cache_creation_input_tokens
+                ),
+                cache_read_input_tokens=(
+                    self.cache_read_input_tokens + y.cache_read_input_tokens
+                ),
             )
         else:
             raise ValueError("Cannot add TokenUsage objects with different models")
@@ -46,6 +56,9 @@ class TokenUsage(BaseModel):
         return (
             self.input_tokens == other.input_tokens
             and self.output_tokens == other.output_tokens
+            and self.cached_tokens == other.cached_tokens
+            and self.cache_creation_input_tokens == other.cache_creation_input_tokens
+            and self.cache_read_input_tokens == other.cache_read_input_tokens
             and self.is_same_model(other)
         )
 
@@ -68,10 +81,17 @@ def get_token_usage_for_openai(
         return TokenUsage(input_tokens=0, output_tokens=0)
     output_tokens = get_from_dict(llm_output, "token_usage.completion_tokens", 0)
     input_tokens = get_from_dict(llm_output, "token_usage.prompt_tokens", 0)
+    cached_tokens = get_from_dict(
+        llm_output, "token_usage.prompt_tokens_details.cached_tokens", 0
+    )
     model = get_from_dict(llm_output, "model_name", "")
 
     return TokenUsage(
-        input_tokens=input_tokens, output_tokens=output_tokens, model=model
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cached_tokens=cached_tokens,
+        cache_read_input_tokens=cached_tokens,
+        model=model,
     )
 
 
@@ -83,6 +103,16 @@ def get_token_usage_for_anthropic(
         for g in gs:
             if isinstance(g, ChatGeneration):
                 if g.message.response_metadata != {}:
+                    cache_read_input_tokens = get_from_dict(
+                        g.message.response_metadata,
+                        "usage.cache_read_input_tokens",
+                        0,
+                    )
+                    cache_creation_input_tokens = get_from_dict(
+                        g.message.response_metadata,
+                        "usage.cache_creation_input_tokens",
+                        0,
+                    )
                     # Anthropic
                     token_usages.append(
                         TokenUsage(
@@ -96,6 +126,9 @@ def get_token_usage_for_anthropic(
                                 "usage.output_tokens",
                                 0,
                             ),
+                            cached_tokens=cache_read_input_tokens,
+                            cache_creation_input_tokens=cache_creation_input_tokens,
+                            cache_read_input_tokens=cache_read_input_tokens,
                             model=get_from_dict(
                                 g.message.response_metadata, "model", ""
                             ),

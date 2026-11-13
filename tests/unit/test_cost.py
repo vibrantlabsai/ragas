@@ -27,6 +27,25 @@ def test_token_usage():
     assert (x + y).input_tokens == 15
     assert (x + y).output_tokens == 35
 
+    cached_x = TokenUsage(
+        input_tokens=10,
+        output_tokens=20,
+        cached_tokens=4,
+        cache_creation_input_tokens=3,
+        cache_read_input_tokens=4,
+    )
+    cached_y = TokenUsage(
+        input_tokens=5,
+        output_tokens=15,
+        cached_tokens=6,
+        cache_creation_input_tokens=2,
+        cache_read_input_tokens=6,
+    )
+    cached_total = cached_x + cached_y
+    assert cached_total.cached_tokens == 10
+    assert cached_total.cache_creation_input_tokens == 5
+    assert cached_total.cache_read_input_tokens == 10
+
     with pytest.raises(ValueError):
         x.model = "openai"
         y.model = "gpt3"
@@ -58,6 +77,7 @@ openai_llm_result = LLMResult(
             "completion_tokens": 10,
             "prompt_tokens": 10,
             "total_tokens": 20,
+            "prompt_tokens_details": {"cached_tokens": 4},
         },
         "model_name": "gpt-4o",
         "system_fingerprint": "fp_2eie",
@@ -75,7 +95,12 @@ anthropic_llm_result = LLMResult(
                         "model": "claude-3-opus-20240229",
                         "stop_reason": "end_turn",
                         "stop_sequence": None,
-                        "usage": {"input_tokens": 9, "output_tokens": 12},
+                        "usage": {
+                            "input_tokens": 9,
+                            "output_tokens": 12,
+                            "cache_creation_input_tokens": 3,
+                            "cache_read_input_tokens": 4,
+                        },
                     },
                 )
             )
@@ -146,12 +171,23 @@ azure_ai_result = LLMResult(
 def test_parse_llm_results():
     # openai
     token_usage = get_token_usage_for_openai(openai_llm_result)
-    assert token_usage == TokenUsage(input_tokens=10, output_tokens=10, model="gpt-4o")
+    assert token_usage == TokenUsage(
+        input_tokens=10,
+        output_tokens=10,
+        cached_tokens=4,
+        cache_read_input_tokens=4,
+        model="gpt-4o",
+    )
 
     # anthropic
     token_usage = get_token_usage_for_anthropic(anthropic_llm_result)
     assert token_usage == TokenUsage(
-        input_tokens=9, output_tokens=12, model="claude-3-opus-20240229"
+        input_tokens=9,
+        output_tokens=12,
+        cached_tokens=4,
+        cache_creation_input_tokens=3,
+        cache_read_input_tokens=4,
+        model="claude-3-opus-20240229",
     )
 
     # Bedrock LLaMa
@@ -222,7 +258,11 @@ def test_cost_callback_handler():
 
     # cost
     assert cost_cb.total_tokens() == TokenUsage(
-        input_tokens=10, output_tokens=10, model="gpt-4o"
+        input_tokens=10,
+        output_tokens=10,
+        cached_tokens=4,
+        cache_read_input_tokens=4,
+        model="gpt-4o",
     )
 
     assert cost_cb.total_cost(0.1) == 2.0
