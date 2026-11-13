@@ -76,8 +76,8 @@ This repository is organized as a single project with integrated experimental fe
 
 ### Examples Package (ragas-examples)
 - Lives under `examples/` as an installable package `ragas-examples`
-- Published independently to PyPI via GitHub Actions workflow `publish-examples.yml`
-- Versioning via Git tags with prefix `examples-v` (e.g., `examples-v0.1.0`)
+- Published to PyPI together with `ragas` by the GitHub Actions workflow `python-publish.yml` when a GitHub release is published
+- Shares the `ragas` version, which comes from the release tag (e.g., `v0.4.4`)
 - Local development: `uv pip install -e . -e ./examples`
 - Run examples: `python -m ragas_examples.benchmark_llm.prompt`
 

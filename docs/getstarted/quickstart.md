@@ -98,7 +98,7 @@ By default, the quickstart example uses OpenAI. Set your API key and you're read
     # Create an OpenAI-compatible client for Ollama
     client = OpenAI(
         api_key="ollama",  # Ollama doesn't require a real key
-        base_url="http://localhost:11434/v1"
+        base_url="http://localhost:11434/v1",
     )
     llm = llm_factory("mistral", provider="openai", client=client)
     ```
@@ -110,10 +110,7 @@ By default, the quickstart example uses OpenAI. Set your API key and you're read
     from openai import OpenAI
     from ragas.llms import llm_factory
 
-    client = OpenAI(
-        api_key="your-api-key",
-        base_url="https://your-api-endpoint"
-    )
+    client = OpenAI(api_key="your-api-key", base_url="https://your-api-endpoint")
     llm = llm_factory("model-name", provider="openai", client=client)
     ```
 
@@ -171,6 +168,7 @@ Edit the `load_dataset()` function in `evals.py` to add more test questions:
 
 ```python
 from ragas import Dataset
+
 
 def load_dataset():
     """Load test dataset for evaluation."""

@@ -27,7 +27,7 @@ scorer = AnswerAccuracy(llm=llm)
 result = await scorer.ascore(
     user_input="When was Einstein born?",
     response="Albert Einstein was born in 1879.",
-    reference="Albert Einstein was born in 1879."
+    reference="Albert Einstein was born in 1879.",
 )
 print(f"Answer Accuracy Score: {result.value}")
 ```
@@ -45,7 +45,7 @@ Answer Accuracy Score: 1.0
     result = scorer.score(
         user_input="When was Einstein born?",
         response="Albert Einstein was born in 1879.",
-        reference="Albert Einstein was born in 1879."
+        reference="Albert Einstein was born in 1879.",
     )
     ```
 
@@ -111,10 +111,12 @@ from ragas.metrics import AnswerAccuracy
 sample = SingleTurnSample(
     user_input="When was Einstein born?",
     response="Albert Einstein was born in 1879.",
-    reference="Albert Einstein was born in 1879."
+    reference="Albert Einstein was born in 1879.",
 )
 
-scorer = AnswerAccuracy(llm=evaluator_llm) # evaluator_llm wrapped with ragas LLM Wrapper
+scorer = AnswerAccuracy(
+    llm=evaluator_llm
+)  # evaluator_llm wrapped with ragas LLM Wrapper
 score = await scorer.single_turn_ascore(sample)
 print(score)
 ```
@@ -153,7 +155,7 @@ result = await scorer.ascore(
     retrieved_contexts=[
         "Albert Einstein was born March 14, 1879.",
         "Albert Einstein was born at Ulm, in Württemberg, Germany.",
-    ]
+    ],
 )
 print(f"Context Relevance Score: {result.value}")
 ```
@@ -169,8 +171,7 @@ Context Relevance Score: 1.0
     
     ```python
     result = scorer.score(
-        user_input="When and Where Albert Einstein was born?",
-        retrieved_contexts=[...]
+        user_input="When and Where Albert Einstein was born?", retrieved_contexts=[...]
     )
     ```
 
@@ -226,7 +227,7 @@ sample = SingleTurnSample(
     retrieved_contexts=[
         "Albert Einstein was born March 14, 1879.",
         "Albert Einstein was born at Ulm, in Württemberg, Germany.",
-    ]
+    ],
 )
 
 scorer = ContextRelevance(llm=evaluator_llm)
@@ -268,7 +269,7 @@ result = await scorer.ascore(
     retrieved_contexts=[
         "Albert Einstein was born March 14, 1879.",
         "Albert Einstein was born at Ulm, in Württemberg, Germany.",
-    ]
+    ],
 )
 print(f"Response Groundedness Score: {result.value}")
 ```
@@ -284,8 +285,7 @@ Response Groundedness Score: 1.0
     
     ```python
     result = scorer.score(
-        response="Albert Einstein was born in 1879.",
-        retrieved_contexts=[...]
+        response="Albert Einstein was born in 1879.", retrieved_contexts=[...]
     )
     ```
 
@@ -337,7 +337,7 @@ sample = SingleTurnSample(
     retrieved_contexts=[
         "Albert Einstein was born March 14, 1879.",
         "Albert Einstein was born at Ulm, in Württemberg, Germany.",
-    ]
+    ],
 )
 
 scorer = ResponseGroundedness(llm=evaluator_llm)

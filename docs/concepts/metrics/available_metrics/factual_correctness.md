@@ -19,7 +19,7 @@ scorer = FactualCorrectness(llm=llm)
 # Evaluate
 result = await scorer.ascore(
     response="The Eiffel Tower is located in Paris.",
-    reference="The Eiffel Tower is located in Paris. It has a height of 1000ft."
+    reference="The Eiffel Tower is located in Paris. It has a height of 1000ft.",
 )
 print(f"Factual Correctness Score: {result.value}")
 ```
@@ -37,7 +37,7 @@ By default, the mode is set to `f1`. You can change the mode to `precision` or `
 scorer = FactualCorrectness(llm=llm, mode="precision")
 result = await scorer.ascore(
     response="The Eiffel Tower is located in Paris.",
-    reference="The Eiffel Tower is located in Paris. It has a height of 1000ft."
+    reference="The Eiffel Tower is located in Paris. It has a height of 1000ft.",
 )
 print(f"Precision Score: {result.value}")
 ```
@@ -56,7 +56,7 @@ scorer = FactualCorrectness(
     llm=llm,
     mode="f1",
     atomicity="high",  # More atomic claims
-    coverage="high"    # Comprehensive coverage
+    coverage="high",  # Comprehensive coverage
 )
 ```
 
@@ -66,7 +66,7 @@ scorer = FactualCorrectness(
     ```python
     result = scorer.score(
         response="The Eiffel Tower is located in Paris.",
-        reference="The Eiffel Tower is located in Paris. It has a height of 1000ft."
+        reference="The Eiffel Tower is located in Paris. It has a height of 1000ft.",
     )
     ```
 
@@ -108,7 +108,7 @@ Each sentence in the response and reference can be broken down into one or more 
 #### Example
 
 ```python
-scorer = FactualCorrectness(mode="precision",atomicity="low")
+scorer = FactualCorrectness(mode="precision", atomicity="low")
 ```
 Output
 ```
@@ -218,10 +218,10 @@ from ragas.metrics._factual_correctness import FactualCorrectness
 
 sample = SingleTurnSample(
     response="The Eiffel Tower is located in Paris.",
-    reference="The Eiffel Tower is located in Paris. I has a height of 1000ft."
+    reference="The Eiffel Tower is located in Paris. I has a height of 1000ft.",
 )
 
-scorer = FactualCorrectness(llm = evaluator_llm)
+scorer = FactualCorrectness(llm=evaluator_llm)
 await scorer.single_turn_ascore(sample)
 ```
 
@@ -236,7 +236,7 @@ Output:
 By default, the mode is set to `F1`, you can change the mode to `precision` or `recall` by setting the `mode` parameter.
 
 ```python
-scorer = FactualCorrectness(llm = evaluator_llm, mode="precision")
+scorer = FactualCorrectness(llm=evaluator_llm, mode="precision")
 ```
 
 Output:

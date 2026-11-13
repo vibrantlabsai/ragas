@@ -156,7 +156,6 @@ from ragas.testset.synthesizers.prompts import (
 
 @dataclass
 class MyMultiHopQuery(MultiHopQuerySynthesizer):
-
     theme_persona_matching_prompt = ThemesPersonasMatchingPrompt()
 
     async def _generate_scenarios(
@@ -182,7 +181,6 @@ class MyMultiHopQuery(MultiHopQuerySynthesizer):
                 node_a, node_b = triplet[0], triplet[-1]
                 overlapped_keywords = triplet[1].properties["overlapped_items"]
                 if overlapped_keywords:
-
                     # match the keyword with a persona for query creation
                     themes = list(dict(overlapped_keywords).keys())
                     prompt_input = ThemesPersonasInput(
@@ -213,6 +211,7 @@ class MyMultiHopQuery(MultiHopQuerySynthesizer):
                     scenarios.extend(base_scenarios)
 
         return scenarios
+
 
 query = MyMultiHopQuery(llm=llm)
 scenarios = await query.generate_scenarios(

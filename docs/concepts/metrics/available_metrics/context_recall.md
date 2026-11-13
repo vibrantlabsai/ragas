@@ -28,7 +28,7 @@ scorer = ContextRecall(llm=llm)
 result = await scorer.ascore(
     user_input="Where is the Eiffel Tower located?",
     retrieved_contexts=["Paris is the capital of France."],
-    reference="The Eiffel Tower is located in Paris."
+    reference="The Eiffel Tower is located in Paris.",
 )
 print(f"Context Recall Score: {result.value}")
 ```
@@ -46,7 +46,7 @@ Context Recall Score: 1.0
     result = scorer.score(
         user_input="Where is the Eiffel Tower located?",
         retrieved_contexts=["Paris is the capital of France."],
-        reference="The Eiffel Tower is located in Paris."
+        reference="The Eiffel Tower is located in Paris.",
     )
     ```
 
@@ -88,20 +88,19 @@ $$
 ### Example
 
 ```python
-
-
 from ragas.dataset_schema import SingleTurnSample
 from ragas.metrics import NonLLMContextRecall
 
 sample = SingleTurnSample(
     retrieved_contexts=["Paris is the capital of France."],
-    reference_contexts=["Paris is the capital of France.", "The Eiffel Tower is one of the most famous landmarks in Paris."]
+    reference_contexts=[
+        "Paris is the capital of France.",
+        "The Eiffel Tower is one of the most famous landmarks in Paris.",
+    ],
 )
 
 context_recall = NonLLMContextRecall()
 await context_recall.single_turn_ascore(sample)
-
-
 ```
 Output
 ```
@@ -122,13 +121,12 @@ $$ \text{ID-Based Context Recall} = \frac{\text{Number of reference context IDs 
 ### Example
 
 ```python
-
 from ragas.dataset_schema import SingleTurnSample
 from ragas.metrics import IDBasedContextRecall
 
 sample = SingleTurnSample(
-    retrieved_context_ids=["doc_1", "doc_2", "doc_3"], 
-    reference_context_ids=["doc_1", "doc_4", "doc_5", "doc_6"]
+    retrieved_context_ids=["doc_1", "doc_2", "doc_3"],
+    reference_context_ids=["doc_1", "doc_4", "doc_5", "doc_6"],
 )
 
 id_recall = IDBasedContextRecall()

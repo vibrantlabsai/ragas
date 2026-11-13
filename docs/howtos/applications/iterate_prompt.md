@@ -94,6 +94,7 @@ import json
 from ragas.metrics.discrete import discrete_metric
 from ragas.metrics.result import MetricResult
 
+
 @discrete_metric(name="labels_exact_match", allowed_values=["correct", "incorrect"])
 def labels_exact_match(prediction: str, expected_labels: str):
     try:
@@ -105,6 +106,7 @@ def labels_exact_match(prediction: str, expected_labels: str):
         )
     except Exception as e:
         return MetricResult(value="incorrect", reason=f"Parse error: {e}")
+
 
 @discrete_metric(name="priority_accuracy", allowed_values=["correct", "incorrect"])
 def priority_accuracy(prediction: str, expected_priority: str):
@@ -130,6 +132,7 @@ import asyncio, json
 from ragas import experiment
 from run_prompt import run_prompt
 
+
 @experiment()
 async def support_triage_experiment(row, prompt_file: str, experiment_name: str):
     response = await asyncio.to_thread(run_prompt, row["text"], prompt_file=prompt_file)
@@ -149,8 +152,12 @@ async def support_triage_experiment(row, prompt_file: str, experiment_name: str)
         "predicted_labels": predicted_labels,
         "expected_priority": row["priority"],
         "predicted_priority": predicted_priority,
-        "labels_score": labels_exact_match.score(prediction=response, expected_labels=row["labels"]).value,
-        "priority_score": priority_accuracy.score(prediction=response, expected_priority=row["priority"]).value,
+        "labels_score": labels_exact_match.score(
+            prediction=response, expected_labels=row["labels"]
+        ).value,
+        "priority_score": priority_accuracy.score(
+            prediction=response, expected_priority=row["priority"]
+        ).value,
     }
 ```
 
@@ -163,17 +170,20 @@ The dataset loader is used to load the dataset into a Ragas dataset object. More
 import os, pandas as pd
 from ragas import Dataset
 
+
 def load_dataset():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     df = pd.read_csv(os.path.join(current_dir, "datasets", "support_triage.csv"))
     dataset = Dataset(name="support_triage", backend="local/csv", root_dir=".")
     for _, row in df.iterrows():
-        dataset.append({
-            "id": str(row["id"]),
-            "text": row["text"],
-            "labels": row["labels"],
-            "priority": row["priority"],
-        })
+        dataset.append(
+            {
+                "id": str(row["id"]),
+                "text": row["text"],
+                "labels": row["labels"],
+                "priority": row["priority"],
+            }
+        )
     return dataset
 ```
 

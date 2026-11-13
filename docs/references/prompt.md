@@ -47,7 +47,7 @@ prompt = FaithfulnessPrompt()
 # Create input data
 input_data = FaithfulnessInput(
     response="The capital of France is Paris.",
-    context="Paris is the capital and most populous city of France."
+    context="Paris is the capital and most populous city of France.",
 )
 
 # Generate the prompt string for the LLM

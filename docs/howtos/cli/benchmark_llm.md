@@ -157,7 +157,9 @@ gpt4_results = pd.read_csv("evals/experiments/gpt4_benchmark.csv")
 gpt35_results = pd.read_csv("evals/experiments/gpt35_benchmark.csv")
 
 print(f"GPT-4 Accuracy: {(gpt4_results['discount_accuracy'] == 'correct').mean():.1%}")
-print(f"GPT-3.5 Accuracy: {(gpt35_results['discount_accuracy'] == 'correct').mean():.1%}")
+print(
+    f"GPT-3.5 Accuracy: {(gpt35_results['discount_accuracy'] == 'correct').mean():.1%}"
+)
 ```
 
 ## Next Steps

@@ -62,11 +62,13 @@ Choose one of two authentication methods:
 from ragas.dataset import Dataset
 from pydantic import BaseModel
 
+
 # Define your data model
 class EvaluationRecord(BaseModel):
     question: str
     answer: str
     score: float
+
 
 # Create dataset with Google Drive backend
 dataset = Dataset(
@@ -74,15 +76,13 @@ dataset = Dataset(
     backend="gdrive",
     config={
         "folder_id": "your_google_drive_folder_id",
-        "service_account_file": "path/to/service-account.json"
-    }
+        "service_account_file": "path/to/service-account.json",
+    },
 )
 
 # Add data
 record = EvaluationRecord(
-    question="What is the capital of France?",
-    answer="Paris",
-    score=1.0
+    question="What is the capital of France?", answer="Paris", score=1.0
 )
 dataset.append(record.model_dump())
 
@@ -93,12 +93,12 @@ dataset.append(record.model_dump())
 
 ```python
 dataset = Dataset(
-    name="my_evaluation", 
+    name="my_evaluation",
     backend="gdrive",
     config={
         "folder_id": "1ABC123def456GHI789jkl",
-        "service_account_file": "/path/to/service-account.json"
-    }
+        "service_account_file": "/path/to/service-account.json",
+    },
 )
 ```
 
@@ -107,11 +107,11 @@ dataset = Dataset(
 ```python
 dataset = Dataset(
     name="my_evaluation",
-    backend="gdrive", 
+    backend="gdrive",
     config={
         "folder_id": "1ABC123def456GHI789jkl",
-        "credentials_file": "/path/to/credentials.json"
-    }
+        "credentials_file": "/path/to/credentials.json",
+    },
 )
 ```
 
@@ -124,8 +124,8 @@ dataset = Dataset.load(
     backend="gdrive",
     config={
         "folder_id": "1ABC123def456GHI789jkl",
-        "service_account_file": "/path/to/service-account.json"
-    }
+        "service_account_file": "/path/to/service-account.json",
+    },
 )
 
 # Access the data
@@ -141,16 +141,14 @@ for record in dataset:
 # After running experiments, results are stored automatically
 from ragas import experiment
 
+
 @experiment()
 async def my_evaluation_experiment(row):
     # Your evaluation logic here
     response = await my_ai_system(row["question"])
-    
-    return {
-        **row,
-        "response": response,
-        "experiment_name": "baseline_v1"
-    }
+
+    return {**row, "response": response, "experiment_name": "baseline_v1"}
+
 
 # Run experiment - results will be saved to Google Drive
 results = await my_evaluation_experiment.arun(dataset)
@@ -171,14 +169,13 @@ results = await my_evaluation_experiment.arun(dataset)
 config = {
     "folder_id": "your_folder_id",
     "service_account_file": "service-account.json",
-    
     # Optional settings
     "credentials_file": None,  # Alternative to service_account_file
     "token_file": "token.json",  # For OAuth token storage
     "scopes": [  # Google API scopes (defaults shown)
         "https://www.googleapis.com/auth/drive.file",
-        "https://www.googleapis.com/auth/spreadsheets"
-    ]
+        "https://www.googleapis.com/auth/spreadsheets",
+    ],
 }
 ```
 
@@ -219,7 +216,7 @@ dataset.append(new_record)
 dataset = Dataset(
     name="custom_name",  # Creates "custom_name.csv" in Google Sheets
     backend="gdrive",
-    config=config
+    config=config,
 )
 ```
 
@@ -230,7 +227,7 @@ dataset = Dataset(
 records = [
     {"question": "Q1", "answer": "A1", "score": 0.9},
     {"question": "Q2", "answer": "A2", "score": 0.8},
-    {"question": "Q3", "answer": "A3", "score": 0.95}
+    {"question": "Q3", "answer": "A3", "score": 0.95},
 ]
 
 for record in records:

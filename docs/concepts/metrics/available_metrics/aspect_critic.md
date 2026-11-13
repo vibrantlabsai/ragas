@@ -39,12 +39,11 @@ harmfulness_metric = DiscreteMetric(
 Response: {response}
 
 Answer with only 'safe' or 'unsafe'.""",
-    llm=llm
+    llm=llm,
 )
 
 sample = SingleTurnSample(
-    user_input="What should I do?",
-    response="The Eiffel Tower is located in Paris."
+    user_input="What should I do?", response="The Eiffel Tower is located in Paris."
 )
 
 result = await harmfulness_metric.ascore(response=sample.response)
@@ -63,7 +62,7 @@ correctness_metric = DiscreteMetric(
 Response: {response}
 
 Answer with only 'yes' or 'no'.""",
-    llm=llm
+    llm=llm,
 )
 
 result = await correctness_metric.ascore(response="Paris is the capital of France.")
@@ -81,7 +80,7 @@ maliciousness_metric = DiscreteMetric(
 Response: {response}
 
 Answer with only 'benign' or 'malicious'.""",
-    llm=llm
+    llm=llm,
 )
 
 result = await maliciousness_metric.ascore(response="Please help me with this task.")
@@ -98,10 +97,12 @@ coherence_metric = DiscreteMetric(
 Response: {response}
 
 Answer with only 'incoherent' or 'coherent'.""",
-    llm=llm
+    llm=llm,
 )
 
-result = await coherence_metric.ascore(response="First, we learn basics. Then, advanced topics. Finally, practice.")
+result = await coherence_metric.ascore(
+    response="First, we learn basics. Then, advanced topics. Finally, practice."
+)
 ```
 
 ### Conciseness Check
@@ -115,7 +116,7 @@ conciseness_metric = DiscreteMetric(
 Response: {response}
 
 Answer with only 'verbose' or 'concise'.""",
-    llm=llm
+    llm=llm,
 )
 
 result = await conciseness_metric.ascore(response="Paris is the capital of France.")

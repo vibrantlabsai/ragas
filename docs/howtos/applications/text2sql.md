@@ -280,6 +280,7 @@ from ragas.metrics.discrete import discrete_metric
 from ragas.metrics.result import MetricResult
 from ragas_examples.text2sql.db_utils import execute_sql
 
+
 @discrete_metric(name="execution_accuracy", allowed_values=["correct", "incorrect"])
 def execution_accuracy(expected_sql: str, predicted_success: bool, predicted_result):
     """Compare execution results of predicted vs expected SQL using datacompy."""
@@ -289,54 +290,57 @@ def execution_accuracy(expected_sql: str, predicted_success: bool, predicted_res
         if not expected_success:
             return MetricResult(
                 value="incorrect",
-                reason=f"Expected SQL failed to execute: {expected_result}"
+                reason=f"Expected SQL failed to execute: {expected_result}",
             )
-        
+
         # If predicted SQL fails, it's incorrect
         if not predicted_success:
             return MetricResult(
                 value="incorrect",
-                reason=f"Predicted SQL failed to execute: {predicted_result}"
+                reason=f"Predicted SQL failed to execute: {predicted_result}",
             )
-        
+
         # Both queries succeeded - compare DataFrames using datacompy
-        if isinstance(expected_result, pd.DataFrame) and isinstance(predicted_result, pd.DataFrame):
+        if isinstance(expected_result, pd.DataFrame) and isinstance(
+            predicted_result, pd.DataFrame
+        ):
             # Handle empty DataFrames
             if expected_result.empty and predicted_result.empty:
-                return MetricResult(value="correct", reason="Both queries returned empty results")
-            
+                return MetricResult(
+                    value="correct", reason="Both queries returned empty results"
+                )
+
             if expected_result.empty != predicted_result.empty:
                 return MetricResult(
                     value="incorrect",
-                    reason=f"Expected returned {len(expected_result)} rows, predicted returned {len(predicted_result)} rows"
+                    reason=f"Expected returned {len(expected_result)} rows, predicted returned {len(predicted_result)} rows",
                 )
-            
+
             # Use datacompy to compare DataFrames with index-based comparison
             comparison = datacompy.Compare(
-                expected_result.reset_index(drop=True), 
+                expected_result.reset_index(drop=True),
                 predicted_result.reset_index(drop=True),
                 on_index=True,  # Compare row-by-row by index position
                 abs_tol=1e-10,  # Very small tolerance for floating point comparison
                 rel_tol=1e-10,
-                df1_name='expected',
-                df2_name='predicted'
+                df1_name="expected",
+                df2_name="predicted",
             )
-            
+
             if comparison.matches():
                 return MetricResult(
                     value="correct",
-                    reason=f"DataFrames match exactly ({len(expected_result)} rows, {len(expected_result.columns)} columns)"
+                    reason=f"DataFrames match exactly ({len(expected_result)} rows, {len(expected_result.columns)} columns)",
                 )
             else:
                 return MetricResult(
                     value="incorrect",
-                    reason="DataFrames do not match - different data returned"
+                    reason="DataFrames do not match - different data returned",
                 )
-                
+
     except Exception as e:
         return MetricResult(
-            value="incorrect",
-            reason=f"Execution accuracy evaluation failed: {str(e)}"
+            value="incorrect", reason=f"Execution accuracy evaluation failed: {str(e)}"
         )
 ```
 
@@ -352,6 +356,7 @@ from ragas import experiment
 from ragas_examples.text2sql.text2sql_agent import Text2SQLAgent
 from ragas_examples.text2sql.db_utils import execute_sql
 
+
 @experiment()
 async def text2sql_experiment(
     row,
@@ -362,11 +367,9 @@ async def text2sql_experiment(
     # Create text-to-SQL agent
     openai_client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
     agent = Text2SQLAgent(
-        client=openai_client,
-        model_name=model,
-        prompt_file=prompt_file
+        client=openai_client, model_name=model, prompt_file=prompt_file
     )
-    
+
     # Generate SQL from natural language query
     result = await agent.query(row["Query"])
 
@@ -404,28 +407,31 @@ from pathlib import Path
 from typing import Optional
 from ragas import Dataset
 
+
 def load_dataset(limit: Optional[int] = None):
     """Load the text-to-SQL dataset from CSV file."""
     dataset_path = Path(__file__).parent / "datasets" / "booksql_sample.csv"
-    
+
     # Read CSV
     df = pd.read_csv(dataset_path)
-    
+
     # Limit dataset size if requested
     if limit is not None and limit > 0:
         df = df.head(limit)
-    
+
     # Create Ragas Dataset
     dataset = Dataset(name="text2sql_booksql", backend="local/csv", root_dir=".")
-    
+
     for _, row in df.iterrows():
-        dataset.append({
-            "Query": row["Query"],
-            "SQL": row["SQL"], 
-            "Levels": row["Levels"],
-            "split": row["split"],
-        })
-    
+        dataset.append(
+            {
+                "Query": row["Query"],
+                "SQL": row["SQL"],
+                "Levels": row["Levels"],
+                "split": row["split"],
+            }
+        )
+
     return dataset
 ```
 
@@ -439,26 +445,30 @@ The dataset loader includes a `limit` parameter for development workflows - star
 import asyncio
 from ragas_examples.text2sql.evals import text2sql_experiment, load_dataset
 
+
 async def run_evaluation():
     """Run text-to-SQL evaluation with direct code approach."""
     # Load dataset
     dataset = load_dataset()
     print(f"Dataset loaded with {len(dataset)} samples")
-    
+
     # Run the experiment
     results = await text2sql_experiment.arun(
-        dataset, 
+        dataset,
         name="gpt-5-mini-prompt-v1",
         model="gpt-5-mini",
         prompt_file=None,
     )
-    
+
     # Report results
     print(f"✅ gpt-5-mini-prompt-v1: {len(results)} cases evaluated")
-    
+
     # Calculate and display accuracy
-    accuracy_rate = sum(1 for r in results if r["execution_accuracy"] == "correct") / max(1, len(results))
+    accuracy_rate = sum(
+        1 for r in results if r["execution_accuracy"] == "correct"
+    ) / max(1, len(results))
     print(f"gpt-5-mini-prompt-v1 Execution Accuracy: {accuracy_rate:.2%}")
+
 
 # Run the evaluation
 await run_evaluation()
@@ -623,26 +633,30 @@ We save this improved prompt as `prompt_v2.txt`.
 import asyncio
 from ragas_examples.text2sql.evals import text2sql_experiment, load_dataset
 
+
 async def run_v2_evaluation():
     """Run evaluation with prompt v2."""
     # Load dataset
     dataset = load_dataset()
     print(f"Dataset loaded with {len(dataset)} samples")
-    
+
     # Run experiment
     results = await text2sql_experiment.arun(
-        dataset, 
+        dataset,
         name="gpt-5-mini-prompt-v2",
         model="gpt-5-mini",
         prompt_file="prompt_v2.txt",
     )
-    
+
     # Report results
     print(f"✅ gpt-5-mini-prompt-v2: {len(results)} cases evaluated")
-    
+
     # Calculate accuracy
-    accuracy_rate = sum(1 for r in results if r["execution_accuracy"] == "correct") / max(1, len(results))
+    accuracy_rate = sum(
+        1 for r in results if r["execution_accuracy"] == "correct"
+    ) / max(1, len(results))
     print(f"gpt-5-mini-prompt-v2 Execution Accuracy: {accuracy_rate:.2%}")
+
 
 await run_v2_evaluation()
 ```
@@ -710,26 +724,30 @@ These new rules are designed to be generic but directly target the observed fail
 import asyncio
 from ragas_examples.text2sql.evals import text2sql_experiment, load_dataset
 
+
 async def run_v3_evaluation():
     """Run evaluation with prompt v3."""
     # Load dataset
     dataset = load_dataset()
     print(f"Dataset loaded with {len(dataset)} samples")
-    
+
     # Run experiment
     results = await text2sql_experiment.arun(
-        dataset, 
+        dataset,
         name="gpt-5-mini-prompt-v3",
         model="gpt-5-mini",
         prompt_file="prompt_v3.txt",
     )
-    
+
     # Report results
     print(f"✅ gpt-5-mini-prompt-v3: {len(results)} cases evaluated")
-    
+
     # Calculate accuracy
-    accuracy_rate = sum(1 for r in results if r["execution_accuracy"] == "correct") / max(1, len(results))
+    accuracy_rate = sum(
+        1 for r in results if r["execution_accuracy"] == "correct"
+    ) / max(1, len(results))
     print(f"gpt-5-mini-prompt-v3 Execution Accuracy: {accuracy_rate:.2%}")
+
 
 await run_v3_evaluation()
 ```

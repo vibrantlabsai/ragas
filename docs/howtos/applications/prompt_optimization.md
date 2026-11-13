@@ -165,35 +165,35 @@ def create_ragas_evaluation_dataset(df: pd.DataFrame, prompt: str) -> Evaluation
     2. For each sample, formatting a prompt with user input and contexts
     3. Calling the LLM with retry logic (up to 4 attempts)
     4. Recording responses in the dataset
-    
+
     Args:
         df: DataFrame with user_input and retrieved_contexts columns
         prompt: Template string with placeholders for contexts and user input
-        
+
     Returns:
         EvaluationDataset for RAGAS evaluation
     """
     # Create a copy to avoid modifying the original DataFrame
     df = df.copy()
-    
+
     # Check if any row has retrieved_contexts as string and convert all to lists
     if df["retrieved_contexts"].apply(type).eq(str).any():
         df["retrieved_contexts"] = df["retrieved_contexts"].apply(
             lambda x: ast.literal_eval(x) if isinstance(x, str) else x
         )
-    
+
     # Convert DataFrame to list of dictionaries
     samples: List[Dict[str, Any]] = df.to_dict(orient="records")
-    
+
     # Process each sample
     for sample in tqdm(samples, desc="Processing samples"):
         user_input_str = sample.get("user_input", "")
         retrieved_contexts = sample.get("retrieved_contexts", [])
-        
+
         # Ensure retrieved_contexts is a list
         if not isinstance(retrieved_contexts, list):
             retrieved_contexts = [str(retrieved_contexts)]
-        
+
         # Join contexts and format prompt
         context_str = "\n".join(retrieved_contexts)
         formatted_prompt = prompt.format(
@@ -210,14 +210,14 @@ def create_ragas_evaluation_dataset(df: pd.DataFrame, prompt: str) -> Evaluation
             try:
                 # Call the OpenAI API
                 response = client.chat.completions.create(
-                    model="gpt-4o-mini", 
+                    model="gpt-4o-mini",
                     messages=[{"role": "user", "content": formatted_prompt}],
-                    temperature=0
+                    temperature=0,
                 )
                 sample["response"] = response.choices[0].message.content
                 break  # Exit the retry loop if successful
             except Exception as e:
-                print(f"Error on attempt {attempt+1}: {str(e)}")
+                print(f"Error on attempt {attempt + 1}: {str(e)}")
                 if attempt == max_attempts - 1:
                     print(f"Failed after {max_attempts} attempts. Skipping sample.")
                     sample["response"] = None
@@ -235,10 +235,14 @@ Now we'll use our function to create evaluation datasets for both prompt version
 ```python
 # Create evaluation datasets for both prompt versions
 print("Generating responses for base prompt...")
-eval_dataset_base = create_ragas_evaluation_dataset(eval_df, prompt=diabetes_assistant_prompt)
+eval_dataset_base = create_ragas_evaluation_dataset(
+    eval_df, prompt=diabetes_assistant_prompt
+)
 
 print("Generating responses for incentive prompt...")
-eval_dataset_incentive = create_ragas_evaluation_dataset(eval_df, prompt=incentive_prompt)
+eval_dataset_incentive = create_ragas_evaluation_dataset(
+    eval_df, prompt=incentive_prompt
+)
 ```
 ```
 Generating responses for base prompt...
@@ -293,7 +297,7 @@ metrics = [
 from ragas import evaluate
 
 # Evaluate both datasets with standard metrics (for answerable questions)
-answerable_df = eval_df.iloc[:10] # First 10 questions should be answered
+answerable_df = eval_df.iloc[:10]  # First 10 questions should be answered
 answerable_dataset_base = EvaluationDataset.from_list(
     [sample for i, sample in enumerate(eval_dataset_base.to_list()) if i < 10]
 )
@@ -322,7 +326,9 @@ Evaluating: 100%|██████████| 20/20 [00:02<00:00,  9.79it/s]
 
 ```python
 print("Evaluating answerable questions with incentive prompt...")
-result_answerable_incentive = evaluate(metrics=metrics, dataset=answerable_dataset_incentive)
+result_answerable_incentive = evaluate(
+    metrics=metrics, dataset=answerable_dataset_incentive
+)
 result_answerable_incentive
 ```
 Output
@@ -376,10 +382,7 @@ Ragas offers flexible tools to create custom metrics that measure your specific 
 ```python
 from ragas.llms import LangchainLLMWrapper
 from langchain_openai import ChatOpenAI
-from ragas.metrics import (
-    AnswerAccuracy,
-    AspectCritic
-)
+from ragas.metrics import AnswerAccuracy, AspectCritic
 
 # Create a specialized metric for evaluating when the model should NOT answer
 no_answer_metric = AspectCritic(
@@ -401,7 +404,9 @@ metrics = [
 
 ```python
 print("Evaluating non-answerable questions with base prompt...")
-result_non_answerable_base = evaluate(metrics=metrics, dataset=non_answerable_dataset_base)
+result_non_answerable_base = evaluate(
+    metrics=metrics, dataset=non_answerable_dataset_base
+)
 result_non_answerable_base
 ```
 Output
@@ -414,7 +419,9 @@ Evaluating: 100%|██████████| 10/10 [00:01<00:00,  5.44it/s]
 
 ```python
 print("Evaluating non-answerable questions with incentive prompt...")
-result_non_answerable_incentive = evaluate(metrics=metrics, dataset=non_answerable_dataset_incentive)
+result_non_answerable_incentive = evaluate(
+    metrics=metrics, dataset=non_answerable_dataset_incentive
+)
 result_non_answerable_incentive
 ```
 Output

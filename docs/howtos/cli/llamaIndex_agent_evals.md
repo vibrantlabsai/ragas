@@ -62,9 +62,7 @@ LlamaIndex agent with simple tools:
 from llama_index.core.agent.workflow import FunctionAgent
 
 agent = FunctionAgent(
-    name="list_manager",
-    tools=[add_item, remove_item, list_items],
-    llm=llm
+    name="list_manager", tools=[add_item, remove_item, list_items], llm=llm
 )
 ```
 

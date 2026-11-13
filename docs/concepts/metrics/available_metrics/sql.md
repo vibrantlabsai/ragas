@@ -148,8 +148,8 @@ result = await metric.ascore(
         - product_id: INT
         - product_name: VARCHAR
         - price: DECIMAL
-        """
-    ]
+        """,
+    ],
 )
 
 print(f"Equivalent: {result.value == 1.0}")
@@ -197,8 +197,8 @@ sample = SingleTurnSample(
         - product_id: INT
         - product_name: VARCHAR
         - price: DECIMAL
-        """
-    ]
+        """,
+    ],
 )
 
 scorer = LLMSQLEquivalence()

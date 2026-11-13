@@ -9,8 +9,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import instructor
-from langchain_community.chat_models.vertexai import ChatVertexAI
-from langchain_community.llms import VertexAI
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.outputs import ChatGeneration, Generation, LLMResult
 from langchain_openai.chat_models import AzureChatOpenAI, ChatOpenAI
@@ -22,6 +20,20 @@ from ragas._analytics import LLMUsageEvent, track
 from ragas.cache import CacheInterface, cacher
 from ragas.exceptions import LLMDidNotFinishException
 from ragas.run_config import RunConfig, add_async_retry
+
+# VertexAI classes are only needed for the multiple-completion capability check
+# below. They moved to the dedicated ``langchain-google-vertexai`` package, and
+# the legacy copies were removed from ``langchain-community`` in 0.4 (the
+# release line that accompanies langchain 1.x), so both locations are optional.
+try:
+    from langchain_google_vertexai import ChatVertexAI, VertexAI
+except ImportError:
+    try:
+        from langchain_community.chat_models.vertexai import ChatVertexAI
+        from langchain_community.llms import VertexAI
+    except ImportError:
+        ChatVertexAI = None  # type: ignore[assignment,misc]
+        VertexAI = None  # type: ignore[assignment,misc]
 
 if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
@@ -35,14 +47,14 @@ logger = logging.getLogger(__name__)
 # TypeVar for Instructor LLM response models
 InstructorTypeVar = t.TypeVar("T", bound=BaseModel)  # type: ignore
 
-MULTIPLE_COMPLETION_SUPPORTED = [
+MULTIPLE_COMPLETION_SUPPORTED: t.List[t.Type[BaseLanguageModel]] = [
     OpenAI,
     ChatOpenAI,
     AzureOpenAI,
     AzureChatOpenAI,
-    ChatVertexAI,
-    VertexAI,
 ]
+if ChatVertexAI is not None and VertexAI is not None:
+    MULTIPLE_COMPLETION_SUPPORTED.extend([ChatVertexAI, VertexAI])
 
 
 def is_multiple_completion_supported(llm: BaseLanguageModel) -> bool:
@@ -581,6 +593,10 @@ def _get_instructor_client(
     - New SDK (google-genai): Uses instructor.from_genai()
     - Old SDK (google-generativeai): Uses instructor.from_gemini()
     """
+    # Google and Perplexity keep instructor's own default mode unless the caller
+    # chose one, so only an explicit mode is forwarded to them.
+    explicit_mode_kwargs: t.Dict[str, t.Any] = {} if mode is None else {"mode": mode}
+
     if mode is None:
         mode = instructor.Mode.JSON
 
@@ -589,16 +605,18 @@ def _get_instructor_client(
     if provider_lower == "openai":
         return instructor.from_openai(client, mode=mode)
     elif provider_lower == "anthropic":
-        return instructor.from_anthropic(client)
+        # instructor's default Anthropic mode forces a tool call, which current
+        # Claude models reject, so Anthropic defaults to JSON mode like OpenAI.
+        return instructor.from_anthropic(client, mode=mode)
     elif provider_lower in ("google", "gemini"):
         if _is_new_google_genai_client(client):
-            return instructor.from_genai(client)
+            return instructor.from_genai(client, **explicit_mode_kwargs)
         else:
-            return instructor.from_gemini(client)
+            return instructor.from_gemini(client, **explicit_mode_kwargs)
     elif provider_lower == "litellm":
         return instructor.from_litellm(client, mode=mode)
     elif provider_lower == "perplexity":
-        return instructor.from_perplexity(client)
+        return instructor.from_perplexity(client, **explicit_mode_kwargs)
     else:
         return _patch_client_for_provider(client, provider_lower, mode=mode)
 
@@ -638,7 +656,9 @@ def llm_factory(
                Pass DiskCacheBackend() for persistent caching across runs.
                Saves costs and speeds up repeated evaluations by 60x.
         mode: Instructor mode for structured outputs (default: Mode.JSON).
-              Only applies when using instructor adapter.
+              Only applies when using instructor adapter. Google and Perplexity
+              use instructor's own default for that provider unless a mode is
+              passed here.
               Options: Mode.JSON, Mode.MD_JSON, Mode.TOOLS, Mode.JSON_SCHEMA, etc.
               Use Mode.MD_JSON for backends that don't support response_format parameter.
         **kwargs: Additional model arguments (temperature, max_tokens, top_p, etc).
@@ -805,6 +825,10 @@ class InstructorLLM(InstructorBaseRagasLLM):
         if model_args is None:
             model_args = InstructorModelArgs()
 
+        # Arguments the caller set, as opposed to the defaults above. Providers
+        # that reject default sampling parameters only receive these.
+        self._explicit_model_args = set(model_args.model_fields_set) | set(kwargs)
+
         # Convert to dict and merge with any additional kwargs
         self.model_args = {**model_args.model_dump(), **kwargs}
 
@@ -826,7 +850,7 @@ class InstructorLLM(InstructorBaseRagasLLM):
         Each provider may have different parameter requirements:
         - Google: Wraps parameters in generation_config and renames max_tokens
         - OpenAI/Azure: Maps max_tokens to max_completion_tokens for o-series models
-        - Anthropic: No special handling required (pass-through)
+        - Anthropic: Sends temperature and top_p only when the caller set them
         - LiteLLM: No special handling required (routes internally, pass-through)
         """
         provider_lower = self.provider.lower()
@@ -835,9 +859,25 @@ class InstructorLLM(InstructorBaseRagasLLM):
             return self._map_google_params()
         elif provider_lower in ("openai", "azure"):
             return self._map_openai_params()
+        elif provider_lower == "anthropic":
+            return self._map_anthropic_params()
         else:
-            # Anthropic, LiteLLM, and other providers - pass through unchanged
+            # LiteLLM and other providers - pass through unchanged
             return self.model_args.copy()
+
+    def _map_anthropic_params(self) -> t.Dict[str, t.Any]:
+        """Map parameters for Anthropic models.
+
+        Current Claude models reject `temperature` and `top_p`, or accept only
+        their default values, so the deterministic defaults ragas applies for
+        other providers are not sent. A value the caller passes explicitly is
+        forwarded unchanged.
+        """
+        mapped_args = self.model_args.copy()
+        for key in ("temperature", "top_p"):
+            if key not in self._explicit_model_args:
+                mapped_args.pop(key, None)
+        return mapped_args
 
     def _map_openai_params(self) -> t.Dict[str, t.Any]:
         """Map parameters for OpenAI/Azure reasoning models with special constraints.
@@ -883,15 +923,16 @@ class InstructorLLM(InstructorBaseRagasLLM):
                 if len(model_str) == 2 or model_str[2] in ("-", "_"):
                     return True
 
-            # GPT-5 and newer generation models (gpt-5, gpt-5-*, gpt-6, gpt-7, ..., gpt-19)
-            # Pattern: "gpt-" followed by single or double digit >= 5, max 19
+            # GPT-5 and newer generation models (gpt-5, gpt-5.2, gpt-5-*, gpt-6, ..., gpt-19)
+            # Pattern: "gpt-" followed by single or double digit major version >= 5
             # TODO: Update to support gpt-20+ when OpenAI releases models beyond gpt-19
             if model_str.startswith("gpt-"):
                 version_str = (
                     model_str[4:].split("-")[0].split("_")[0]
-                )  # Get version number
+                )  # Get version number, including decimal variants like gpt-5.2
+                major_version_str = version_str.split(".")[0]
                 try:
-                    version = int(version_str)
+                    version = int(major_version_str)
                     if 5 <= version <= 19:
                         return True
                 except ValueError:
@@ -951,6 +992,7 @@ class InstructorLLM(InstructorBaseRagasLLM):
         2. Instructor-wrapped Instructor clients that wrap async underlying clients
         3. Direct async clients with chat.completions.create
         4. Instructor-wrapped clients where the underlying client is in a closure
+        5. Google genai clients with create method
         """
         try:
             # Check if this is an AsyncInstructor wrapper
@@ -969,6 +1011,10 @@ class InstructorLLM(InstructorBaseRagasLLM):
                             underlying.chat.completions.create
                         ):
                             return True
+                # For Google genai async clients
+                if hasattr(underlying, "create"):
+                    if inspect.iscoroutinefunction(underlying.create):
+                        return True
 
             # Check if this is an async client by checking for a coroutine method
             if hasattr(self.client, "chat") and hasattr(
@@ -978,6 +1024,11 @@ class InstructorLLM(InstructorBaseRagasLLM):
                     return inspect.iscoroutinefunction(
                         self.client.chat.completions.create
                     )
+
+            # For Google genai clients, check for create method directly
+            if hasattr(self.client, "create"):
+                if inspect.iscoroutinefunction(self.client.create):
+                    return True
 
             # For instructor-wrapped clients, also check the closure of create_fn
             # This handles cases where the underlying client is stored in a closure
@@ -999,6 +1050,10 @@ class InstructorLLM(InstructorBaseRagasLLM):
                         # Also check for acompletion (e.g., litellm Router)
                         if hasattr(obj, "acompletion"):
                             if inspect.iscoroutinefunction(obj.acompletion):
+                                return True
+                        # Also check for Google genai create method
+                        if hasattr(obj, "create"):
+                            if inspect.iscoroutinefunction(obj.create):
                                 return True
                     except (ValueError, AttributeError):
                         # cell_contents might not be accessible
@@ -1065,6 +1120,40 @@ class InstructorLLM(InstructorBaseRagasLLM):
                 loop.close()
                 asyncio.set_event_loop(None)
 
+    def _generate_sync(
+        self, prompt: str, response_model: t.Type[InstructorTypeVar]
+    ) -> InstructorTypeVar:
+        """Execute a synchronous LLM call.
+
+        This is the single source of truth for synchronous execution.
+        Both generate() and agenerate() (via asyncio.to_thread) delegate to this.
+        """
+        messages = []
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        # Map parameters based on provider requirements
+        provider_kwargs = self._map_provider_params()
+
+        if self.provider.lower() == "google":
+            result = self.client.create(
+                model=self.model,
+                messages=messages,
+                response_model=response_model,
+                **provider_kwargs,
+            )
+        else:
+            # OpenAI, Anthropic, LiteLLM
+            result = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                response_model=response_model,
+                **provider_kwargs,
+            )
+
+        return result
+
     def generate(
         self, prompt: str, response_model: t.Type[InstructorTypeVar]
     ) -> InstructorTypeVar:
@@ -1072,35 +1161,12 @@ class InstructorLLM(InstructorBaseRagasLLM):
 
         For async clients, this will run the async method in the appropriate event loop.
         """
-        messages = []
-        if self.system_prompt:
-            messages.append({"role": "system", "content": self.system_prompt})
-        messages.append({"role": "user", "content": prompt})
-
-        # If client is async, use the appropriate method to run it
         if self.is_async:
             result = self._run_async_in_current_loop(
                 self.agenerate(prompt, response_model)
             )
         else:
-            # Map parameters based on provider requirements
-            provider_kwargs = self._map_provider_params()
-
-            if self.provider.lower() == "google":
-                result = self.client.create(
-                    model=self.model,
-                    messages=messages,
-                    response_model=response_model,
-                    **provider_kwargs,
-                )
-            else:
-                # OpenAI, Anthropic, LiteLLM
-                result = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    response_model=response_model,
-                    **provider_kwargs,
-                )
+            result = self._generate_sync(prompt, response_model)
 
         # Track the usage
         track(
@@ -1120,16 +1186,14 @@ class InstructorLLM(InstructorBaseRagasLLM):
         response_model: t.Type[InstructorTypeVar],
     ) -> InstructorTypeVar:
         """Asynchronously generate a response using the configured LLM."""
+        # If client is sync, offload to a thread to avoid blocking the event loop
+        if not self.is_async:
+            return await asyncio.to_thread(self._generate_sync, prompt, response_model)
+
         messages = []
         if self.system_prompt:
             messages.append({"role": "system", "content": self.system_prompt})
         messages.append({"role": "user", "content": prompt})
-
-        # If client is not async, raise a helpful error
-        if not self.is_async:
-            raise TypeError(
-                "Cannot use agenerate() with a synchronous client. Use generate() instead."
-            )
 
         # Map parameters based on provider requirements
         provider_kwargs = self._map_provider_params()

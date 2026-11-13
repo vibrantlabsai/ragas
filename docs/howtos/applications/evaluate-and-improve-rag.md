@@ -62,45 +62,68 @@ print(f"Answer: {result['answer']}")
     from typing import Any, Dict, Optional
     from openai import AsyncOpenAI
 
+
     class RAG:
         """Simple RAG system for document retrieval and answer generation."""
 
-        def __init__(self, llm_client: AsyncOpenAI, retriever: BM25Retriever, system_prompt=None, model="gpt-4o-mini", default_k=3):
+        def __init__(
+            self,
+            llm_client: AsyncOpenAI,
+            retriever: BM25Retriever,
+            system_prompt=None,
+            model="gpt-4o-mini",
+            default_k=3,
+        ):
             self.llm_client = llm_client
             self.retriever = retriever
             self.model = model
             self.default_k = default_k
-            self.system_prompt = system_prompt or "Answer only based on documents. Be concise.\n\nQuestion: {query}\nDocuments:\n{context}\nAnswer:"
+            self.system_prompt = (
+                system_prompt
+                or "Answer only based on documents. Be concise.\n\nQuestion: {query}\nDocuments:\n{context}\nAnswer:"
+            )
 
         async def query(self, question: str, top_k: Optional[int] = None) -> Dict[str, Any]:
             """Query the RAG system."""
             if top_k is None:
                 top_k = self.default_k
-                
+
             return await self._naive_query(question, top_k)
 
         async def _naive_query(self, question: str, top_k: int) -> Dict[str, Any]:
             """Handle naive RAG: retrieve once, then generate."""
             # 1. Retrieve documents using BM25
             docs = self.retriever.retrieve(question, top_k)
-            
+
             if not docs:
-                return {"answer": "No relevant documents found.", "retrieved_documents": [], "num_retrieved": 0}
-            
+                return {
+                    "answer": "No relevant documents found.",
+                    "retrieved_documents": [],
+                    "num_retrieved": 0,
+                }
+
             # 2. Build context from retrieved documents
-            context = "\n\n".join([f"Document {i}:\n{doc.page_content}" for i, doc in enumerate(docs, 1)])
+            context = "\n\n".join(
+                [f"Document {i}:\n{doc.page_content}" for i, doc in enumerate(docs, 1)]
+            )
             prompt = self.system_prompt.format(query=question, context=context)
-            
+
             # 3. Generate response using OpenAI with retrieved context
             response = await self.llm_client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}]
+                model=self.model, messages=[{"role": "user", "content": prompt}]
             )
-            
+
             return {
                 "answer": response.choices[0].message.content.strip(),
-                "retrieved_documents": [{"content": doc.page_content, "metadata": doc.metadata, "document_id": i} for i, doc in enumerate(docs)],
-                "num_retrieved": len(docs)
+                "retrieved_documents": [
+                    {
+                        "content": doc.page_content,
+                        "metadata": doc.metadata,
+                        "document_id": i,
+                    }
+                    for i, doc in enumerate(docs)
+                ],
+                "num_retrieved": len(docs),
             }
     ```
 
@@ -127,23 +150,27 @@ from pathlib import Path
 from ragas import Dataset
 import pandas as pd
 
+
 def download_and_save_dataset() -> Path:
     dataset_path = Path("datasets/hf_doc_qa_eval.csv")
     dataset_path.parent.mkdir(exist_ok=True)
-    
+
     if not dataset_path.exists():
         github_url = "https://raw.githubusercontent.com/vibrantlabsai/ragas/main/examples/ragas_examples/improve_rag/datasets/hf_doc_qa_eval.csv"
         urllib.request.urlretrieve(github_url, dataset_path)
-    
+
     return dataset_path
+
 
 def create_ragas_dataset(dataset_path: Path) -> Dataset:
     dataset = Dataset(name="hf_doc_qa_eval", backend="local/csv", root_dir=".")
     df = pd.read_csv(dataset_path)
-    
+
     for _, row in df.iterrows():
-        dataset.append({"question": row["question"], "expected_answer": row["expected_answer"]})
-    
+        dataset.append(
+            {"question": row["question"], "expected_answer": row["expected_answer"]}
+        )
+
     dataset.save()
     return dataset
 ```
@@ -199,46 +226,51 @@ import asyncio
 from typing import Dict, Any
 from ragas import experiment
 
+
 @experiment()
 async def evaluate_rag(row: Dict[str, Any], rag: RAG, llm) -> Dict[str, Any]:
     """
     Run RAG evaluation on a single row.
-    
+
     Args:
         row: Dictionary containing question and expected_answer
         rag: Pre-initialized RAG instance
         llm: Pre-initialized LLM client for evaluation
-        
+
     Returns:
         Dictionary with evaluation results
     """
     question = row["question"]
-    
+
     # Query the RAG system
     rag_response = await rag.query(question, top_k=4)
     model_response = rag_response.get("answer", "")
-    
+
     # Evaluate correctness asynchronously
     score = await correctness_metric.ascore(
         question=question,
         expected_answer=row["expected_answer"],
         response=model_response,
-        llm=llm
+        llm=llm,
     )
-    
+
     # Return evaluation results
     result = {
         **row,
         "model_response": model_response,
         "correctness_score": score.value,
         "correctness_reason": score.reason,
-        "mlflow_trace_id": rag_response.get("mlflow_trace_id", "N/A"),  # MLflow trace ID for debugging (explained later)
+        "mlflow_trace_id": rag_response.get(
+            "mlflow_trace_id", "N/A"
+        ),  # MLflow trace ID for debugging (explained later)
         "retrieved_documents": [
-            doc.get("content", "")[:200] + "..." if len(doc.get("content", "")) > 200 else doc.get("content", "")
+            doc.get("content", "")[:200] + "..."
+            if len(doc.get("content", "")) > 200
+            else doc.get("content", "")
             for doc in rag_response.get("retrieved_documents", [])
-        ]
+        ],
     }
-    
+
     return result
 ```
 
@@ -270,38 +302,39 @@ from ragas_examples.improve_rag.evals import (
     download_and_save_dataset,
     create_ragas_dataset,
     get_openai_client,
-    get_llm_client
+    get_llm_client,
 )
 from ragas_examples.improve_rag.rag import RAG, BM25Retriever
+
 
 async def run_evaluation():
     # Download and prepare dataset
     dataset_path = download_and_save_dataset()
     dataset = create_ragas_dataset(dataset_path)
-    
+
     # Initialize RAG components
     openai_client = get_openai_client()
     retriever = BM25Retriever()
-    rag = RAG(llm_client=openai_client, retriever=retriever, model="gpt-5-mini", mode="naive")
+    rag = RAG(
+        llm_client=openai_client, retriever=retriever, model="gpt-5-mini", mode="naive"
+    )
     llm = get_llm_client()
-    
+
     # Run evaluation experiment
     exp_name = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}_naiverag"
-    results = await evaluate_rag.arun(
-        dataset, 
-        name=exp_name,
-        rag=rag,
-        llm=llm
-    )
-    
+    results = await evaluate_rag.arun(dataset, name=exp_name, rag=rag, llm=llm)
+
     # Print results
     if results:
-        pass_count = sum(1 for result in results if result.get("correctness_score") == "pass")
+        pass_count = sum(
+            1 for result in results if result.get("correctness_score") == "pass"
+        )
         total_count = len(results)
         pass_rate = (pass_count / total_count) * 100 if total_count > 0 else 0
         print(f"Results: {pass_count}/{total_count} passed ({pass_rate:.1f}%)")
-    
+
     return results
+
 
 # Run the evaluation
 results = await run_evaluation()
@@ -398,22 +431,27 @@ print(f"Answer: {result['answer']}")
     # Key components from the RAG class when mode="agentic"
     from agents import Agent, Runner, function_tool
 
+
     def _setup_agent(self):
         """Setup agent for agentic mode."""
+
         @function_tool
         def retrieve(query: str) -> str:
             """Search documents using BM25 retriever for a given query."""
             docs = self.retriever.retrieve(query, self.default_k)
             if not docs:
                 return "No documents found."
-            return "\n\n".join([f"Doc {i}: {doc.page_content}" for i, doc in enumerate(docs, 1)])
+            return "\n\n".join(
+                [f"Doc {i}: {doc.page_content}" for i, doc in enumerate(docs, 1)]
+            )
 
         self._agent = Agent(
             name="RAG Assistant",
             model=self.model,
             instructions="Use short keywords to search. Try 2-3 different searches. Only answer based on documents. Be concise.",
-            tools=[retrieve]
+            tools=[retrieve],
         )
+
 
     async def _agentic_query(self, question: str, top_k: int) -> Dict[str, Any]:
         """Handle agentic mode: agent controls retrieval strategy."""
@@ -438,41 +476,45 @@ load_dotenv()
 
 from ragas_examples.improve_rag.evals import (
     evaluate_rag,
-    download_and_save_dataset, 
+    download_and_save_dataset,
     create_ragas_dataset,
     get_openai_client,
-    get_llm_client
+    get_llm_client,
 )
 from ragas_examples.improve_rag.rag import RAG, BM25Retriever
+
 
 async def run_agentic_evaluation():
     # Download and prepare dataset
     dataset_path = download_and_save_dataset()
     dataset = create_ragas_dataset(dataset_path)
-    
+
     # Initialize RAG components with agentic mode
     openai_client = get_openai_client()
     retriever = BM25Retriever()
-    rag = RAG(llm_client=openai_client, retriever=retriever, model="gpt-5-mini", mode="agentic")
+    rag = RAG(
+        llm_client=openai_client,
+        retriever=retriever,
+        model="gpt-5-mini",
+        mode="agentic",
+    )
     llm = get_llm_client()
-    
+
     # Run evaluation experiment
     exp_name = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}_agenticrag"
-    results = await evaluate_rag.arun(
-        dataset, 
-        name=exp_name,
-        rag=rag,
-        llm=llm
-    )
-    
+    results = await evaluate_rag.arun(dataset, name=exp_name, rag=rag, llm=llm)
+
     # Print results
     if results:
-        pass_count = sum(1 for result in results if result.get("correctness_score") == "pass")
+        pass_count = sum(
+            1 for result in results if result.get("correctness_score") == "pass"
+        )
         total_count = len(results)
         pass_rate = (pass_count / total_count) * 100 if total_count > 0 else 0
         print(f"Results: {pass_count}/{total_count} passed ({pass_rate:.1f}%)")
-    
+
     return results
+
 
 # Run the agentic evaluation
 results = await run_agentic_evaluation()

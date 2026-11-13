@@ -188,7 +188,12 @@ def initiate_return():
 ```py
 triage_agent.functions = [transfer_to_tracker_agent, transfer_to_return_agent]
 tracker_agent.functions = [transfer_to_triage_agent, track_order, case_resolved]
-return_agent.functions = [transfer_to_triage_agent, valid_to_return, initiate_return, case_resolved]
+return_agent.functions = [
+    transfer_to_triage_agent,
+    valid_to_return,
+    initiate_return,
+    case_resolved,
+]
 ```
 
 We need to capture the messages exchanged during the [demo loop](https://github.com/openai/swarm/blob/main/swarm/repl/repl.py#L60) to evaluate the interactions between the user and the agents. This can be done by modifying the `run_demo_loop` function in the Swarm codebase. Specifically, you’ll need to update the function to return the list of messages once the while loop ends.
@@ -274,7 +279,9 @@ Here's how you can use the function:
 from ragas.integrations.swarm import convert_to_ragas_messages
 
 # Assuming 'result["messages"]' contains the list of LangChain messages
-shipment_update_ragas_trace = convert_to_ragas_messages(messages=shipment_update_interaction)
+shipment_update_ragas_trace = convert_to_ragas_messages(
+    messages=shipment_update_interaction
+)
 shipment_update_ragas_trace
 ```
 Output

@@ -33,8 +33,8 @@ result = await scorer.ascore(
         "The Life Insurance Corporation of India (LIC) was established in 1956 following the nationalization of the insurance industry in India.",
         "LIC is the largest insurance company in India, with a vast network of policyholders and huge investments.",
         "As the largest institutional investor in India, LIC manages substantial funds, contributing to the financial stability of the country.",
-        "The Indian economy is one of the fastest-growing major economies in the world, thanks to sectors like finance, technology, manufacturing etc."
-    ]
+        "The Indian economy is one of the fastest-growing major economies in the world, thanks to sectors like finance, technology, manufacturing etc.",
+    ],
 )
 print(f"Noise Sensitivity Score: {result.value}")
 ```
@@ -57,8 +57,8 @@ result = await scorer.ascore(
         "The Life Insurance Corporation of India (LIC) was established in 1956 following the nationalization of the insurance industry in India.",
         "LIC is the largest insurance company in India, with a vast network of policyholders and huge investments.",
         "As the largest institutional investor in India, LIC manages substantial funds, contributing to the financial stability of the country.",
-        "The Indian economy is one of the fastest-growing major economies in the world, thanks to sectors like finance, technology, manufacturing etc."
-    ]
+        "The Indian economy is one of the fastest-growing major economies in the world, thanks to sectors like finance, technology, manufacturing etc.",
+    ],
 )
 print(f"Noise Sensitivity (Irrelevant) Score: {result.value}")
 ```
@@ -77,7 +77,7 @@ Noise Sensitivity (Irrelevant) Score: 0.0
         user_input="What is the Life Insurance Corporation of India (LIC) known for?",
         response="The Life Insurance Corporation of India (LIC) is the largest insurance company in India...",
         reference="The Life Insurance Corporation of India (LIC) is the largest insurance company...",
-        retrieved_contexts=[...]
+        retrieved_contexts=[...],
     )
     ```
 
@@ -162,8 +162,8 @@ sample = SingleTurnSample(
         "The Life Insurance Corporation of India (LIC) was established in 1956 following the nationalization of the insurance industry in India.",
         "LIC is the largest insurance company in India, with a vast network of policyholders and huge investments.",
         "As the largest institutional investor in India, LIC manages substantial funds, contributing to the financial stability of the country.",
-        "The Indian economy is one of the fastest-growing major economies in the world, thanks to sectors like finance, technology, manufacturing etc."
-    ]
+        "The Indian economy is one of the fastest-growing major economies in the world, thanks to sectors like finance, technology, manufacturing etc.",
+    ],
 )
 
 scorer = NoiseSensitivity(llm=evaluator_llm)
