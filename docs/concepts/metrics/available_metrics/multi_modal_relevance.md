@@ -23,7 +23,7 @@ result = await metric.ascore(
     user_input="What about the Tesla Model X?",
     response="The Tesla Model X is an electric SUV.",
     retrieved_contexts=[
-        "path/to/tesla_image.jpg",  # Image context
+        "https://example.com/tesla_image.jpg",  # Image context
         "Tesla manufactures electric vehicles.",  # Text context
     ],
 )
@@ -42,7 +42,7 @@ from ragas.metrics import MultiModalRelevance
 sample = SingleTurnSample(
     user_input="What about the Tesla Model X?",
     response="Cats are cute.",
-    retrieved_contexts=["custom_eval/multimodal/images/tesla.jpg"],
+    retrieved_contexts=["https://example.com/tesla_image.jpg"],
 )
 scorer = MultiModalRelevance()
 await scorer.single_turn_ascore(sample)
@@ -54,7 +54,7 @@ await scorer.single_turn_ascore(sample)
     **Question**: What about the Tesla Model X?
 
     **Context (visual)**:
-    - An image of the Tesla Model X (custom_eval/multimodal/images/tesla.jpg)
+    - An image of the Tesla Model X (https://example.com/tesla_image.jpg)
 
     **High relevance answer**: The Tesla Model X is an electric SUV manufactured by Tesla.
 
@@ -81,9 +81,36 @@ In this example, the response "Cats are cute" does not align with the image of t
 The metric supports multiple types of context inputs:
 
 - **Text contexts**: Plain text strings
-- **Image URLs**: HTTP/HTTPS URLs pointing to images
-- **Local image paths**: File paths to local images (jpg, png, gif, webp, bmp)
+- **Image URLs**: HTTP/HTTPS URLs pointing to images on the public internet
 - **Base64 data URIs**: Inline base64-encoded images
+- **Local image paths**: File paths to local images (jpg, png, gif, webp, bmp). Disabled by default, see below
+
+### Image Loading and Security
+
+Retrieved contexts usually come from a dataset, so Ragas treats image references as untrusted input:
+
+- **Image URLs** are downloaded only from public internet addresses. A URL that points to `localhost`, a private or link-local address (including cloud metadata endpoints), or that redirects to one, is not fetched.
+- **Local image paths** are not read unless you enable local file access and name the single directory that images may be loaded from.
+
+An image that is not loaded is passed to the model as plain text and a message is logged, so a blocked image shows up in the logs rather than as an error.
+
+If your images live on an internal host or on disk, opt in before running the metric:
+
+```python
+import ragas.prompt.multi_modal_prompt as image_policy
+
+# Read local images, but only from inside this directory
+image_policy.ALLOW_LOCAL_FILE_ACCESS = True
+image_policy.ALLOWED_IMAGE_BASE_DIR = "/data/eval_images"
+
+# Allow image URLs on internal or private addresses
+image_policy.ALLOW_INTERNAL_TARGETS = True
+```
+
+Local paths are resolved relative to `ALLOWED_IMAGE_BASE_DIR`, and a path that resolves outside it is refused.
+
+!!! warning
+    Turn these settings on only when you trust every context in the dataset. With them enabled, a context string can make the machine running the evaluation read a local file or call an internal service and send the result to your LLM provider.
 
 ### Requirements
 

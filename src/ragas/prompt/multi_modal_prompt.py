@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import base64
 import binascii
-import ipaddress
 import logging
 import os
 import re
-import socket
 import typing as t
 from io import BytesIO
 from urllib.parse import urlparse
@@ -19,6 +17,7 @@ from PIL import Image
 from pydantic import BaseModel
 from typing_extensions import TypedDict
 
+from ragas._safe_fetch import BlockedAddressError, fetch_url_bytes
 from ragas.callbacks import ChainType, new_group
 from ragas.exceptions import RagasOutputParserException
 from ragas.prompt.pydantic_prompt import (
@@ -53,6 +52,9 @@ MessageContent = t.Union[TextContent, ImageUrlContent]
 logger = logging.getLogger(__name__)
 
 # --- Constants for Security Policy ---
+# ALLOW_INTERNAL_TARGETS, ALLOW_LOCAL_FILE_ACCESS and ALLOWED_IMAGE_BASE_DIR are
+# read at call time and also govern the collections multimodal metrics
+# (ragas.metrics.collections.multi_modal_faithfulness / multi_modal_relevance).
 
 # Allow only HTTP and HTTPS URLs by default
 ALLOWED_URL_SCHEMES = {"http", "https"}
@@ -72,8 +74,6 @@ COMMON_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 ALLOW_LOCAL_FILE_ACCESS = False  # <<< SECURITY: Default to False
 
 ALLOW_INTERNAL_TARGETS = False  # <<< SECURITY: Default to False
-
-DISALLOWED_IP_CHECKS = {"is_loopback", "is_private", "is_link_local", "is_reserved"}
 
 
 # Define the *absolute* path to the ONLY directory from which local images can be loaded.
@@ -369,61 +369,16 @@ class ImageTextPromptValue(PromptValue):
         Uses 'requests' library for better control.
         """
         try:
-            # <<< SSRF CHECK START >>>
-            parsed_url = urlparse(url)
-            if not parsed_url.hostname:
-                logger.error(
-                    f"Could not extract hostname from URL '{url}' for SSRF check."
+            # 1-3. Download with the SSRF guard: the target of the request and of
+            # every redirect hop is validated, and the size limit is enforced.
+            image_data = BytesIO(
+                fetch_url_bytes(
+                    url,
+                    timeout=REQUESTS_TIMEOUT_SECONDS,
+                    max_bytes=MAX_DOWNLOAD_SIZE_BYTES,
+                    allow_internal=ALLOW_INTERNAL_TARGETS,
                 )
-                return None
-
-            if not self._is_safe_url_target(parsed_url.hostname):
-                # Logging is handled within _is_safe_url_target
-                return None
-            # <<< SSRF CHECK END >>>
-
-            # Proceed with the request only if the target IP check passed
-            response = requests.get(
-                url,
-                timeout=REQUESTS_TIMEOUT_SECONDS,
-                stream=True,
-                # IMPORTANT CAVEAT: Redirects can bypass this initial check.
-                # An initial safe URL could redirect to an internal one.
-                # Setting allow_redirects=False is safer but may break legitimate uses.
-                # Handling redirects manually with re-checks is complex.
-                # Consider the risk profile. Defaulting to allow_redirects=True for now.
-                allow_redirects=True,
             )
-            response.raise_for_status()  # Check for HTTP errors (4xx, 5xx)
-
-            # 1. Check Content-Type header (as a hint, not definitive)
-            content_type = response.headers.get("Content-Type", "").lower()
-            if not content_type.startswith("image/"):
-                logger.warning(f"URL {url} Content-Type '{content_type}' is not image.")
-                # Allow processing to continue, but rely on content validation later
-                # return None # uncomment if strict header check desired
-
-            # 2. Check Content-Length header (if available) against limit
-            content_length = response.headers.get("Content-Length")
-            if content_length and int(content_length) > MAX_DOWNLOAD_SIZE_BYTES:
-                logger.error(
-                    f"URL {url} content length {content_length} exceeds limit {MAX_DOWNLOAD_SIZE_BYTES}."
-                )
-                return None
-
-            # 3. Download content incrementally, enforcing size limit
-            image_data = BytesIO()
-            downloaded_size = 0
-            for chunk in response.iter_content(chunk_size=8192):
-                downloaded_size += len(chunk)
-                if downloaded_size > MAX_DOWNLOAD_SIZE_BYTES:
-                    logger.error(
-                        f"URL {url} download size exceeded limit {MAX_DOWNLOAD_SIZE_BYTES} during streaming."
-                    )
-                    return None
-                image_data.write(chunk)
-
-            image_data.seek(0)  # Rewind buffer for reading
 
             # 4. Validate content using Pillow
             try:
@@ -453,89 +408,15 @@ class ImageTextPromptValue(PromptValue):
                 )
                 return None
 
+        except BlockedAddressError as ssrf_err:
+            logger.error(f"SSRF check: blocking request to URL {url}: {ssrf_err}")
+            return None
         except requests.exceptions.RequestException as req_err:
             logger.error(f"Failed to download image from URL {url}: {req_err}")
             return None
         except Exception as e:
             logger.error(f"An unexpected error occurred processing URL {url}: {e}")
             return None
-
-    def _is_safe_url_target(self, url_hostname: str) -> bool:
-        """
-        Resolves the URL hostname to IP addresses and checks if any fall into
-        disallowed categories (loopback, private, reserved, link-local)
-        to prevent SSRF attacks against internal networks.
-
-        Args:
-            url_hostname: The hostname extracted from the URL.
-
-        Returns:
-            True if all resolved IPs are considered safe (e.g., public),
-            False if any resolved IP is disallowed or resolution fails.
-        """
-        if ALLOW_INTERNAL_TARGETS:
-            # Bypass check if explicitly allowed (dangerous!)
-            logger.warning(
-                "SSRF IP address check bypassed due to ALLOW_INTERNAL_TARGETS=True"
-            )
-            return True
-
-        try:
-            # Use getaddrinfo for robust resolution (handles IPv4/IPv6)
-            # The flags ensure we get canonical names and prevent certain resolution loops if needed,
-            # though default flags are often sufficient. Using AF_UNSPEC gets both IPv4 and IPv6 if available.
-            addrinfo_results = socket.getaddrinfo(
-                url_hostname, None, family=socket.AF_UNSPEC
-            )
-            # Example result: [(<AddressFamily.AF_INET: 2>, <SocketKind.SOCK_STREAM: 1>, 6, '', ('93.184.216.34', 0))]
-
-            if not addrinfo_results:
-                logger.error(
-                    f"SSRF check: DNS resolution failed for hostname '{url_hostname}' (no results)"
-                )
-                return False
-
-            for family, type, proto, canonname, sockaddr in addrinfo_results:
-                ip_address_str = sockaddr[
-                    0
-                ]  # IP address is the first element of the sockaddr tuple
-                try:
-                    ip = ipaddress.ip_address(ip_address_str)
-
-                    # Check against disallowed types using the policy
-                    for check_name in DISALLOWED_IP_CHECKS:
-                        # Dynamically call the check method (e.g., ip.is_loopback)
-                        is_disallowed_type = getattr(ip, check_name, False)
-                        if is_disallowed_type:
-                            logger.error(
-                                f"SSRF check: Hostname '{url_hostname}' resolved to disallowed IP '{ip_address_str}' ({check_name}=True). Blocking request."
-                            )
-                            return False
-
-                    # Optional: Log allowed IPs for debugging if needed
-                    # logger.debug(f"SSRF check: Hostname '{url_hostname}' resolved to allowed IP '{ip_address_str}'")
-
-                except ValueError as ip_err:
-                    logger.error(
-                        f"SSRF check: Error parsing resolved IP address '{ip_address_str}' for hostname '{url_hostname}': {ip_err}"
-                    )
-                    # Treat parsing errors as unsafe
-                    return False
-
-            # If we looped through all resolved IPs and none were disallowed
-            return True
-
-        except socket.gaierror as dns_err:
-            logger.error(
-                f"SSRF check: DNS resolution error for hostname '{url_hostname}': {dns_err}"
-            )
-            return False
-        except Exception as e:
-            # Catch unexpected errors during resolution/checking
-            logger.error(
-                f"SSRF check: Unexpected error checking hostname '{url_hostname}': {e}"
-            )
-            return False
 
     def _try_process_local_file(self, item: str) -> t.Optional[dict]:
         """

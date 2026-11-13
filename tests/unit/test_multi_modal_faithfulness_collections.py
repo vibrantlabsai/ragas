@@ -14,6 +14,16 @@ from ragas.metrics.collections.multi_modal_faithfulness.util import (
     is_image_path_or_url,
     process_image_to_base64,
 )
+from ragas.prompt import multi_modal_prompt
+
+
+@pytest.fixture
+def allow_local_images(monkeypatch):
+    """Opt in to local image files (disabled by default) for the temp directory."""
+    monkeypatch.setattr(multi_modal_prompt, "ALLOW_LOCAL_FILE_ACCESS", True)
+    monkeypatch.setattr(
+        multi_modal_prompt, "ALLOWED_IMAGE_BASE_DIR", tempfile.gettempdir()
+    )
 
 
 class TestImageProcessingUtilities:
@@ -52,7 +62,7 @@ class TestImageProcessingUtilities:
         assert is_image_path_or_url(None) is False  # type: ignore
         assert is_image_path_or_url("") is False
 
-    def test_process_image_to_base64_with_valid_file(self):
+    def test_process_image_to_base64_with_valid_file(self, allow_local_images):
         """Test processing a valid local image file."""
         # Create a temporary image file
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
@@ -113,7 +123,7 @@ class TestBuildMultimodalMessageContent:
         text_blocks = [c for c in content if c["type"] == "text"]
         assert len(text_blocks) >= 2  # Instruction + context
 
-    def test_build_with_mixed_content(self):
+    def test_build_with_mixed_content(self, allow_local_images):
         """Test building content with mixed text and image contexts."""
         # Create a temporary image
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
