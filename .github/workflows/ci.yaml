@@ -56,7 +56,9 @@ jobs:
       matrix:
         include:
           # Critical path: Latest + oldest Python on Ubuntu (full test suite)
-          - os: ubuntu-latest
+          # setup-python has no Python 3.9 build for Ubuntu 26.04 (ubuntu-latest),
+          # so the oldest supported Python stays on the 24.04 image.
+          - os: ubuntu-24.04
             python-version: "3.9"
             test-type: "full"
           - os: ubuntu-latest
