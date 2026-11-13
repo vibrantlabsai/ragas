@@ -17,10 +17,13 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
+from ragas.comparison.cli import compare_command
+
 # from ragas.experimental.project.core import Project  # TODO: Project module not implemented yet
 from ragas.utils import console
 
 app = typer.Typer(help="Ragas CLI for running LLM evaluations")
+app.command(name="compare")(compare_command)
 
 
 # Create a callback for the main app to make it a group
