@@ -7,6 +7,7 @@ to track and monitor Ragas evaluation runs.
 Supported Platforms:
 - Langfuse: Open-source LLM engineering platform
 - MLflow: Machine learning lifecycle management platform
+- OpenTelemetry: Vendor-neutral observability framework
 
 Example:
     Basic usage with Langfuse:
@@ -47,6 +48,7 @@ if False:
         sync_trace,
     )
     from .mlflow import MLflowTrace  # noqa: F401
+    from .opentelemetry import OpenTelemetryTracer, RagasTracer  # noqa: F401
 
 
 # Lazy imports to handle optional dependencies gracefully
@@ -74,5 +76,12 @@ def __getattr__(name: str):
         from .mlflow import MLflowTrace
 
         return MLflowTrace
+    elif name in ["OpenTelemetryTracer", "RagasTracer"]:
+        from .opentelemetry import OpenTelemetryTracer, RagasTracer
+
+        if name == "OpenTelemetryTracer":
+            return OpenTelemetryTracer
+        elif name == "RagasTracer":
+            return RagasTracer
     else:
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

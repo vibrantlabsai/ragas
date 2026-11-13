@@ -56,6 +56,14 @@ all = [
 # Specific integrations
 git = ["GitPython"]
 tracing = ["langfuse>=3.2.4", "mlflow>=3.1.4"]
+opentelemetry = [
+    "opentelemetry-api>=1.25.0",
+    "opentelemetry-sdk>=1.25.0",
+    # OpenTelemetryTracer subclasses langchain_core's BaseCallbackHandler so
+    # the integration only loads when langchain is available. Without this
+    # dep, `pip install ragas[opentelemetry]` ImportErrors at module load.
+    "langchain-core>=0.3.0",
+]
 gdrive = [
     "google-api-python-client>=2.178.0",
     "google-auth>=2.40.3",
@@ -180,7 +188,7 @@ dev = [
     "numpy<2.4",
     "openinference-instrumentation-langchain>=0.1.29",
     # Include all optional features
-    "ragas[all,tracing,gdrive,ai-frameworks]",
+    "ragas[all,tracing,gdrive,ai-frameworks,opentelemetry]",
 ]
 docs = [
     "mkdocs>=1.6.1",
