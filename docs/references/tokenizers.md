@@ -37,6 +37,7 @@ tokenizer = HuggingFaceTokenizer(model_name="meta-llama/Llama-2-7b-hf")
 
 # Use a pre-initialized tokenizer
 from transformers import AutoTokenizer
+
 hf_tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-v0.1")
 tokenizer = HuggingFaceTokenizer(tokenizer=hf_tokenizer)
 ```

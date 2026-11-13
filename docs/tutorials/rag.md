@@ -27,9 +27,18 @@ Next, we will write down a few sample queries and expected outputs for our RAG s
 import pandas as pd
 
 samples = [
-    {"query": "What is Ragas 0.3?", "grading_notes": "- Ragas 0.3 is a library for evaluating LLM applications."},
-    {"query": "How to install Ragas?", "grading_notes": "- install from source  - install from pip using ragas[examples]"},
-    {"query": "What are the main features of Ragas?", "grading_notes": "organised around - experiments - datasets - metrics."}
+    {
+        "query": "What is Ragas 0.3?",
+        "grading_notes": "- Ragas 0.3 is a library for evaluating LLM applications.",
+    },
+    {
+        "query": "How to install Ragas?",
+        "grading_notes": "- install from source  - install from pip using ragas[examples]",
+    },
+    {
+        "query": "What are the main features of Ragas?",
+        "grading_notes": "organised around - experiments - datasets - metrics.",
+    },
 ]
 pd.DataFrame(samples).to_csv("datasets/test_dataset.csv", index=False)
 ```
@@ -38,9 +47,10 @@ To evaluate the performance of our RAG system, we will define a llm based metric
 
 ```python
 from ragas.metrics import DiscreteMetric
+
 my_metric = DiscreteMetric(
     name="correctness",
-    prompt = "Check if the response contains points mentioned from the grading notes and return 'pass' or 'fail'.\nResponse: {response} Grading Notes: {grading_notes}",
+    prompt="Check if the response contains points mentioned from the grading notes and return 'pass' or 'fail'.\nResponse: {response} Grading Notes: {grading_notes}",
     allowed_values=["pass", "fail"],
 )
 ```
@@ -51,11 +61,11 @@ Next, we will write the experiment loop that will run our RAG system on the test
 @experiment()
 async def run_experiment(row):
     response = rag_client.query(row["query"])
-    
+
     score = my_metric.score(
         llm=llm,
         response=response.get("answer", " "),
-        grading_notes=row["grading_notes"]
+        grading_notes=row["grading_notes"],
     )
 
     experiment_view = {

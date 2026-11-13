@@ -1,3 +1,4 @@
+import gc
 import random
 import time
 import typing as t
@@ -350,6 +351,26 @@ def build_knowledge_graph(
         kg.add(rel)
 
     return kg
+
+
+def time_find_n_indirect_clusters(
+    kg: KnowledgeGraph, n: int, depth_limit: int
+) -> tuple[list[set[Node]], float]:
+    """
+    Return the clusters and the fastest of three timed runs. A garbage collection pause
+    or a busy runner can slow a single run by 100x, which would skew the time ratios.
+    """
+    execution_time = float("inf")
+    clusters: list[set[Node]] = []
+    gc.disable()
+    try:
+        for _ in range(3):
+            start_time = time.perf_counter()
+            clusters = kg.find_n_indirect_clusters(n=n, depth_limit=depth_limit)
+            execution_time = min(execution_time, time.perf_counter() - start_time)
+    finally:
+        gc.enable()
+    return clusters, execution_time
 
 
 def assert_clusters_equal(
@@ -815,12 +836,9 @@ def test_performance_find_n_indirect_clusters_max_density():
         nodes, relationships = create_web_of_similarities(node_count=size)
         kg: KnowledgeGraph = build_knowledge_graph(nodes, relationships)
 
-        # Measure execution time
-        start_time = time.time()
-        clusters: list[set[Node]] = kg.find_n_indirect_clusters(n=size, depth_limit=4)
-        end_time = time.time()
-
-        execution_time = end_time - start_time
+        clusters, execution_time = time_find_n_indirect_clusters(
+            kg, n=size, depth_limit=4
+        )
 
         # Store results
         results.append(
@@ -909,13 +927,9 @@ def test_performance_find_n_indirect_clusters_large_web_constant_n(
 
     for kg, size in constant_n_knowledge_graphs:
         # Measure execution time
-        start_time = time.time()
-        clusters: list[set[Node]] = kg.find_n_indirect_clusters(
-            n=constant_n, depth_limit=3
+        clusters, execution_time = time_find_n_indirect_clusters(
+            kg, n=constant_n, depth_limit=3
         )
-        end_time = time.time()
-
-        execution_time = end_time - start_time
 
         # Store results
         results.append(
@@ -1005,13 +1019,9 @@ def test_performance_find_n_indirect_clusters_independent_chains():
         kg: KnowledgeGraph = build_knowledge_graph(all_nodes, all_relationships)
 
         # Measure execution time
-        start_time = time.time()
-        clusters: list[set[Node]] = kg.find_n_indirect_clusters(
-            n=num_chains, depth_limit=3
+        clusters, execution_time = time_find_n_indirect_clusters(
+            kg, n=num_chains, depth_limit=3
         )
-        end_time = time.time()
-
-        execution_time = end_time - start_time
 
         # Store results
         results.append(

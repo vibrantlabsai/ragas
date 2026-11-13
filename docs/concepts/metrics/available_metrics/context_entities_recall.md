@@ -31,7 +31,7 @@ scorer = ContextEntityRecall(llm=llm)
 # Evaluate
 result = await scorer.ascore(
     reference="The Eiffel Tower is located in Paris.",
-    retrieved_contexts=["The Eiffel Tower is located in Paris."]
+    retrieved_contexts=["The Eiffel Tower is located in Paris."],
 )
 print(f"Context Entity Recall Score: {result.value}")
 ```
@@ -47,7 +47,7 @@ Context Entity Recall Score: 0.999999995
     ```python
     result = scorer.score(
         reference="The Eiffel Tower is located in Paris.",
-        retrieved_contexts=["The Eiffel Tower is located in Paris."]
+        retrieved_contexts=["The Eiffel Tower is located in Paris."],
     )
     ```
 

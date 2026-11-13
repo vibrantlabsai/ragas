@@ -44,16 +44,18 @@ import pandas as pd
 from ragas.dataset import Dataset
 
 scientist_questions = Dataset.from_pandas(
-    pd.DataFrame([
-        {
-            "user_input": "Who originated the theory of relativity?",
-            "reference": "Albert Einstein originated the theory of relativity.",
-        },
-        {
-            "user_input": "Who discovered penicillin and when?",
-            "reference": "Alexander Fleming discovered penicillin in 1928.",
-        },
-    ]),
+    pd.DataFrame(
+        [
+            {
+                "user_input": "Who originated the theory of relativity?",
+                "reference": "Albert Einstein originated the theory of relativity.",
+            },
+            {
+                "user_input": "Who discovered penicillin and when?",
+                "reference": "Alexander Fleming discovered penicillin in 1928.",
+            },
+        ]
+    ),
     name="scientist_questions",
     backend="inmemory",
 )
@@ -70,23 +72,27 @@ from ragas.dataset import Dataset
 from ragas.messages import HumanMessage
 
 weather_queries = Dataset.from_pandas(
-    pd.DataFrame([
-        {
-            "user_input": [HumanMessage(content="What's the weather in Paris?")],
-            "reference_tool_calls": json.dumps([
-                {"name": "get_weather", "args": {"location": "Paris"}}
-            ]),
-            # Expected outcome for AgentGoalAccuracyWithReference
-            "reference": "The user received the current weather conditions for Paris.",
-        },
-        {
-            "user_input": [HumanMessage(content="Is it raining in London right now?")],
-            "reference_tool_calls": json.dumps([
-                {"name": "get_weather", "args": {"location": "London"}}
-            ]),
-            "reference": "The user received the current weather conditions for London.",
-        },
-    ]),
+    pd.DataFrame(
+        [
+            {
+                "user_input": [HumanMessage(content="What's the weather in Paris?")],
+                "reference_tool_calls": json.dumps(
+                    [{"name": "get_weather", "args": {"location": "Paris"}}]
+                ),
+                # Expected outcome for AgentGoalAccuracyWithReference
+                "reference": "The user received the current weather conditions for Paris.",
+            },
+            {
+                "user_input": [
+                    HumanMessage(content="Is it raining in London right now?")
+                ],
+                "reference_tool_calls": json.dumps(
+                    [{"name": "get_weather", "args": {"location": "London"}}]
+                ),
+                "reference": "The user received the current weather conditions for London.",
+            },
+        ]
+    ),
     name="weather_queries",
     backend="inmemory",
 )
@@ -128,7 +134,10 @@ evaluator_llm = llm_factory("gpt-4o-mini", client=async_llm_client)
 # AnswerRelevancy's embeddings still run synchronously, so pair it with a sync client.
 embedding_client = OpenAI()
 evaluator_embeddings = embedding_factory(
-    "openai", model="text-embedding-3-small", client=embedding_client, interface="modern"
+    "openai",
+    model="text-embedding-3-small",
+    client=embedding_client,
+    interface="modern",
 )
 
 conciseness_metric = DiscreteMetric(
@@ -143,9 +152,7 @@ conciseness_metric = DiscreteMetric(
 
 # Metrics for single-turn Q&A evaluation
 qa_metrics = [
-    FactualCorrectness(
-        llm=evaluator_llm, mode="f1", atomicity="high", coverage="high"
-    ),
+    FactualCorrectness(llm=evaluator_llm, mode="f1", atomicity="high", coverage="high"),
     AnswerRelevancy(llm=evaluator_llm, embeddings=evaluator_embeddings, strictness=2),
     conciseness_metric,
 ]
@@ -174,6 +181,7 @@ from ragas import experiment
 from ragas.integrations.ag_ui import run_ag_ui_row
 from ragas.metrics.collections import FactualCorrectness
 
+
 @experiment()
 async def factual_experiment(row):
     # Call AG-UI endpoint and get enriched row
@@ -187,11 +195,11 @@ async def factual_experiment(row):
 
     return {**enriched, "factual_correctness": score.value}
 
+
 # Run the experiment against the dataset
 # In Jupyter/IPython (after calling nest_asyncio.apply())
 factual_result = await factual_experiment.arun(
-    scientist_questions,
-    name="scientist_qa_eval"
+    scientist_questions, name="scientist_qa_eval"
 )
 
 # In a standalone script, use:
@@ -212,6 +220,7 @@ from ragas import experiment
 from ragas.integrations.ag_ui import run_ag_ui_row
 from ragas.messages import ToolCall
 from ragas.metrics.collections import AgentGoalAccuracyWithReference, ToolCallF1
+
 
 @experiment()
 async def tool_experiment(row):
@@ -241,12 +250,10 @@ async def tool_experiment(row):
         "agent_goal_accuracy": goal_result.value,
     }
 
+
 # Run the experiment
 # In Jupyter/IPython
-tool_result = await tool_experiment.arun(
-    weather_queries,
-    name="weather_tool_eval"
-)
+tool_result = await tool_experiment.arun(weather_queries, name="weather_tool_eval")
 
 # Or in a script
 # tool_result = asyncio.run(tool_experiment.arun(weather_queries, name="weather_tool_eval"))
@@ -300,16 +307,18 @@ The integration provides helper functions to extract specific data from messages
 
 ```python
 from ragas.integrations.ag_ui import (
-    extract_response,    # Get concatenated AI response text
+    extract_response,  # Get concatenated AI response text
     extract_tool_calls,  # Get all tool calls from AI messages
-    extract_contexts,    # Get tool results/contexts
+    extract_contexts,  # Get tool results/contexts
 )
 
 messages = convert_to_ragas_messages(events)
 
-response = extract_response(messages)      # "Hello! The weather is sunny."
-tool_calls = extract_tool_calls(messages)  # [ToolCall(name="get_weather", args={"location": "SF"})]
-contexts = extract_contexts(messages)      # ["Sunny, 72F in San Francisco"]
+response = extract_response(messages)  # "Hello! The weather is sunny."
+tool_calls = extract_tool_calls(
+    messages
+)  # [ToolCall(name="get_weather", args={"location": "SF"})]
+contexts = extract_contexts(messages)  # ["Sunny, 72F in San Francisco"]
 ```
 
 ## Tips for production experiments

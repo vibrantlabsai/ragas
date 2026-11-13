@@ -57,10 +57,10 @@ dataset = create_annotated_dataset()
 config = InstructionConfig(
     llm=llm,
     optimizer=DSPyOptimizer(
-        num_candidates=10,          # Try 10 prompt variations
-        max_bootstrapped_demos=5,   # Generate up to 5 examples
-        max_labeled_demos=5,        # Use up to 5 human annotations
-    )
+        num_candidates=10,  # Try 10 prompt variations
+        max_bootstrapped_demos=5,  # Generate up to 5 examples
+        max_labeled_demos=5,  # Use up to 5 human annotations
+    ),
 )
 
 # Optimize the metric's prompts
@@ -78,7 +78,7 @@ DSPy optimizer requires ground truth annotations:
 from ragas.dataset_schema import (
     PromptAnnotation,
     SampleAnnotation,
-    SingleMetricAnnotation
+    SingleMetricAnnotation,
 )
 
 # Create prompt annotations
@@ -99,7 +99,7 @@ sample = SampleAnnotation(
 # Create dataset
 dataset = SingleMetricAnnotation(
     name="faithfulness",
-    samples=[sample, ...]  # Need 20-50+ samples for best results
+    samples=[sample, ...],  # Need 20-50+ samples for best results
 )
 ```
 
@@ -111,10 +111,10 @@ Control MIPROv2 behavior:
 
 ```python
 optimizer = DSPyOptimizer(
-    num_candidates=20,           # More candidates = better prompts, higher cost
-    max_bootstrapped_demos=10,   # Auto-generated few-shot examples
-    max_labeled_demos=10,        # Human-annotated examples to use
-    init_temperature=1.0,        # Exploration temperature (0.0-2.0)
+    num_candidates=20,  # More candidates = better prompts, higher cost
+    max_bootstrapped_demos=10,  # Auto-generated few-shot examples
+    max_labeled_demos=10,  # Human-annotated examples to use
+    init_temperature=1.0,  # Exploration temperature (0.0-2.0)
 )
 ```
 
@@ -134,10 +134,10 @@ MIPROv2 optimization can be expensive. Reduce costs by:
 ```python
 # Budget-conscious configuration
 budget_optimizer = DSPyOptimizer(
-    num_candidates=5,            # Fewer candidates
-    max_bootstrapped_demos=2,    # Fewer generated examples
-    max_labeled_demos=3,         # More reliance on annotations
-    init_temperature=0.5,        # Less exploration
+    num_candidates=5,  # Fewer candidates
+    max_bootstrapped_demos=2,  # Fewer generated examples
+    max_labeled_demos=3,  # More reliance on annotations
+    init_temperature=0.5,  # Less exploration
 )
 
 # Use cheaper LLM for optimization
@@ -180,9 +180,9 @@ from ragas.optimizers import GeneticOptimizer, DSPyOptimizer
 genetic_config = InstructionConfig(
     llm=llm,
     optimizer=GeneticOptimizer(
-        max_steps=50,          # Evolution steps
-        population_size=10,    # Population per generation
-    )
+        max_steps=50,  # Evolution steps
+        population_size=10,  # Population per generation
+    ),
 )
 
 # DSPy optimizer - advanced, better results, more expensive
@@ -192,7 +192,7 @@ dspy_config = InstructionConfig(
         num_candidates=10,
         max_bootstrapped_demos=5,
         max_labeled_demos=5,
-    )
+    ),
 )
 
 # Compare results
@@ -220,11 +220,7 @@ test_scores_dspy = metric_dspy.batch_score(test_set)
 Optimize several metrics with the same approach:
 
 ```python
-from ragas.metrics.collections import (
-    Faithfulness,
-    AnswerRelevancy,
-    ContextPrecision
-)
+from ragas.metrics.collections import Faithfulness, AnswerRelevancy, ContextPrecision
 
 metrics = {
     "faithfulness": Faithfulness(llm=llm),
@@ -265,7 +261,7 @@ Reduce the number of LLM calls:
 
 ```python
 fast_optimizer = DSPyOptimizer(
-    num_candidates=3,      # Minimum viable
+    num_candidates=3,  # Minimum viable
     max_bootstrapped_demos=1,
     max_labeled_demos=3,
 )
@@ -287,6 +283,7 @@ MIPROv2 can use significant memory for large datasets:
 ```python
 # Process in smaller batches
 from ragas.dataset_schema import SingleMetricAnnotation
+
 
 def optimize_in_batches(dataset, batch_size=20):
     # Split dataset

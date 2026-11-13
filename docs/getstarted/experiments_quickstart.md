@@ -43,7 +43,9 @@ def mock_app_endpoint(**kwargs) -> str:
 @experiment()
 async def run_experiment(row):
     response = mock_app_endpoint(query=row.get("query"))
-    accuracy = accuracy_score.score(response=response, expected=row.get("expected_output"))
+    accuracy = accuracy_score.score(
+        response=response, expected=row.get("expected_output")
+    )
     return {**row, "response": response, "accuracy": accuracy.value}
 
 
@@ -56,8 +58,14 @@ if __name__ == "__main__":
         {"query": "What is the capital of France?", "expected_output": "Paris"},
         {"query": "What is 2 + 2?", "expected_output": "4"},
         {"query": "What is the largest animal?", "expected_output": "Blue Whale"},
-        {"query": "Who developed the theory of relativity?", "expected_output": "Einstein"},
-        {"query": "What programming language is named after a snake?", "expected_output": "Python"},
+        {
+            "query": "Who developed the theory of relativity?",
+            "expected_output": "Einstein",
+        },
+        {
+            "query": "What programming language is named after a snake?",
+            "expected_output": "Python",
+        },
     ]
 
     for sample in test_data:

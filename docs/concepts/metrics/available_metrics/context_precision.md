@@ -38,8 +38,8 @@ result = await scorer.ascore(
     reference="The Eiffel Tower is located in Paris.",
     retrieved_contexts=[
         "The Eiffel Tower is located in Paris.",
-        "The Brandenburg Gate is located in Berlin."
-    ]
+        "The Brandenburg Gate is located in Berlin.",
+    ],
 )
 print(f"Context Precision Score: {result.value}")
 ```
@@ -56,7 +56,7 @@ Context Precision Score: 0.9999999999
     result = scorer.score(
         user_input="Where is the Eiffel Tower located?",
         reference="The Eiffel Tower is located in Paris.",
-        retrieved_contexts=[...]
+        retrieved_contexts=[...],
     )
     ```
 
@@ -82,8 +82,8 @@ result = await scorer.ascore(
     response="The Eiffel Tower is located in Paris.",
     retrieved_contexts=[
         "The Eiffel Tower is located in Paris.",
-        "The Brandenburg Gate is located in Berlin."
-    ]
+        "The Brandenburg Gate is located in Berlin.",
+    ],
 )
 print(f"Context Utilization Score: {result.value}")
 ```
@@ -101,8 +101,8 @@ result = await scorer.ascore(
     response="The Eiffel Tower is located in Paris.",
     retrieved_contexts=[
         "The Brandenburg Gate is located in Berlin.",
-        "The Eiffel Tower is located in Paris."
-    ]
+        "The Eiffel Tower is located in Paris.",
+    ],
 )
 print(f"Context Utilization Score: {result.value}")
 ```
@@ -213,7 +213,10 @@ context_precision = NonLLMContextPrecisionWithReference()
 
 sample = SingleTurnSample(
     retrieved_contexts=["The Eiffel Tower is located in Paris."],
-    reference_contexts=["Paris is the capital of France.", "The Eiffel Tower is one of the most famous landmarks in Paris."]
+    reference_contexts=[
+        "Paris is the capital of France.",
+        "The Eiffel Tower is one of the most famous landmarks in Paris.",
+    ],
 )
 
 await context_precision.single_turn_ascore(sample)
@@ -242,7 +245,7 @@ from ragas.metrics import IDBasedContextPrecision
 
 sample = SingleTurnSample(
     retrieved_context_ids=["doc_1", "doc_2", "doc_3", "doc_4"],
-    reference_context_ids=["doc_1", "doc_4", "doc_5", "doc_6"]
+    reference_context_ids=["doc_1", "doc_4", "doc_5", "doc_6"],
 )
 
 id_precision = IDBasedContextPrecision()

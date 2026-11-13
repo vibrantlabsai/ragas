@@ -76,14 +76,11 @@ The [`/rag`](https://r2r-docs.sciphi.ai/api-and-sdks/retrieval/rag-app) endpoint
 query = "What makes Meta AI’s LLaMA models stand out?"
 
 search_settings = {
-        "limit": 2,
-        "graph_settings": {"enabled": False, "limit": 2},
-    }
+    "limit": 2,
+    "graph_settings": {"enabled": False, "limit": 2},
+}
 
-response = client.retrieval.rag(
-    query=query,
-    search_settings=search_settings
-)
+response = client.retrieval.rag(query=query, search_settings=search_settings)
 
 print(response.results.generated_answer)
 ```
@@ -170,7 +167,11 @@ from ragas.llms import LangchainLLMWrapper
 llm = ChatOpenAI(model="gpt-4o-mini")
 evaluator_llm = LangchainLLMWrapper(llm)
 
-ragas_metrics = [AnswerRelevancy(llm=evaluator_llm), ContextPrecision(llm=evaluator_llm), Faithfulness(llm=evaluator_llm)]
+ragas_metrics = [
+    AnswerRelevancy(llm=evaluator_llm),
+    ContextPrecision(llm=evaluator_llm),
+    Faithfulness(llm=evaluator_llm),
+]
 
 results = evaluate(dataset=ragas_eval_dataset, metrics=ragas_metrics)
 ```

@@ -214,7 +214,7 @@ from ragas.experimental.prompt.dynamic_few_shot import DynamicFewShotPrompt
 # Load base prompt
 prompt = Prompt.load("my_prompt.json")
 
-# Load dynamic prompt  
+# Load dynamic prompt
 dynamic_prompt = DynamicFewShotPrompt.load("my_dynamic_prompt.json")
 
 # Load with models
@@ -222,9 +222,7 @@ from mymodels import MyResponseModel, MyEmbeddingModel
 
 prompt = Prompt.load("prompt.json", response_model=MyResponseModel())
 dynamic_prompt = DynamicFewShotPrompt.load(
-    "dynamic.json", 
-    response_model=MyResponseModel(),
-    embedding_model=MyEmbeddingModel()
+    "dynamic.json", response_model=MyResponseModel(), embedding_model=MyEmbeddingModel()
 )
 ```
 
@@ -234,19 +232,22 @@ dynamic_prompt = DynamicFewShotPrompt.load(
 import json
 from pathlib import Path
 
+
 def detect_prompt_type(filepath: str) -> str:
     """Detect prompt type from JSON file."""
     path = Path(filepath)
-    
-    if path.suffix == '.gz':
+
+    if path.suffix == ".gz":
         import gzip
-        with gzip.open(path, 'rt', encoding='utf-8') as f:
+
+        with gzip.open(path, "rt", encoding="utf-8") as f:
             data = json.load(f)
     else:
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-    
+
     return data.get("type", "unknown")
+
 
 # Usage
 prompt_type = detect_prompt_type("my_prompt.json")
@@ -263,28 +264,32 @@ def validate_prompt_file(filepath: str) -> dict:
     """Validate prompt file format and return metadata."""
     try:
         path = Path(filepath)
-        if path.suffix == '.gz':
+        if path.suffix == ".gz":
             import gzip
-            with gzip.open(path, 'rt', encoding='utf-8') as f:
+
+            with gzip.open(path, "rt", encoding="utf-8") as f:
                 data = json.load(f)
         else:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-        
+
         # Basic validation
         required_fields = ["format_version", "type", "instruction", "examples"]
         missing_fields = [f for f in required_fields if f not in data]
-        
+
         if missing_fields:
             return {"valid": False, "errors": f"Missing fields: {missing_fields}"}
-        
+
         # Type-specific validation
         if data["type"] == "DynamicFewShotPrompt":
             dynamic_fields = ["max_similar_examples", "similarity_threshold"]
             missing_dynamic = [f for f in dynamic_fields if f not in data]
             if missing_dynamic:
-                return {"valid": False, "errors": f"Missing dynamic fields: {missing_dynamic}"}
-        
+                return {
+                    "valid": False,
+                    "errors": f"Missing dynamic fields: {missing_dynamic}",
+                }
+
         return {
             "valid": True,
             "type": data["type"],
@@ -292,9 +297,9 @@ def validate_prompt_file(filepath: str) -> dict:
             "has_response_model": data.get("response_model_info") is not None,
             "has_embedding_model": data.get("embedding_model_info") is not None,
             "has_embeddings": "embeddings" in data,
-            "example_count": len(data.get("examples", []))
+            "example_count": len(data.get("examples", [])),
         }
-        
+
     except Exception as e:
         return {"valid": False, "errors": str(e)}
 ```
@@ -308,10 +313,11 @@ def validate_prompt_file(filepath: str) -> dict:
 dynamic_prompt.save("prompt.json", include_embeddings=False)
 
 # Save with embeddings (larger files, faster loading)
-dynamic_prompt.save("prompt.json", include_embeddings=True) 
+dynamic_prompt.save("prompt.json", include_embeddings=True)
 
 # File size comparison
 import os
+
 size_without = os.path.getsize("prompt_no_emb.json")
 size_with = os.path.getsize("prompt_with_emb.json")
 print(f"Size difference: {size_with - size_without} bytes")
@@ -324,20 +330,22 @@ def check_embedding_compatibility(filepath: str, embedding_model) -> bool:
     """Check if saved embeddings are compatible with current model."""
     import json
     from pathlib import Path
-    
+
     path = Path(filepath)
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         data = json.load(f)
-    
+
     if "embedding_model_info" not in data or not data["embedding_model_info"]:
         return False
-        
+
     saved_info = data["embedding_model_info"]
     current_class = embedding_model.__class__.__name__
     current_module = embedding_model.__class__.__module__
-    
-    return (saved_info["class_name"] == current_class and 
-            saved_info["module"] == current_module)
+
+    return (
+        saved_info["class_name"] == current_class
+        and saved_info["module"] == current_module
+    )
 ```
 
 ## Extending Prompt Types
@@ -351,7 +359,7 @@ class MyCustomPrompt(Prompt):
     def __init__(self, instruction: str, my_custom_field: str, **kwargs):
         super().__init__(instruction, **kwargs)
         self.my_custom_field = my_custom_field
-    
+
     def save(self, path: str) -> None:
         """Override to include custom fields."""
         # Build extended data structure
@@ -361,52 +369,53 @@ class MyCustomPrompt(Prompt):
             "instruction": self.instruction,
             "examples": [{"input": inp, "output": out} for inp, out in self.examples],
             "response_model_info": self._serialize_response_model_info(),
-            
             # Custom fields
             "my_custom_field": self.my_custom_field,
         }
-        
+
         # Use same file handling as base class
         file_path = Path(path)
         try:
-            if file_path.suffix == '.gz':
-                with gzip.open(file_path, 'wt', encoding='utf-8') as f:
+            if file_path.suffix == ".gz":
+                with gzip.open(file_path, "wt", encoding="utf-8") as f:
                     json.dump(data, f, indent=2)
             else:
-                with open(file_path, 'w', encoding='utf-8') as f:
+                with open(file_path, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=2)
         except (OSError, IOError) as e:
             raise ValueError(f"Cannot save MyCustomPrompt to {path}: {e}")
-    
+
     @classmethod
     def load(cls, path: str, response_model=None):
         """Override to handle custom fields."""
         # Use same file loading as base class
         file_path = Path(path)
         try:
-            if file_path.suffix == '.gz':
-                with gzip.open(file_path, 'rt', encoding='utf-8') as f:
+            if file_path.suffix == ".gz":
+                with gzip.open(file_path, "rt", encoding="utf-8") as f:
                     data = json.load(f)
             else:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
             raise ValueError(f"Cannot load MyCustomPrompt from {path}: {e}")
-        
+
         # Validate type
         if data.get("type") != "MyCustomPrompt":
-            raise ValueError(f"File is not a MyCustomPrompt (found: {data.get('type')})")
-        
+            raise ValueError(
+                f"File is not a MyCustomPrompt (found: {data.get('type')})"
+            )
+
         # Extract data
         examples = [(ex["input"], ex["output"]) for ex in data.get("examples", [])]
         my_custom_field = data["my_custom_field"]
-        
+
         # Create instance
         return cls(
             instruction=data["instruction"],
             examples=examples,
             response_model=response_model,
-            my_custom_field=my_custom_field
+            my_custom_field=my_custom_field,
         )
 ```
 
@@ -421,24 +430,25 @@ def _serialize_response_model_info(self) -> Optional[Dict]:
     """Serialize Pydantic response model information."""
     if not self.response_model:
         return None
-    
+
     return {
         "class_name": self.response_model.__class__.__name__,
-        "module": self.response_model.__class__.__module__, 
+        "module": self.response_model.__class__.__module__,
         "schema": self.response_model.model_json_schema(),
-        "note": "You must provide this model when loading"
+        "note": "You must provide this model when loading",
     }
+
 
 # DynamicFewShotPrompt only
 def _serialize_embedding_model_info(self) -> Optional[Dict]:
     """Serialize embedding model information."""
     if not self.example_store.embedding_model:
         return None
-        
+
     return {
         "class_name": self.example_store.embedding_model.__class__.__name__,
         "module": self.example_store.embedding_model.__class__.__module__,
-        "note": "You must provide this model when loading"
+        "note": "You must provide this model when loading",
     }
 ```
 
@@ -472,13 +482,17 @@ except (OSError, IOError) as e:
 ### Migration Between Formats
 
 ```python
-def convert_prompt_to_dynamic(base_prompt_path: str, output_path: str, 
-                            embedding_model=None, max_examples: int = 3, 
-                            threshold: float = 0.7):
+def convert_prompt_to_dynamic(
+    base_prompt_path: str,
+    output_path: str,
+    embedding_model=None,
+    max_examples: int = 3,
+    threshold: float = 0.7,
+):
     """Convert base Prompt to DynamicFewShotPrompt."""
     # Load base prompt
     base_prompt = Prompt.load(base_prompt_path)
-    
+
     # Create dynamic version
     dynamic_prompt = DynamicFewShotPrompt(
         instruction=base_prompt.instruction,
@@ -486,9 +500,9 @@ def convert_prompt_to_dynamic(base_prompt_path: str, output_path: str,
         response_model=base_prompt.response_model,
         embedding_model=embedding_model,
         max_similar_examples=max_examples,
-        similarity_threshold=threshold
+        similarity_threshold=threshold,
     )
-    
+
     # Save new format
     dynamic_prompt.save(output_path)
 ```

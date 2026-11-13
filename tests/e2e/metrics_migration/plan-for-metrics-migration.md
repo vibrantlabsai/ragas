@@ -277,27 +277,22 @@ METRIC_CONFIG = {
     # ===== METRIC IMPORTS =====
     "legacy_import": {
         "module": "ragas.metrics._{legacy_module_name}",  # e.g., "ragas.metrics._answer_relevance"
-        "class_name": "{LegacyMetricClassName}",           # e.g., "AnswerRelevancy"
+        "class_name": "{LegacyMetricClassName}",  # e.g., "AnswerRelevancy"
     },
     "modern_import": {
         "module": "ragas.metrics.collections",
-        "class_name": "{ModernMetricClassName}",           # e.g., "AnswerRelevancy"
+        "class_name": "{ModernMetricClassName}",  # e.g., "AnswerRelevancy"
     },
-
     # ===== COMPONENT REQUIREMENTS =====
     # Set to False if your metric doesn't need this component
-    "needs_llm": True,      # Does your metric use an LLM?
+    "needs_llm": True,  # Does your metric use an LLM?
     "needs_embeddings": True,  # Does your metric use embeddings?
-
     # ===== DATASET FIELD MAPPING =====
     # Choose ONE option based on your metric type (uncomment the appropriate one)
-
     # OPTION 1: Answer-based metrics (AnswerRelevancy, AnswerSimilarity, AnswerCorrectness, etc.)
     "dataset_fields": ["user_input", "response"],
-
     # OPTION 2: Context-based metrics (ContextRecall, ContextPrecision, Faithfulness, etc.)
     # "dataset_fields": ["user_input", "retrieved_contexts", "reference"],
-
     # OPTION 3: Deterministic/Non-LLM metrics (NonLLMContextRecall, etc.)
     # "dataset_fields": ["retrieved_contexts", "reference_contexts"],
 }

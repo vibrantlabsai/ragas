@@ -84,7 +84,9 @@ from langchain_google_vertexai import VertexAI, VertexAIEmbeddings
 
 
 evaluator_llm = LangchainLLMWrapper(VertexAI(model_name="gemini-2.0-flash-001"))
-evaluator_embeddings = LangchainEmbeddingsWrapper(VertexAIEmbeddings(model_name="text-embedding-004"))
+evaluator_embeddings = LangchainEmbeddingsWrapper(
+    VertexAIEmbeddings(model_name="text-embedding-004")
+)
 ```
 
 ### Ragas metrics
@@ -98,7 +100,7 @@ from ragas.metrics import AspectCritic
 helpfulness_critic = AspectCritic(
     name="helpfulness",
     definition="Evaluate how helpful the assistant's response is to the user's query.",
-    llm=evaluator_llm
+    llm=evaluator_llm,
 )
 ```
 
@@ -122,6 +124,7 @@ Since we are using a binary metric, we will measure the alignment using the F1-s
 ```python
 from typing import List
 from sklearn.metrics import f1_score
+
 
 def alignment_score(human_score: List[float], llm_score: List[float]) -> float:
     """
@@ -150,35 +153,40 @@ from ragas import EvaluationDataset
 
 
 def process_hhh_dataset(split: str = "helpful", total_count: int = 50):
-	dataset = load_dataset("HuggingFaceH4/hhh_alignment",split, split=f"test[:{total_count}]")
-	data = []
-	expert_scores = []
+    dataset = load_dataset(
+        "HuggingFaceH4/hhh_alignment", split, split=f"test[:{total_count}]"
+    )
+    data = []
+    expert_scores = []
 
-	for idx, entry in enumerate(dataset):
-		# Extract input and target details
-		user_input = entry['input']
-		choices = entry['targets']['choices']
-		labels = entry['targets']['labels']
+    for idx, entry in enumerate(dataset):
+        # Extract input and target details
+        user_input = entry["input"]
+        choices = entry["targets"]["choices"]
+        labels = entry["targets"]["labels"]
 
-		# Choose target based on whether the index is even or odd
-		if idx % 2 == 0:
-			target_label = 1
-			score = 1
-		else:
-			target_label = 0
-			score = 0
+        # Choose target based on whether the index is even or odd
+        if idx % 2 == 0:
+            target_label = 1
+            score = 1
+        else:
+            target_label = 0
+            score = 0
 
-		label_index = labels.index(target_label)
+        label_index = labels.index(target_label)
 
-		response = choices[label_index]
+        response = choices[label_index]
 
-		data.append({
-			'user_input': user_input,
-			'response': response,
-		})
-		expert_scores.append(score)
+        data.append(
+            {
+                "user_input": user_input,
+                "response": response,
+            }
+        )
+        expert_scores.append(score)
 
-	return EvaluationDataset.from_list(data), expert_scores
+    return EvaluationDataset.from_list(data), expert_scores
+
 
 eval_dataset, expert_scores = process_hhh_dataset()
 ```
@@ -267,7 +275,9 @@ from langchain_google_vertexai import VertexAI, VertexAIEmbeddings
 
 
 evaluator_llm = LangchainLLMWrapper(VertexAI(model_name="gemini-pro"))
-evaluator_embeddings = LangchainEmbeddingsWrapper(VertexAIEmbeddings(model_name="text-embedding-004"))
+evaluator_embeddings = LangchainEmbeddingsWrapper(
+    VertexAIEmbeddings(model_name="text-embedding-004")
+)
 ```
 
 

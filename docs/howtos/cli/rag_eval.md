@@ -67,10 +67,7 @@ pip install -e .
     from openai import OpenAI
     from ragas.llms import llm_factory
 
-    client = OpenAI(
-        api_key="ollama",
-        base_url="http://localhost:11434/v1"
-    )
+    client = OpenAI(api_key="ollama", base_url="http://localhost:11434/v1")
     llm = llm_factory("mistral", provider="openai", client=client)
     ```
 
@@ -236,6 +233,7 @@ Replace the example RAG with your production system:
 from your_rag_module import YourRAGClient
 
 rag_client = YourRAGClient(...)
+
 
 @experiment()
 async def run_experiment(row):

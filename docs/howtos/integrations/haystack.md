@@ -199,8 +199,8 @@ result = rag_pipeline.run(
     }
 )
 
-print(result['answer_builder']['answers'][0].data, '\n')
-print(result['ragas_evaluator']['result'])
+print(result["answer_builder"]["answers"][0].data, "\n")
+print(result["ragas_evaluator"]["result"])
 ```
 Output
 ```
@@ -233,12 +233,15 @@ SportsRelevanceMetric = AspectCritic(
 rubrics = {
     "score1_description": "The response does not answer the user input.",
     "score2_description": "The response partially answers the user input.",
-    "score3_description": "The response fully answer the user input"
+    "score3_description": "The response fully answer the user input",
 }
 
 evaluator = RagasEvaluator(
-    ragas_metrics=[SportsRelevanceMetric, RubricsScore(llm=evaluator_llm, rubrics=rubrics)],
-    evaluator_llm=evaluator_llm
+    ragas_metrics=[
+        SportsRelevanceMetric,
+        RubricsScore(llm=evaluator_llm, rubrics=rubrics),
+    ],
+    evaluator_llm=evaluator_llm,
 )
 
 output = evaluator.run(
@@ -250,10 +253,10 @@ output = evaluator.run(
         " billion people."
     ],
     response="Football is the most popular sport with around 4 billion"
-                " followers worldwide",
+    " followers worldwide",
 )
 
-output['result']
+output["result"]
 ```
 Output
 ```

@@ -9,6 +9,7 @@
 
     ```python
     import os
+
     os.environ["OPENAI_API_KEY"] = "your-openai-key"
     ```
 
@@ -53,18 +54,22 @@
     from ragas.llms import LangchainLLMWrapper
     from ragas.embeddings import LangchainEmbeddingsWrapper
 
-    generator_llm = LangchainLLMWrapper(ChatBedrockConverse(
-        credentials_profile_name=config["credentials_profile_name"],
-        region_name=config["region_name"],
-        base_url=f"https://bedrock-runtime.{config['region_name']}.amazonaws.com",
-        model=config["llm"],
-        temperature=config["temperature"],
-    ))
-    generator_embeddings = LangchainEmbeddingsWrapper(BedrockEmbeddings(
-        credentials_profile_name=config["credentials_profile_name"],
-        region_name=config["region_name"],
-        model_id=config["embeddings"],
-    ))
+    generator_llm = LangchainLLMWrapper(
+        ChatBedrockConverse(
+            credentials_profile_name=config["credentials_profile_name"],
+            region_name=config["region_name"],
+            base_url=f"https://bedrock-runtime.{config['region_name']}.amazonaws.com",
+            model=config["llm"],
+            temperature=config["temperature"],
+        )
+    )
+    generator_embeddings = LangchainEmbeddingsWrapper(
+        BedrockEmbeddings(
+            credentials_profile_name=config["credentials_profile_name"],
+            region_name=config["region_name"],
+            model_id=config["embeddings"],
+        )
+    )
     ```
 
     If you want more information on how to use other AWS services, please refer to the [langchain-aws](https://python.langchain.com/docs/integrations/providers/aws/) documentation.
@@ -84,6 +89,7 @@
 
     ```python
     import os
+
     os.environ["GOOGLE_API_KEY"] = "your-google-ai-key"  # From https://ai.google.dev/
     ```
 
@@ -105,7 +111,7 @@
         "top_p": 0.8,
         # For Vertex AI only:
         "project": "your-project-id",  # Required for Vertex AI
-        "location": "us-central1",     # Required for Vertex AI
+        "location": "us-central1",  # Required for Vertex AI
     }
     ```
 
@@ -120,22 +126,26 @@
     from langchain_google_vertexai import ChatVertexAI
 
     # Initialize with Google AI Studio
-    generator_llm = LangchainLLMWrapper(ChatGoogleGenerativeAI(
-        model=config["model"],
-        temperature=config["temperature"],
-        max_tokens=config["max_tokens"],
-        top_p=config["top_p"],
-    ))
+    generator_llm = LangchainLLMWrapper(
+        ChatGoogleGenerativeAI(
+            model=config["model"],
+            temperature=config["temperature"],
+            max_tokens=config["max_tokens"],
+            top_p=config["top_p"],
+        )
+    )
 
     # Or initialize with Vertex AI
-    generator_llm = LangchainLLMWrapper(ChatVertexAI(
-        model=config["model"],
-        temperature=config["temperature"],
-        max_tokens=config["max_tokens"],
-        top_p=config["top_p"],
-        project=config["project"],
-        location=config["location"],
-    ))
+    generator_llm = LangchainLLMWrapper(
+        ChatVertexAI(
+            model=config["model"],
+            temperature=config["temperature"],
+            max_tokens=config["max_tokens"],
+            top_p=config["top_p"],
+            project=config["project"],
+            location=config["location"],
+        )
+    )
     ```
 
 
@@ -150,11 +160,13 @@
     }
 
     # Apply to your LLM initialization
-    generator_llm = LangchainLLMWrapper(ChatGoogleGenerativeAI(
-        model=config["model"],
-        temperature=config["temperature"],
-        safety_settings=safety_settings,
-    ))
+    generator_llm = LangchainLLMWrapper(
+        ChatGoogleGenerativeAI(
+            model=config["model"],
+            temperature=config["temperature"],
+            safety_settings=safety_settings,
+        )
+    )
     ```
 
     Initialize the embeddings and wrap them for use with ragas:
@@ -163,21 +175,25 @@
     # Google AI Studio Embeddings
     from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
-    generator_embeddings = LangchainEmbeddingsWrapper(GoogleGenerativeAIEmbeddings(
-        model="models/embedding-001",  # Google's text embedding model
-        task_type="retrieval_document"  # Optional: specify the task type
-    ))
+    generator_embeddings = LangchainEmbeddingsWrapper(
+        GoogleGenerativeAIEmbeddings(
+            model="models/embedding-001",  # Google's text embedding model
+            task_type="retrieval_document",  # Optional: specify the task type
+        )
+    )
     ```
 
     ```python
     # Vertex AI Embeddings
     from langchain_google_vertexai import VertexAIEmbeddings
 
-    generator_embeddings = LangchainEmbeddingsWrapper(VertexAIEmbeddings(
-        model_name="textembedding-gecko@001",  # or other available model
-        project=config["project"],  # Your GCP project ID
-        location=config["location"]  # Your GCP location
-    ))
+    generator_embeddings = LangchainEmbeddingsWrapper(
+        VertexAIEmbeddings(
+            model_name="textembedding-gecko@001",  # or other available model
+            project=config["project"],  # Your GCP project ID
+            location=config["location"],  # Your GCP location
+        )
+    )
     ```
 
     For more information on available models, features, and configurations, refer to: [Google AI documentation](https://ai.google.dev/docs)
@@ -197,6 +213,7 @@
 
     ```python
     import os
+
     os.environ["AZURE_OPENAI_API_KEY"] = "your-azure-openai-key"
 
     # other configuration
@@ -207,7 +224,6 @@
         "embedding_deployment": "",  # your embedding deployment name
         "embedding_name": "",  # your embedding name
     }
-
     ```
 
     Define your LLMs and wrap them in `LangchainLLMWrapper` so that it can be used with ragas.
@@ -217,21 +233,26 @@
     from langchain_openai import AzureOpenAIEmbeddings
     from ragas.llms import LangchainLLMWrapper
     from ragas.embeddings import LangchainEmbeddingsWrapper
-    generator_llm = LangchainLLMWrapper(AzureChatOpenAI(
-        openai_api_version="2023-05-15",
-        azure_endpoint=azure_configs["base_url"],
-        azure_deployment=azure_configs["model_deployment"],
-        model=azure_configs["model_name"],
-        validate_base_url=False,
-    ))
+
+    generator_llm = LangchainLLMWrapper(
+        AzureChatOpenAI(
+            openai_api_version="2023-05-15",
+            azure_endpoint=azure_configs["base_url"],
+            azure_deployment=azure_configs["model_deployment"],
+            model=azure_configs["model_name"],
+            validate_base_url=False,
+        )
+    )
 
     # init the embeddings for answer_relevancy, answer_correctness and answer_similarity
-    generator_embeddings = LangchainEmbeddingsWrapper(AzureOpenAIEmbeddings(
-        openai_api_version="2023-05-15",
-        azure_endpoint=azure_configs["base_url"],
-        azure_deployment=azure_configs["embedding_deployment"],
-        model=azure_configs["embedding_name"],
-    ))
+    generator_embeddings = LangchainEmbeddingsWrapper(
+        AzureOpenAIEmbeddings(
+            openai_api_version="2023-05-15",
+            azure_endpoint=azure_configs["base_url"],
+            azure_deployment=azure_configs["embedding_deployment"],
+            model=azure_configs["embedding_name"],
+        )
+    )
     ```
 
     If you want more information on how to use other Azure services, please refer to the [langchain-azure](https://python.langchain.com/docs/integrations/chat/azure_chat_openai/) documentation.
@@ -241,6 +262,7 @@
 
     ```python
     from ragas.llms import LangchainLLMWrapper
+
     generator_llm = LangchainLLMWrapper(your_llm_instance)
     ```
 
@@ -250,6 +272,7 @@
 
     ```python
     from ragas.llms import LlamaIndexLLMWrapper
+
     generator_llm = LlamaIndexLLMWrapper(your_llm_instance)
     ```
 

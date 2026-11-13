@@ -48,7 +48,7 @@ install: ## Install full dependencies with uv sync (backward compatible - modern
 # CODE QUALITY
 # =============================================================================
 
-.PHONY: help setup-venv install-minimal install format type check clean test test-e2e benchmarks benchmarks-docker run-ci run-ci-fast run-ci-format-check run-ci-type run-ci-tests build-docs serve-docs
+.PHONY: help setup-venv install-minimal install format type check clean test test-e2e benchmarks benchmarks-docker run-ci run-ci-fast run-ci-format-check run-ci-type run-ci-tests package-smoke build-docs serve-docs
 format: ## Format and lint all code
 	@echo "Formatting and linting all code..."
 	@echo "(ruff format) Formatting ragas..."
@@ -123,6 +123,19 @@ run-ci-fast: ## Fast CI check for quick local validation (2-3 minutes)
 	@echo "Core unit tests (no nbmake for speed)..."
 	$(Q)uv run --active pytest tests/unit --dist loadfile -n auto -x
 	@echo "Fast CI check completed!"
+
+package-smoke: ## Build the package, install the wheel in a clean venv and import it (what a user gets)
+	@echo "Building sdist and wheel, then installing the wheel with core dependencies only..."
+	$(Q)SMOKE_DIR=$$(mktemp -d) && \
+		uv build --out-dir "$$SMOKE_DIR/dist" && \
+		uvx twine check "$$SMOKE_DIR"/dist/* && \
+		uv venv --quiet "$$SMOKE_DIR/venv" && \
+		uv pip install --quiet --python "$$SMOKE_DIR/venv/bin/python" "$$SMOKE_DIR"/dist/*.whl && \
+		cd "$$SMOKE_DIR" && \
+		RAGAS_DO_NOT_TRACK=true ./venv/bin/python -c "import ragas; print('ragas', ragas.__version__, 'imports')" && \
+		RAGAS_DO_NOT_TRACK=true ./venv/bin/ragas --help > /dev/null && \
+		uv pip check --python ./venv/bin/python
+	@echo "Package smoke test passed!"
 
 clean: ## Clean all generated files
 	@echo "Cleaning all generated files..."

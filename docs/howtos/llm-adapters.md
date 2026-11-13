@@ -114,7 +114,7 @@ from ragas.llms import llm_factory
 # Requires running: litellm --model gemini-2.0-flash
 client = OpenAI(
     api_key="anything",
-    base_url="http://0.0.0.0:4000"  # LiteLLM proxy endpoint
+    base_url="http://0.0.0.0:4000",  # LiteLLM proxy endpoint
 )
 llm = llm_factory("gemini-2.0-flash", client=client, adapter="litellm")
 # Uses LiteLLM adapter explicitly
@@ -127,10 +127,7 @@ from openai import OpenAI
 from ragas.llms import llm_factory
 
 # Ollama exposes OpenAI-compatible API
-client = OpenAI(
-    api_key="ollama",
-    base_url="http://localhost:11434/v1"
-)
+client = OpenAI(api_key="ollama", base_url="http://localhost:11434/v1")
 llm = llm_factory("mistral", provider="openai", client=client)
 # Uses Instructor adapter
 ```
@@ -145,7 +142,7 @@ from ragas.llms import llm_factory
 # Note: Set up LiteLLM with Bedrock credentials first
 client = OpenAI(
     api_key="",  # Bedrock uses IAM auth
-    base_url="http://0.0.0.0:4000"  # LiteLLM proxy endpoint
+    base_url="http://0.0.0.0:4000",  # LiteLLM proxy endpoint
 )
 llm = llm_factory("claude-3-sonnet", client=client, adapter="litellm")
 ```
@@ -250,7 +247,7 @@ Both adapters support system prompts for models that require specific instructio
 llm = llm_factory(
     "gpt-4o",
     client=client,
-    system_prompt="You are a helpful assistant that evaluates RAG systems."
+    system_prompt="You are a helpful assistant that evaluates RAG systems.",
 )
 ```
 
@@ -273,10 +270,7 @@ from openai import OpenAI
 # Use MD_JSON mode for backends without response_format support
 client = OpenAI(api_key="...", base_url="https://custom-backend")
 llm = llm_factory(
-    "custom-model",
-    provider="openai",
-    client=client,
-    mode=instructor.Mode.MD_JSON
+    "custom-model", provider="openai", client=client, mode=instructor.Mode.MD_JSON
 )
 ```
 
@@ -321,7 +315,7 @@ from ragas.llms import llm_factory
 
 client = OpenAI(
     api_key="your-provider-api-key",
-    base_url="http://0.0.0.0:4000"  # LiteLLM proxy endpoint
+    base_url="http://0.0.0.0:4000",  # LiteLLM proxy endpoint
 )
 
 # xAI Grok
@@ -349,6 +343,7 @@ from ragas.metrics import (
 
 # Initialize LLM with your provider
 import google.generativeai as genai
+
 genai.configure(api_key="...")
 client = genai.GenerativeModel("gemini-2.0-flash")
 llm = llm_factory("gemini-2.0-flash", provider="google", client=client)
@@ -358,7 +353,7 @@ data = {
     "question": ["What is the capital of France?"],
     "answer": ["Paris"],
     "contexts": [["France is in Europe. Paris is its capital."]],
-    "ground_truth": ["Paris"]
+    "ground_truth": ["Paris"],
 }
 dataset = Dataset.from_dict(data)
 
@@ -399,6 +394,7 @@ Ensure:
 ```python
 # Check if adapter can handle your provider
 from ragas.llms.adapters import auto_detect_adapter
+
 adapter = auto_detect_adapter(client, "my-provider")
 print(f"Will use: {adapter}")
 ```
@@ -413,7 +409,7 @@ llm = llm_factory(
     "model",
     provider="provider-name",
     client=client,
-    adapter="litellm"  # Explicit override
+    adapter="litellm",  # Explicit override
 )
 ```
 
@@ -430,6 +426,7 @@ If you're upgrading from text-only LLM usage:
 
 # After (new way)
 from ragas.llms import llm_factory
+
 llm = llm_factory("gpt-4o", client=client)
 ```
 
@@ -440,11 +437,13 @@ To switch from OpenAI to Gemini:
 ```python
 # Before: OpenAI
 from openai import OpenAI
+
 client = OpenAI(api_key="...")
 llm = llm_factory("gpt-4o", client=client)
 
 # After: Gemini (similar code pattern!)
 import google.generativeai as genai
+
 genai.configure(api_key="...")
 client = genai.GenerativeModel("gemini-2.0-flash")
 llm = llm_factory("gemini-2.0-flash", provider="google", client=client)

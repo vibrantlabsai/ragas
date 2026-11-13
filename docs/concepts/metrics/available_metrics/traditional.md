@@ -15,7 +15,7 @@ scorer = NonLLMStringSimilarity(distance_measure=DistanceMeasure.LEVENSHTEIN)
 # Evaluate
 result = await scorer.ascore(
     reference="The Eiffel Tower is located in Paris.",
-    response="The Eiffel Tower is located in India."
+    response="The Eiffel Tower is located in India.",
 )
 print(f"NonLLM String Similarity Score: {result.value}")
 ```
@@ -32,7 +32,7 @@ NonLLM String Similarity Score: 0.8918918918918919
     ```python
     result = scorer.score(
         reference="The Eiffel Tower is located in Paris.",
-        response="The Eiffel Tower is located in India."
+        response="The Eiffel Tower is located in India.",
     )
     ```
 
@@ -65,7 +65,7 @@ from ragas.metrics._string import NonLLMStringSimilarity
 
 sample = SingleTurnSample(
     response="The Eiffel Tower is located in India.",
-    reference="The Eiffel Tower is located in Paris."
+    reference="The Eiffel Tower is located in Paris.",
 )
 
 scorer = NonLLMStringSimilarity()
@@ -102,7 +102,7 @@ scorer = BleuScore()
 # Evaluate
 result = await scorer.ascore(
     reference="The Eiffel Tower is located in Paris.",
-    response="The Eiffel Tower is located in India."
+    response="The Eiffel Tower is located in India.",
 )
 print(f"BLEU Score: {result.value}")
 ```
@@ -119,7 +119,7 @@ BLEU Score: 0.7071067811865478
     ```python
     result = scorer.score(
         reference="The Eiffel Tower is located in Paris.",
-        response="The Eiffel Tower is located in India."
+        response="The Eiffel Tower is located in India.",
     )
     ```
 
@@ -146,7 +146,7 @@ from ragas.metrics import BleuScore
 
 sample = SingleTurnSample(
     response="The Eiffel Tower is located in India.",
-    reference="The Eiffel Tower is located in Paris."
+    reference="The Eiffel Tower is located in Paris.",
 )
 
 scorer = BleuScore()
@@ -175,7 +175,7 @@ scorer = RougeScore(rouge_type="rougeL", mode="fmeasure")
 # Evaluate
 result = await scorer.ascore(
     reference="The Eiffel Tower is located in Paris.",
-    response="The Eiffel Tower is located in India."
+    response="The Eiffel Tower is located in India.",
 )
 print(f"ROUGE Score: {result.value}")
 ```
@@ -192,7 +192,7 @@ ROUGE Score: 0.8571428571428571
     ```python
     result = scorer.score(
         reference="The Eiffel Tower is located in Paris.",
-        response="The Eiffel Tower is located in India."
+        response="The Eiffel Tower is located in India.",
     )
     ```
 
@@ -225,7 +225,7 @@ from ragas.metrics import RougeScore
 
 sample = SingleTurnSample(
     response="The Eiffel Tower is located in India.",
-    reference="The Eiffel Tower is located in Paris."
+    reference="The Eiffel Tower is located in Paris.",
 )
 
 scorer = RougeScore()
@@ -251,10 +251,7 @@ from ragas.metrics.collections import ExactMatch
 scorer = ExactMatch()
 
 # Evaluate
-result = await scorer.ascore(
-    reference="Paris",
-    response="India"
-)
+result = await scorer.ascore(reference="Paris", response="India")
 print(f"Exact Match Score: {result.value}")
 ```
 
@@ -268,10 +265,7 @@ Exact Match Score: 0.0
     If you prefer synchronous code, you can use the `.score()` method instead of `.ascore()`:
     
     ```python
-    result = scorer.score(
-        reference="Paris",
-        response="India"
-    )
+    result = scorer.score(reference="Paris", response="India")
     ```
 
 ### Legacy Metrics API
@@ -287,10 +281,7 @@ The following examples use the legacy metrics API pattern. For new projects, we 
 from ragas.dataset_schema import SingleTurnSample
 from ragas.metrics import ExactMatch
 
-sample = SingleTurnSample(
-    response="India",
-    reference="Paris"
-)
+sample = SingleTurnSample(response="India", reference="Paris")
 
 scorer = ExactMatch()
 await scorer.single_turn_ascore(sample)
@@ -316,8 +307,7 @@ scorer = StringPresence()
 
 # Evaluate
 result = await scorer.ascore(
-    reference="Eiffel Tower",
-    response="The Eiffel Tower is located in India."
+    reference="Eiffel Tower", response="The Eiffel Tower is located in India."
 )
 print(f"String Presence Score: {result.value}")
 ```
@@ -333,8 +323,7 @@ String Presence Score: 1.0
     
     ```python
     result = scorer.score(
-        reference="Eiffel Tower",
-        response="The Eiffel Tower is located in India."
+        reference="Eiffel Tower", response="The Eiffel Tower is located in India."
     )
     ```
 
@@ -352,8 +341,7 @@ from ragas.dataset_schema import SingleTurnSample
 from ragas.metrics import StringPresence
 
 sample = SingleTurnSample(
-    response="The Eiffel Tower is located in India.",
-    reference="Eiffel Tower"
+    response="The Eiffel Tower is located in India.", reference="Eiffel Tower"
 )
 scorer = StringPresence()
 await scorer.single_turn_ascore(sample)
@@ -385,7 +373,7 @@ scorer = CHRFScore()
 # Evaluate
 result = await scorer.ascore(
     reference="The Eiffel Tower is located in Paris.",
-    response="The Eiffel Tower is located in India."
+    response="The Eiffel Tower is located in India.",
 )
 print(f"CHRF Score: {result.value}")
 ```
@@ -402,7 +390,7 @@ CHRF Score: 0.8048
     ```python
     result = scorer.score(
         reference="The Eiffel Tower is located in Paris.",
-        response="The Eiffel Tower is located in India."
+        response="The Eiffel Tower is located in India.",
     )
     ```
 
@@ -433,7 +421,7 @@ from ragas.metrics import ChrfScore
 
 sample = SingleTurnSample(
     response="The Eiffel Tower is located in India.",
-    reference="The Eiffel Tower is located in Paris."
+    reference="The Eiffel Tower is located in Paris.",
 )
 
 scorer = ChrfScore()

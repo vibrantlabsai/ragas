@@ -34,7 +34,7 @@ config = {
     "key_file": "~/.oci/private_key.pem",
     "fingerprint": "your_fingerprint",
     "tenancy": "ocid1.tenancy.oc1..example",
-    "region": "us-ashburn-1"
+    "region": "us-ashburn-1",
 }
 ```
 
@@ -56,23 +56,24 @@ from datasets import Dataset
 
 # Initialize OCI Gen AI LLM
 llm = oci_genai_factory(
-    model_id="cohere.command",
-    compartment_id="ocid1.compartment.oc1..example"
+    model_id="cohere.command", compartment_id="ocid1.compartment.oc1..example"
 )
 
 # Your dataset
-dataset = Dataset.from_dict({
-    "question": ["What is the capital of France?"],
-    "answer": ["Paris"],
-    "contexts": [["France is a country in Europe. Its capital is Paris."]],
-    "ground_truth": ["Paris"]
-})
+dataset = Dataset.from_dict(
+    {
+        "question": ["What is the capital of France?"],
+        "answer": ["Paris"],
+        "contexts": [["France is a country in Europe. Its capital is Paris."]],
+        "ground_truth": ["Paris"],
+    }
+)
 
 # Evaluate with OCI Gen AI
 result = evaluate(
     dataset,
     llm=llm,
-    embeddings=None  # You can use any embedding model
+    embeddings=None,  # You can use any embedding model
 )
 ```
 
@@ -88,14 +89,11 @@ config = {
     "key_file": "~/.oci/private_key.pem",
     "fingerprint": "your_fingerprint",
     "tenancy": "ocid1.tenancy.oc1..example",
-    "region": "us-ashburn-1"
+    "region": "us-ashburn-1",
 }
 
 # Custom run configuration
-run_config = RunConfig(
-    timeout=60,
-    max_retries=3
-)
+run_config = RunConfig(timeout=60, max_retries=3)
 
 # Initialize with custom config and endpoint
 llm = oci_genai_factory(
@@ -103,7 +101,7 @@ llm = oci_genai_factory(
     compartment_id="ocid1.compartment.oc1..example",
     config=config,
     endpoint_id="ocid1.endpoint.oc1..example",  # Optional
-    run_config=run_config
+    run_config=run_config,
 )
 ```
 
@@ -112,21 +110,19 @@ llm = oci_genai_factory(
 ```python
 # Cohere Command model
 llm_cohere = oci_genai_factory(
-    model_id="cohere.command",
-    compartment_id="ocid1.compartment.oc1..example"
+    model_id="cohere.command", compartment_id="ocid1.compartment.oc1..example"
 )
 
 # Meta Llama model
 llm_llama = oci_genai_factory(
-    model_id="meta.llama-3-8b",
-    compartment_id="ocid1.compartment.oc1..example"
+    model_id="meta.llama-3-8b", compartment_id="ocid1.compartment.oc1..example"
 )
 
 # Using with different endpoints
 llm_endpoint = oci_genai_factory(
     model_id="cohere.command",
     compartment_id="ocid1.compartment.oc1..example",
-    endpoint_id="ocid1.endpoint.oc1..example"
+    endpoint_id="ocid1.endpoint.oc1..example",
 )
 ```
 
@@ -184,6 +180,7 @@ Enable debug logging to troubleshoot issues:
 
 ```python
 import logging
+
 logging.basicConfig(level=logging.DEBUG)
 
 # Your OCI Gen AI code here
@@ -201,35 +198,28 @@ from datasets import Dataset
 
 # Initialize OCI Gen AI
 llm = oci_genai_factory(
-    model_id="cohere.command",
-    compartment_id="ocid1.compartment.oc1..example"
+    model_id="cohere.command", compartment_id="ocid1.compartment.oc1..example"
 )
 
 # Create dataset
-dataset = Dataset.from_dict({
-    "question": [
-        "What is the capital of France?",
-        "Who wrote Romeo and Juliet?"
-    ],
-    "answer": [
-        "Paris is the capital of France.",
-        "William Shakespeare wrote Romeo and Juliet."
-    ],
-    "contexts": [
-        ["France is a country in Europe. Its capital is Paris."],
-        ["Romeo and Juliet is a play by William Shakespeare."]
-    ],
-    "ground_truth": [
-        "Paris",
-        "William Shakespeare"
-    ]
-})
+dataset = Dataset.from_dict(
+    {
+        "question": ["What is the capital of France?", "Who wrote Romeo and Juliet?"],
+        "answer": [
+            "Paris is the capital of France.",
+            "William Shakespeare wrote Romeo and Juliet.",
+        ],
+        "contexts": [
+            ["France is a country in Europe. Its capital is Paris."],
+            ["Romeo and Juliet is a play by William Shakespeare."],
+        ],
+        "ground_truth": ["Paris", "William Shakespeare"],
+    }
+)
 
 # Evaluate
 result = evaluate(
-    dataset,
-    metrics=[faithfulness, answer_relevancy, context_precision],
-    llm=llm
+    dataset, metrics=[faithfulness, answer_relevancy, context_precision], llm=llm
 )
 
 print(result)
@@ -240,21 +230,18 @@ print(result)
 ```python
 from ragas.metrics import MetricWithLLM
 
+
 # Create custom metric using OCI Gen AI
 class CustomMetric(MetricWithLLM):
     def __init__(self):
         super().__init__()
         self.llm = oci_genai_factory(
-            model_id="cohere.command",
-            compartment_id="ocid1.compartment.oc1..example"
+            model_id="cohere.command", compartment_id="ocid1.compartment.oc1..example"
         )
 
+
 # Use in evaluation
-result = evaluate(
-    dataset,
-    metrics=[CustomMetric()],
-    llm=llm
-)
+result = evaluate(dataset, metrics=[CustomMetric()], llm=llm)
 ```
 
 ## Best Practices

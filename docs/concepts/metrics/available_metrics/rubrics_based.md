@@ -211,17 +211,14 @@ rows = {
             "Scientists debate whether the Amazon or the Nile is the longest river in the world.",
             "The Nile River was central to the Ancient Egyptians' rise to wealth and power.",
         ],
-    ]
+    ],
 }
 
 dataset = Dataset.from_dict(rows)
 
 result = evaluate(
     dataset,
-    metrics=[
-        rubrics_score_without_reference,
-        rubrics_score_with_reference
-    ],
+    metrics=[rubrics_score_without_reference, rubrics_score_with_reference],
 )
 ```
 

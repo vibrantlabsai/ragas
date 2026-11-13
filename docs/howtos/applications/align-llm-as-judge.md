@@ -48,25 +48,29 @@ curl -o datasets/benchmark_df.csv https://raw.githubusercontent.com/vibrantlabsa
 import pandas as pd
 from ragas import Dataset
 
+
 def load_dataset(csv_path: str = None) -> Dataset:
     """Load annotated dataset with human judgments.
-    
+
     Expected columns: question, grading_notes, response, target (pass/fail)
     """
     path = csv_path or "datasets/benchmark_df.csv"
     df = pd.read_csv(path)
 
     dataset = Dataset(name="llm_judge_alignment", backend="local/csv")
-    
+
     for _, row in df.iterrows():
-        dataset.append({
-            "question": row["question"],
-            "grading_notes": row["grading_notes"],
-            "response": row["response"],
-            "target": (row["target"]),
-        })
-    
+        dataset.append(
+            {
+                "question": row["question"],
+                "grading_notes": row["grading_notes"],
+                "response": row["response"],
+                "target": (row["target"]),
+            }
+        )
+
     return dataset
+
 
 # Load the dataset
 dataset = load_dataset()
@@ -122,15 +126,16 @@ The alignment metric compares the judge's decision with the human verdict:
 from ragas.metrics.discrete import discrete_metric
 from ragas.metrics.result import MetricResult
 
+
 @discrete_metric(name="judge_alignment", allowed_values=["pass", "fail"])
 def judge_alignment(judge_label: str, human_label: str) -> MetricResult:
     """Compare judge decision with human label."""
     judge = judge_label.strip().lower()
     human = human_label.strip().lower()
-    
+
     if judge == human:
         return MetricResult(value="pass", reason=f"Judge={judge}; Human={human}")
-    
+
     return MetricResult(value="fail", reason=f"Judge={judge}; Human={human}")
 ```
 
@@ -142,7 +147,10 @@ The [experiment function](/concepts/experimentation) orchestrates the complete e
 from typing import Dict, Any
 from ragas import experiment
 from ragas.metrics import DiscreteMetric
-from ragas_examples.judge_alignment import judge_alignment  # The metric we created above
+from ragas_examples.judge_alignment import (
+    judge_alignment,
+)  # The metric we created above
+
 
 @experiment()
 async def judge_experiment(
@@ -154,7 +162,7 @@ async def judge_experiment(
     # Step 1: Get response (in production, this is where you'd call your LLM app)
     # For this evaluation, we use pre-existing responses from the dataset
     app_response = row["response"]
-    
+
     # Step 2: Judge evaluates the response
     judge_score = await accuracy_metric.ascore(
         question=row["question"],
@@ -165,8 +173,7 @@ async def judge_experiment(
 
     # Step 3: Compare judge decision with human target
     alignment = judge_alignment.score(
-        judge_label=judge_score.value,
-        human_label=row["target"]
+        judge_label=judge_score.value, human_label=row["target"]
     )
 
     return {
@@ -207,7 +214,7 @@ results = await judge_experiment.arun(
 # Calculate alignment rate
 passed = sum(1 for r in results if r["alignment"] == "pass")
 total = len(results)
-print(f"✅ Baseline alignment: {passed}/{total} passed ({passed/total:.1%})")
+print(f"✅ Baseline alignment: {passed}/{total} passed ({passed / total:.1%})")
 ```
 
 ??? "📋 Output (baseline v1)"
@@ -238,11 +245,11 @@ Let's examine the error distribution
     import pandas as pd
 
     # Load results
-    df = pd.read_csv('experiments/judge_baseline_v1_gpt-4o-mini.csv')
+    df = pd.read_csv("experiments/judge_baseline_v1_gpt-4o-mini.csv")
 
     # Analyze misalignments
-    false_positives = len(df[(df['judge_label'] == 'pass') & (df['target'] == 'fail')])
-    false_negatives = len(df[(df['judge_label'] == 'fail') & (df['target'] == 'pass')])
+    false_positives = len(df[(df["judge_label"] == "pass") & (df["target"] == "fail")])
+    false_negatives = len(df[(df["judge_label"] == "fail") & (df["target"] == "pass")])
 
     print(f"False positives (judge too lenient): {false_positives}")
     print(f"False negatives (judge too strict): {false_negatives}")
@@ -373,7 +380,7 @@ results = await judge_experiment.arun(
 
 passed = sum(1 for r in results if r["alignment"] == "pass")
 total = len(results)
-print(f"✅ V2 alignment: {passed}/{total} passed ({passed/total:.1%})")
+print(f"✅ V2 alignment: {passed}/{total} passed ({passed / total:.1%})")
 ```
 
 ??? "📋 Output (improved v2)"
