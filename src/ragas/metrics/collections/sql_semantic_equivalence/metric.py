@@ -3,7 +3,7 @@
 import typing as t
 from typing import List, Optional
 
-from ragas.metrics.collections.base import BaseMetric
+from ragas.metrics.collections.base import BaseMetric, validate_text_list
 from ragas.metrics.result import MetricResult
 
 from .util import SQLEquivalenceInput, SQLEquivalenceOutput, SQLEquivalencePrompt
@@ -78,6 +78,7 @@ class SQLSemanticEquivalence(BaseMetric):
         Returns:
             MetricResult with equivalence score (1.0 if equivalent, 0.0 if not)
         """
+        validate_text_list("reference_contexts", reference_contexts)
         if not isinstance(response, str) or not response.strip():
             raise ValueError("response must be a non-empty SQL query string")
         if not isinstance(reference, str) or not reference.strip():

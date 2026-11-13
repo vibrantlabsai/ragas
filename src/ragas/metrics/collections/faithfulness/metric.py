@@ -3,7 +3,7 @@
 import typing as t
 from typing import List
 
-from ragas.metrics.collections.base import BaseMetric
+from ragas.metrics.collections.base import BaseMetric, validate_text_list
 from ragas.metrics.result import MetricResult
 
 from .util import (
@@ -99,6 +99,7 @@ class Faithfulness(BaseMetric):
         Returns:
             MetricResult with faithfulness score (0.0-1.0, higher is better)
         """
+        validate_text_list("retrieved_contexts", retrieved_contexts)
         # Input validation
         if not response:
             raise ValueError(

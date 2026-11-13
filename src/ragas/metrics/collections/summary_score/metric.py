@@ -4,7 +4,7 @@ import logging
 import typing as t
 from typing import List
 
-from ragas.metrics.collections.base import BaseMetric
+from ragas.metrics.collections.base import BaseMetric, validate_text_list
 from ragas.metrics.result import MetricResult
 
 from .util import (
@@ -122,6 +122,7 @@ class SummaryScore(BaseMetric):
         Raises:
             ValueError: If reference_contexts is empty or response is empty/whitespace only
         """
+        validate_text_list("reference_contexts", reference_contexts)
         # Input validation
         if not reference_contexts or not any(ctx.strip() for ctx in reference_contexts):
             raise ValueError(

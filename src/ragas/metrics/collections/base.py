@@ -10,6 +10,27 @@ from ragas.metrics.result import MetricResult
 from ragas.metrics.validators import NumericValidator
 
 
+def validate_text_list(name: str, value: t.Any) -> None:
+    """Reject a single string where a list of strings is expected.
+
+    A string is iterable, so a metric that loops over it would score it one character at
+    a time (for ContextPrecision, one LLM call per character) without raising. This
+    usually happens when a list was stored as text, for example by the local/csv backend.
+    """
+    if not isinstance(value, (str, bytes)):
+        return
+    hint = "wrap it in a list"
+    if str(value).lstrip().startswith("["):
+        hint = (
+            "it looks like a list that was saved as text (the local/csv backend stores "
+            "every value as a string); parse it back into a list, e.g. with "
+            "ast.literal_eval, or use the local/jsonl backend"
+        )
+    raise ValueError(
+        f"{name} must be a list of strings, not a single {type(value).__name__}: {hint}."
+    )
+
+
 class BaseMetric(SimpleBaseMetric, NumericValidator):
     """
     Base class for metrics collections with modern component validation.

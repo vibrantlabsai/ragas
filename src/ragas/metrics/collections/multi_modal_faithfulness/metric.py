@@ -3,7 +3,7 @@
 import typing as t
 from typing import List
 
-from ragas.metrics.collections.base import BaseMetric
+from ragas.metrics.collections.base import BaseMetric, validate_text_list
 from ragas.metrics.result import MetricResult
 
 from .util import (
@@ -100,6 +100,7 @@ class MultiModalFaithfulness(BaseMetric):
         Raises:
             ValueError: If response or retrieved_contexts is missing
         """
+        validate_text_list("retrieved_contexts", retrieved_contexts)
         # Input validation
         if not response:
             raise ValueError(

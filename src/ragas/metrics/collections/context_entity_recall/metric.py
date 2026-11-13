@@ -3,7 +3,7 @@
 import typing as t
 from typing import List, Sequence
 
-from ragas.metrics.collections.base import BaseMetric
+from ragas.metrics.collections.base import BaseMetric, validate_text_list
 from ragas.metrics.result import MetricResult
 
 from .util import (
@@ -92,6 +92,7 @@ class ContextEntityRecall(BaseMetric):
         Returns:
             MetricResult with entity recall score (0.0-1.0, higher is better)
         """
+        validate_text_list("retrieved_contexts", retrieved_contexts)
         # Extract entities from reference (ground truth)
         reference_entities = await self._extract_entities(reference)
 

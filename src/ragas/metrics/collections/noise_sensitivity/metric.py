@@ -5,7 +5,7 @@ from typing import Dict, List, Literal
 
 import numpy as np
 
-from ragas.metrics.collections.base import BaseMetric
+from ragas.metrics.collections.base import BaseMetric, validate_text_list
 from ragas.metrics.result import MetricResult
 
 from .util import (
@@ -120,6 +120,7 @@ class NoiseSensitivity(BaseMetric):
         Returns:
             MetricResult with noise sensitivity score (0.0-1.0, lower is better)
         """
+        validate_text_list("retrieved_contexts", retrieved_contexts)
         # Input validation
         if not reference:
             raise ValueError(
