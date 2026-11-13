@@ -182,7 +182,7 @@ def test_provider_support(monkeypatch):
     def mock_from_openai(client, mode=None):
         return MockInstructor(client)
 
-    def mock_from_anthropic(client):
+    def mock_from_anthropic(client, mode=None):
         return MockInstructor(client)
 
     def mock_from_gemini(client):
@@ -433,10 +433,31 @@ def test_llm_factory_forwards_explicit_mode(
     assert captured == {"mode": instructor.Mode.MD_JSON}
 
 
+def test_llm_factory_defaults_anthropic_to_json_mode(mock_sync_client, monkeypatch):
+    """Without a mode, Anthropic gets Mode.JSON instead of instructor's forced tool call."""
+    import instructor
+
+    captured = {}
+
+    def mock_from_anthropic(client, **kwargs):
+        captured.update(kwargs)
+        return MockInstructor(client)
+
+    monkeypatch.setattr("instructor.from_anthropic", mock_from_anthropic, raising=False)
+
+    llm_factory(
+        "claude-test",
+        provider="anthropic",
+        client=mock_sync_client,
+        adapter="instructor",
+    )
+
+    assert captured == {"mode": instructor.Mode.JSON}
+
+
 @pytest.mark.parametrize(
     "provider, instructor_factory",
     [
-        ("anthropic", "from_anthropic"),
         ("google", "from_gemini"),
         ("perplexity", "from_perplexity"),
     ],
