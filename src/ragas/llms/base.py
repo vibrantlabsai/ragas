@@ -593,6 +593,10 @@ def _get_instructor_client(
     - New SDK (google-genai): Uses instructor.from_genai()
     - Old SDK (google-generativeai): Uses instructor.from_gemini()
     """
+    # Anthropic, Google and Perplexity keep instructor's own default mode unless
+    # the caller chose one, so only an explicit mode is forwarded to them.
+    explicit_mode_kwargs: t.Dict[str, t.Any] = {} if mode is None else {"mode": mode}
+
     if mode is None:
         mode = instructor.Mode.JSON
 
@@ -601,16 +605,16 @@ def _get_instructor_client(
     if provider_lower == "openai":
         return instructor.from_openai(client, mode=mode)
     elif provider_lower == "anthropic":
-        return instructor.from_anthropic(client)
+        return instructor.from_anthropic(client, **explicit_mode_kwargs)
     elif provider_lower in ("google", "gemini"):
         if _is_new_google_genai_client(client):
-            return instructor.from_genai(client)
+            return instructor.from_genai(client, **explicit_mode_kwargs)
         else:
-            return instructor.from_gemini(client)
+            return instructor.from_gemini(client, **explicit_mode_kwargs)
     elif provider_lower == "litellm":
         return instructor.from_litellm(client, mode=mode)
     elif provider_lower == "perplexity":
-        return instructor.from_perplexity(client)
+        return instructor.from_perplexity(client, **explicit_mode_kwargs)
     else:
         return _patch_client_for_provider(client, provider_lower, mode=mode)
 
@@ -650,7 +654,9 @@ def llm_factory(
                Pass DiskCacheBackend() for persistent caching across runs.
                Saves costs and speeds up repeated evaluations by 60x.
         mode: Instructor mode for structured outputs (default: Mode.JSON).
-              Only applies when using instructor adapter.
+              Only applies when using instructor adapter. Anthropic, Google and
+              Perplexity use instructor's own default for that provider unless
+              a mode is passed here.
               Options: Mode.JSON, Mode.MD_JSON, Mode.TOOLS, Mode.JSON_SCHEMA, etc.
               Use Mode.MD_JSON for backends that don't support response_format parameter.
         **kwargs: Additional model arguments (temperature, max_tokens, top_p, etc).
@@ -817,6 +823,10 @@ class InstructorLLM(InstructorBaseRagasLLM):
         if model_args is None:
             model_args = InstructorModelArgs()
 
+        # Arguments the caller set, as opposed to the defaults above. Providers
+        # that reject default sampling parameters only receive these.
+        self._explicit_model_args = set(model_args.model_fields_set) | set(kwargs)
+
         # Convert to dict and merge with any additional kwargs
         self.model_args = {**model_args.model_dump(), **kwargs}
 
@@ -838,7 +848,7 @@ class InstructorLLM(InstructorBaseRagasLLM):
         Each provider may have different parameter requirements:
         - Google: Wraps parameters in generation_config and renames max_tokens
         - OpenAI/Azure: Maps max_tokens to max_completion_tokens for o-series models
-        - Anthropic: No special handling required (pass-through)
+        - Anthropic: Sends temperature and top_p only when the caller set them
         - LiteLLM: No special handling required (routes internally, pass-through)
         """
         provider_lower = self.provider.lower()
@@ -847,9 +857,25 @@ class InstructorLLM(InstructorBaseRagasLLM):
             return self._map_google_params()
         elif provider_lower in ("openai", "azure"):
             return self._map_openai_params()
+        elif provider_lower == "anthropic":
+            return self._map_anthropic_params()
         else:
-            # Anthropic, LiteLLM, and other providers - pass through unchanged
+            # LiteLLM and other providers - pass through unchanged
             return self.model_args.copy()
+
+    def _map_anthropic_params(self) -> t.Dict[str, t.Any]:
+        """Map parameters for Anthropic models.
+
+        Current Claude models reject `temperature` and `top_p`, or accept only
+        their default values, so the deterministic defaults ragas applies for
+        other providers are not sent. A value the caller passes explicitly is
+        forwarded unchanged.
+        """
+        mapped_args = self.model_args.copy()
+        for key in ("temperature", "top_p"):
+            if key not in self._explicit_model_args:
+                mapped_args.pop(key, None)
+        return mapped_args
 
     def _map_openai_params(self) -> t.Dict[str, t.Any]:
         """Map parameters for OpenAI/Azure reasoning models with special constraints.

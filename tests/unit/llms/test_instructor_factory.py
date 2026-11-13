@@ -333,3 +333,129 @@ def test_llm_factory_mode_with_generic_provider(monkeypatch):
 
     assert llm.model == "custom-model"
     assert captured_mode == instructor.Mode.TOOLS
+
+
+def _mock_anthropic(monkeypatch):
+    monkeypatch.setattr(
+        "instructor.from_anthropic",
+        lambda client, **kwargs: MockInstructor(client),
+        raising=False,
+    )
+
+
+def test_anthropic_omits_default_sampling_params(mock_sync_client, monkeypatch):
+    """Current Claude models reject temperature/top_p, so the defaults are not sent."""
+    _mock_anthropic(monkeypatch)
+
+    llm = llm_factory("claude-opus-5-5", provider="anthropic", client=mock_sync_client)
+    params = llm._map_provider_params()  # type: ignore
+
+    assert "temperature" not in params
+    assert "top_p" not in params
+    assert params["max_tokens"] == 1024
+
+
+def test_anthropic_forwards_explicit_sampling_params(mock_sync_client, monkeypatch):
+    """A sampling parameter the caller passes is forwarded, even at a falsy value."""
+    _mock_anthropic(monkeypatch)
+
+    llm = llm_factory(
+        "claude-sonnet-4-6",
+        provider="anthropic",
+        client=mock_sync_client,
+        temperature=0.0,
+    )
+    params = llm._map_provider_params()  # type: ignore
+
+    assert params["temperature"] == 0.0
+    assert "top_p" not in params
+
+
+def test_anthropic_forwards_sampling_params_set_on_model_args():
+    """Values set on InstructorModelArgs count as explicit; its defaults do not."""
+    from ragas.llms.base import InstructorLLM, InstructorModelArgs
+
+    llm = InstructorLLM(
+        client=MockInstructor(MockClient(is_async=False)),
+        model="claude-sonnet-4-6",
+        provider="anthropic",
+        model_args=InstructorModelArgs(top_p=0.5),
+    )
+    params = llm._map_provider_params()
+
+    assert params["top_p"] == 0.5
+    assert "temperature" not in params
+
+
+def test_other_providers_keep_default_sampling_params(mock_sync_client, monkeypatch):
+    """The Anthropic handling does not change what other providers receive."""
+    monkeypatch.setattr(
+        "instructor.from_openai", lambda client, mode=None: MockInstructor(client)
+    )
+
+    llm = llm_factory("gpt-4o", provider="openai", client=mock_sync_client)
+    params = llm._map_provider_params()  # type: ignore
+
+    assert params["temperature"] == 0.01
+    assert params["top_p"] == 0.1
+
+
+@pytest.mark.parametrize(
+    "provider, instructor_factory",
+    [
+        ("anthropic", "from_anthropic"),
+        ("google", "from_gemini"),
+        ("perplexity", "from_perplexity"),
+    ],
+)
+def test_llm_factory_forwards_explicit_mode(
+    provider, instructor_factory, mock_sync_client, monkeypatch
+):
+    """An explicit mode reaches providers that have no ragas default mode."""
+    import instructor
+
+    captured = {}
+
+    def mock_factory(client, **kwargs):
+        captured.update(kwargs)
+        return MockInstructor(client)
+
+    monkeypatch.setattr(f"instructor.{instructor_factory}", mock_factory, raising=False)
+
+    llm_factory(
+        "test-model",
+        provider=provider,
+        client=mock_sync_client,
+        adapter="instructor",
+        mode=instructor.Mode.MD_JSON,
+    )
+
+    assert captured == {"mode": instructor.Mode.MD_JSON}
+
+
+@pytest.mark.parametrize(
+    "provider, instructor_factory",
+    [
+        ("anthropic", "from_anthropic"),
+        ("google", "from_gemini"),
+        ("perplexity", "from_perplexity"),
+    ],
+)
+def test_llm_factory_keeps_instructor_default_mode(
+    provider, instructor_factory, mock_sync_client, monkeypatch
+):
+    """Without a mode, those providers get instructor's own default, not Mode.JSON."""
+    captured = {"called": False}
+
+    def mock_factory(client, **kwargs):
+        captured["called"] = True
+        captured.update(kwargs)
+        return MockInstructor(client)
+
+    monkeypatch.setattr(f"instructor.{instructor_factory}", mock_factory, raising=False)
+
+    llm_factory(
+        "test-model", provider=provider, client=mock_sync_client, adapter="instructor"
+    )
+
+    assert captured == {"called": True}
