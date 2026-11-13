@@ -82,12 +82,7 @@ dataset = ...  # Your dataset
 metrics = [Faithfulness(llm=llm), AnswerRelevancy(llm=llm)]
 
 # Simple evaluation
-result = evaluate(
-    dataset=dataset,
-    metrics=metrics,
-    llm=llm,
-    embeddings=embeddings
-)
+result = evaluate(dataset=dataset, metrics=metrics, llm=llm, embeddings=embeddings)
 
 print(result)  # Returns EvaluationResult with scores
 ```
@@ -99,10 +94,12 @@ from ragas import experiment
 from ragas.metrics.collections import Faithfulness, AnswerRelevancy
 from pydantic import BaseModel
 
+
 # Define experiment result structure
 class ExperimentResult(BaseModel):
     faithfulness: float
     answer_relevancy: float
+
 
 # Create experiment function
 @experiment(ExperimentResult)
@@ -111,19 +108,17 @@ async def run_evaluation(row):
     answer_relevancy = AnswerRelevancy(llm=llm)
 
     faith_result = await faithfulness.ascore(
-        response=row.response,
-        retrieved_contexts=row.contexts
+        response=row.response, retrieved_contexts=row.contexts
     )
 
     relevancy_result = await answer_relevancy.ascore(
-        user_input=row.user_input,
-        response=row.response
+        user_input=row.user_input, response=row.response
     )
 
     return ExperimentResult(
-        faithfulness=faith_result.value,
-        answer_relevancy=relevancy_result.value
+        faithfulness=faith_result.value, answer_relevancy=relevancy_result.value
     )
+
 
 # Run experiment
 exp_results = await run_evaluation(dataset)
@@ -169,7 +164,9 @@ from ragas.llms import instructor_llm_factory, llm_factory
 from openai import AsyncOpenAI
 
 # For metrics that need instructor
-llm = instructor_llm_factory("openai", model="gpt-4o-mini", client=AsyncOpenAI(api_key="..."))
+llm = instructor_llm_factory(
+    "openai", model="gpt-4o-mini", client=AsyncOpenAI(api_key="...")
+)
 
 # Or, the old way (not recommended, still supported in 0.3)
 client = AsyncOpenAI(api_key="sk-...")
@@ -284,7 +281,7 @@ sample = SingleTurnSample(
     user_input="What is AI?",
     response="AI is artificial intelligence...",
     retrieved_contexts=["Context 1", "Context 2"],
-    ground_truths=["AI definition"]
+    ground_truths=["AI definition"],
 )
 
 # 2. Call metric with the sample
@@ -299,12 +296,12 @@ metric = Faithfulness(llm=llm)
 result = await metric.ascore(
     user_input="What is AI?",
     response="AI is artificial intelligence...",
-    retrieved_contexts=["Context 1", "Context 2"]
+    retrieved_contexts=["Context 1", "Context 2"],
 )
 
 # 2. Access result properties
-print(result.value)      # Score: 0.85 (float)
-print(result.reason)     # Optional explanation
+print(result.value)  # Score: 0.85 (float)
+print(result.reason)  # Optional explanation
 ```
 
 ### Available Metrics in v0.4
@@ -381,12 +378,7 @@ The following metrics have been successfully migrated to the collections system 
 
 ```python
 # v0.3
-from ragas.metrics import (
-    Faithfulness,
-    AnswerRelevancy,
-    ContextPrecision,
-    ContextRecall
-)
+from ragas.metrics import Faithfulness, AnswerRelevancy, ContextPrecision, ContextRecall
 ```
 
 ```python
@@ -395,7 +387,7 @@ from ragas.metrics.collections import (
     Faithfulness,
     AnswerRelevancy,
     ContextPrecision,
-    ContextRecall
+    ContextRecall,
 )
 ```
 
@@ -421,7 +413,7 @@ sample = SingleTurnSample(
     user_input="What is AI?",
     response="AI is artificial intelligence.",
     retrieved_contexts=["AI is a technology..."],
-    ground_truths=["AI definition"]
+    ground_truths=["AI definition"],
 )
 
 score = await metric.single_turn_ascore(sample)
@@ -433,10 +425,10 @@ print(score)  # Output: 0.85
 result = await metric.ascore(
     user_input="What is AI?",
     response="AI is artificial intelligence.",
-    retrieved_contexts=["AI is a technology..."]
+    retrieved_contexts=["AI is a technology..."],
 )
 
-print(result.value)   # Output: 0.85
+print(result.value)  # Output: 0.85
 print(result.reason)  # Optional: "Response is faithful to context"
 ```
 
@@ -469,7 +461,7 @@ score_float = float(result.value)
 sample = SingleTurnSample(
     user_input="What is machine learning?",
     response="ML is a subset of AI.",
-    retrieved_contexts=["ML involves algorithms..."]
+    retrieved_contexts=["ML involves algorithms..."],
 )
 score = await metric.single_turn_ascore(sample)
 ```
@@ -479,7 +471,7 @@ score = await metric.single_turn_ascore(sample)
 result = await metric.ascore(
     user_input="What is machine learning?",
     response="ML is a subset of AI.",
-    retrieved_contexts=["ML involves algorithms..."]
+    retrieved_contexts=["ML involves algorithms..."],
 )
 score = result.value
 ```
@@ -489,8 +481,7 @@ score = result.value
 **Before (v0.3):**
 ```python
 sample = SingleTurnSample(
-    user_input="What is Python?",
-    response="Python is a programming language..."
+    user_input="What is Python?", response="Python is a programming language..."
 )
 score = await metric.single_turn_ascore(sample)
 ```
@@ -498,8 +489,7 @@ score = await metric.single_turn_ascore(sample)
 **After (v0.4):**
 ```python
 result = await metric.ascore(
-    user_input="What is Python?",
-    response="Python is a programming language..."
+    user_input="What is Python?", response="Python is a programming language..."
 )
 score = result.value
 ```
@@ -513,7 +503,7 @@ Note: This metric now uses `reference` instead of `ground_truths`:
 sample = SingleTurnSample(
     user_input="What is AI?",
     response="AI is artificial intelligence.",
-    ground_truths=["AI is artificial intelligence and machine learning."]
+    ground_truths=["AI is artificial intelligence and machine learning."],
 )
 score = await metric.single_turn_ascore(sample)
 ```
@@ -523,7 +513,7 @@ score = await metric.single_turn_ascore(sample)
 result = await metric.ascore(
     user_input="What is AI?",
     response="AI is artificial intelligence.",
-    reference="AI is artificial intelligence and machine learning."
+    reference="AI is artificial intelligence and machine learning.",
 )
 score = result.value
 ```
@@ -536,7 +526,7 @@ sample = SingleTurnSample(
     user_input="What is RAG?",
     response="RAG improves LLM accuracy.",
     retrieved_contexts=["RAG = Retrieval Augmented Generation...", "..."],
-    ground_truths=["RAG definition"]
+    ground_truths=["RAG definition"],
 )
 score = await metric.single_turn_ascore(sample)
 ```
@@ -547,7 +537,7 @@ result = await metric.ascore(
     user_input="What is RAG?",
     response="RAG improves LLM accuracy.",
     retrieved_contexts=["RAG = Retrieval Augmented Generation...", "..."],
-    reference="RAG definition"
+    reference="RAG definition",
 )
 score = result.value
 ```
@@ -619,7 +609,7 @@ from ragas.metrics.collections.faithfulness.util import FaithfulnessInput
 # Create sample input
 sample_input = FaithfulnessInput(
     response="The Eiffel Tower is in Paris.",
-    context="The Eiffel Tower is located in Paris, France."
+    context="The Eiffel Tower is located in Paris, France.",
 )
 
 # Generate prompt string
@@ -635,11 +625,13 @@ print(prompt_string)
 from ragas.metrics.collections import Faithfulness
 from ragas.metrics.collections.faithfulness.util import FaithfulnessPrompt
 
+
 # Create custom prompt by subclassing
 class CustomFaithfulnessPrompt(FaithfulnessPrompt):
     @property
     def instruction(self):
         return """Your custom instruction here."""
+
 
 # Apply to metric
 metric = Faithfulness(llm=llm)
@@ -656,6 +648,7 @@ from ragas.metrics.collections.faithfulness.util import (
     StatementFaithfulnessAnswer,
 )
 
+
 class DomainSpecificPrompt(FaithfulnessPrompt):
     examples = [
         (
@@ -668,12 +661,13 @@ class DomainSpecificPrompt(FaithfulnessPrompt):
                     StatementFaithfulnessAnswer(
                         statement="ML uses statistical techniques.",
                         reason="Related to learning from data, but context doesn't explicitly mention statistical techniques.",
-                        verdict=0
+                        verdict=0,
                     ),
                 ]
             ),
         ),
     ]
+
 
 # Apply custom prompt
 metric = Faithfulness(llm=llm)
@@ -722,10 +716,7 @@ Always verify your custom prompts before using them:
 
 ```python
 # Test prompt generation
-sample_input = FaithfulnessInput(
-    response="Test response.",
-    context="Test context."
-)
+sample_input = FaithfulnessInput(response="Test response.", context="Test context.")
 
 custom_metric = Faithfulness(llm=llm)
 custom_metric.prompt = MyCustomPrompt()
@@ -735,10 +726,7 @@ prompt_string = custom_metric.prompt.to_string(sample_input)
 print(prompt_string)
 
 # Then use it for evaluation
-result = await custom_metric.ascore(
-    response="Test response.",
-    context="Test context."
-)
+result = await custom_metric.ascore(response="Test response.", context="Test context.")
 ```
 
 ### Migration from v0.3 Custom Prompts
@@ -750,12 +738,15 @@ If you had custom prompts in v0.3 using `PydanticPrompt`:
 from ragas.prompt.pydantic_prompt import PydanticPrompt
 from pydantic import BaseModel
 
+
 class MyInput(BaseModel):
     response: str
     context: str
 
+
 class MyOutput(BaseModel):
     is_faithful: bool
+
 
 class MyPrompt(PydanticPrompt[MyInput, MyOutput]):
     instruction = "Check if response is faithful to context"
@@ -769,12 +760,15 @@ class MyPrompt(PydanticPrompt[MyInput, MyOutput]):
 from ragas.metrics.collections.base import BasePrompt
 from pydantic import BaseModel
 
+
 class MyInput(BaseModel):
     response: str
     context: str
 
+
 class MyOutput(BaseModel):
     is_faithful: bool
+
 
 class MyPrompt(BasePrompt):
     @property
@@ -808,17 +802,17 @@ v0.4 introduces the `adapt()` method on `BasePrompt` instances for language tran
 from ragas.prompt.mixin import PromptMixin
 from ragas.metrics import Faithfulness
 
+
 # Metrics inherited from PromptMixin to use adapt_prompts
 class MyFaithfulness(Faithfulness, PromptMixin):
     pass
+
 
 metric = MyFaithfulness(llm=llm)
 
 # Adapt ALL prompts to another language
 adapted_prompts = await metric.adapt_prompts(
-    language="spanish",
-    llm=llm,
-    adapt_instruction=True
+    language="spanish", llm=llm, adapt_instruction=True
 )
 
 # Apply all adapted prompts
@@ -840,19 +834,14 @@ metric = Faithfulness(llm=llm)
 
 # Adapt individual prompt to another language
 adapted_prompt = await metric.prompt.adapt(
-    target_language="spanish",
-    llm=llm,
-    adapt_instruction=True
+    target_language="spanish", llm=llm, adapt_instruction=True
 )
 
 # Apply adapted prompt
 metric.prompt = adapted_prompt
 
 # Use metric with adapted language
-result = await metric.ascore(
-    response="...",
-    retrieved_contexts=[...]
-)
+result = await metric.ascore(response="...", retrieved_contexts=[...])
 ```
 
 !!! note ""
@@ -870,7 +859,7 @@ metric = AnswerRelevancy(llm=llm)
 adapted_prompt = await metric.prompt.adapt(
     target_language="french",
     llm=llm,
-    adapt_instruction=False  # Default - just updates language
+    adapt_instruction=False,  # Default - just updates language
 )
 
 metric.prompt = adapted_prompt
@@ -883,7 +872,7 @@ print(metric.prompt.language)  # "french"
 adapted_prompt = await metric.prompt.adapt(
     target_language="german",
     llm=llm,
-    adapt_instruction=True  # Translate instruction text too
+    adapt_instruction=True,  # Translate instruction text too
 )
 
 metric.prompt = adapted_prompt
@@ -896,19 +885,17 @@ metric.prompt = adapted_prompt
 ```python
 from ragas.metrics.collections.faithfulness.util import FaithfulnessPrompt
 
+
 class CustomFaithfulnessPrompt(FaithfulnessPrompt):
     @property
     def instruction(self):
         return "Custom instruction in English"
 
+
 prompt = CustomFaithfulnessPrompt(language="english")
 
 # Adapt to Italian
-adapted = await prompt.adapt(
-    target_language="italian",
-    llm=llm,
-    adapt_instruction=True
-)
+adapted = await prompt.adapt(target_language="italian", llm=llm, adapt_instruction=True)
 
 # Check language was updated
 assert adapted.language == "italian"
@@ -923,8 +910,10 @@ assert adapted.language == "italian"
 from ragas.prompt.mixin import PromptMixin
 from ragas.metrics import Faithfulness
 
+
 class MyMetric(Faithfulness, PromptMixin):  # ← Remove PromptMixin
     pass
+
 
 # v0.4
 from ragas.metrics.collections import Faithfulness
@@ -938,17 +927,13 @@ metric = Faithfulness(llm=llm)
 ```python
 # v0.3
 adapted_prompts = await metric.adapt_prompts(
-    language="spanish",
-    llm=llm,
-    adapt_instruction=True
+    language="spanish", llm=llm, adapt_instruction=True
 )
 metric.set_prompts(**adapted_prompts)
 
 # v0.4
 adapted_prompt = await metric.prompt.adapt(
-    target_language="spanish",
-    llm=llm,
-    adapt_instruction=True
+    target_language="spanish", llm=llm, adapt_instruction=True
 )
 metric.prompt = adapted_prompt
 ```
@@ -960,17 +945,17 @@ metric.prompt = adapted_prompt
 from ragas.prompt.mixin import PromptMixin
 from ragas.metrics import Faithfulness, AnswerRelevancy
 
+
 class MyMetrics(Faithfulness, AnswerRelevancy, PromptMixin):
     pass
+
 
 # Setup
 metrics = MyMetrics(llm=llm)
 
 # Adapt multiple metrics to Spanish
 adapted = await metrics.adapt_prompts(
-    language="spanish",
-    llm=best_llm,
-    adapt_instruction=True
+    language="spanish", llm=best_llm, adapt_instruction=True
 )
 
 metrics.set_prompts(**adapted)
@@ -987,16 +972,12 @@ answer_metric = AnswerRelevancy(llm=llm)
 
 # Adapt each metric's prompt independently
 faith_adapted = await faith_metric.prompt.adapt(
-    target_language="spanish",
-    llm=best_llm,
-    adapt_instruction=True
+    target_language="spanish", llm=best_llm, adapt_instruction=True
 )
 faith_metric.prompt = faith_adapted
 
 answer_adapted = await answer_metric.prompt.adapt(
-    target_language="spanish",
-    llm=best_llm,
-    adapt_instruction=True
+    target_language="spanish", llm=best_llm, adapt_instruction=True
 )
 answer_metric.prompt = answer_adapted
 
@@ -1022,7 +1003,7 @@ The `ground_truths` parameter has been renamed to `reference` across the board:
 sample = SingleTurnSample(
     user_input="...",
     response="...",
-    ground_truths=["correct answer"]  # List of strings
+    ground_truths=["correct answer"],  # List of strings
 )
 ```
 
@@ -1031,7 +1012,7 @@ sample = SingleTurnSample(
 sample = SingleTurnSample(
     user_input="...",
     response="...",
-    reference="correct answer"  # Single string
+    reference="correct answer",  # Single string
 )
 ```
 
@@ -1048,10 +1029,10 @@ from ragas import SingleTurnSample
 
 # v0.4 complete sample
 sample = SingleTurnSample(
-    user_input="What is AI?",                      # Required
-    response="AI is artificial intelligence.",     # Required
-    retrieved_contexts=["Context 1", "Context 2"], # Optional
-    reference="Correct definition of AI"           # Optional (was ground_truths)
+    user_input="What is AI?",  # Required
+    response="AI is artificial intelligence.",  # Required
+    retrieved_contexts=["Context 1", "Context 2"],  # Optional
+    reference="Correct definition of AI",  # Optional (was ground_truths)
 )
 ```
 
@@ -1063,11 +1044,7 @@ If you're using `EvaluationDataset`, update your data loading:
 ```python
 dataset = EvaluationDataset(
     samples=[
-        SingleTurnSample(
-            user_input="Q1",
-            response="A1",
-            ground_truths=["correct"]
-        )
+        SingleTurnSample(user_input="Q1", response="A1", ground_truths=["correct"])
     ]
 )
 ```
@@ -1075,13 +1052,7 @@ dataset = EvaluationDataset(
 **After (v0.4):**
 ```python
 dataset = EvaluationDataset(
-    samples=[
-        SingleTurnSample(
-            user_input="Q1",
-            response="A1",
-            reference="correct"
-        )
-    ]
+    samples=[SingleTurnSample(user_input="Q1", response="A1", reference="correct")]
 )
 ```
 
@@ -1111,6 +1082,7 @@ If you've already written custom metrics extending `BaseMetric` from collections
 from ragas.metrics.collections.base import BaseMetric, MetricResult
 from pydantic import BaseModel
 
+
 class MyCustomMetric(BaseMetric):
     name: str = "my_metric"
     dimensions: list[str] = ["my_dimension"]
@@ -1137,6 +1109,7 @@ If you have custom metrics extending `SingleTurnMetric` or `MetricWithLLM`:
 # v0.3 - Legacy approach
 from ragas.metrics.base import MetricWithLLM
 
+
 class MyMetric(MetricWithLLM):
     async def single_turn_ascore(self, sample: SingleTurnSample) -> float:
         # Extract values from sample
@@ -1159,15 +1132,18 @@ class MyMetric(MetricWithLLM):
 # v0.4 - Collections approach
 from ragas.metrics.collections.base import BaseMetric, MetricResult
 
+
 class MyMetric(BaseMetric):
     name: str = "my_metric"
     dimensions: list[str] = ["quality"]
 
-    async def ascore(self,
-                    user_input: str,
-                    response: str,
-                    retrieved_contexts: list[str] | None = None,
-                    **kwargs) -> MetricResult:
+    async def ascore(
+        self,
+        user_input: str,
+        response: str,
+        retrieved_contexts: list[str] | None = None,
+        **kwargs,
+    ) -> MetricResult:
         # Use keyword arguments directly
         contexts = retrieved_contexts or []
 
@@ -1184,12 +1160,15 @@ class MyMetric(BaseMetric):
 from ragas.prompt.pydantic_prompt import PydanticPrompt
 from pydantic import BaseModel
 
+
 class Input(BaseModel):
     query: str
     document: str
 
+
 class Output(BaseModel):
     is_relevant: bool
+
 
 class RelevancePrompt(PydanticPrompt[Input, Output]):
     instruction = "Is the document relevant to the query?"
@@ -1263,7 +1242,10 @@ Three metrics have been completely removed from the collections API. They are no
   # Instead of AspectCritic, use:
   from ragas.metrics import discrete_metric
 
-  @discrete_metric(name="aspect_critic", allowed_values=["positive", "negative", "neutral"])
+
+  @discrete_metric(
+      name="aspect_critic", allowed_values=["positive", "negative", "neutral"]
+  )
   def evaluate_aspect(response: str, aspect: str) -> str:
       # Your evaluation logic
       return "positive"
@@ -1276,6 +1258,7 @@ Three metrics have been completely removed from the collections API. They are no
 - **Usage**:
   ```python
   from ragas.metrics import discrete_metric
+
 
   @discrete_metric(name="custom_criteria", allowed_values=["pass", "fail"])
   def evaluate_criteria(response: str, criteria: str) -> str:
@@ -1293,11 +1276,9 @@ Three metrics have been completely removed from the collections API. They are no
 
   # v0.4 - Use this instead
   from ragas.metrics.collections import SemanticSimilarity
+
   metric = SemanticSimilarity(llm=llm)
-  result = await metric.ascore(
-      reference="Expected answer",
-      response="Actual answer"
-  )
+  result = await metric.ascore(reference="Expected answer", response="Actual answer")
   ```
 
 ### Deprecated Methods (Removed in v0.4)
@@ -1337,13 +1318,16 @@ result = evaluate(dataset=dataset, metrics=metrics, llm=llm, embeddings=embeddin
 from ragas import experiment
 from pydantic import BaseModel
 
+
 class Results(BaseModel):
     score: float
+
 
 @experiment(Results)
 async def run(row):
     result = await metric.ascore(**row.dict())
     return Results(score=result.value)
+
 
 result = await run(dataset)
 ```
@@ -1428,9 +1412,7 @@ v0.4 replaces wrapper classes with **native embedding providers** that integrate
 from langchain_openai import OpenAIEmbeddings as LangChainEmbeddings
 from ragas.embeddings import LangchainEmbeddingsWrapper
 
-embeddings = LangchainEmbeddingsWrapper(
-    LangChainEmbeddings(api_key="sk-...")
-)
+embeddings = LangchainEmbeddingsWrapper(LangChainEmbeddings(api_key="sk-..."))
 embedding = embeddings.embed_query("text")
 ```
 
@@ -1440,8 +1422,7 @@ from openai import AsyncOpenAI
 from ragas.embeddings import OpenAIEmbeddings
 
 embeddings = OpenAIEmbeddings(
-    client=AsyncOpenAI(api_key="sk-..."),
-    model="text-embedding-3-small"
+    client=AsyncOpenAI(api_key="sk-..."), model="text-embedding-3-small"
 )
 embedding = embeddings.embed_text("text")  # Different method name
 ```
@@ -1463,9 +1444,7 @@ embeddings = LangchainEmbeddingsWrapper(
 from ragas.embeddings import GoogleEmbeddings
 
 embeddings = GoogleEmbeddings(
-    model="text-embedding-004",
-    use_vertex=True,
-    project_id="my-project"
+    model="text-embedding-004", use_vertex=True, project_id="my-project"
 )
 ```
 
@@ -1484,7 +1463,7 @@ from ragas.embeddings import HuggingFaceEmbeddings  # Capitalization changed
 
 embeddings = HuggingFaceEmbeddings(
     model="sentence-transformers/all-MiniLM-L6-v2",
-    device="cuda"  # Optional GPU acceleration
+    device="cuda",  # Optional GPU acceleration
 )
 ```
 
@@ -1505,7 +1484,7 @@ from openai import AsyncOpenAI
 embeddings = embedding_factory(
     provider="openai",
     model="text-embedding-3-small",
-    client=AsyncOpenAI(api_key="sk-...")
+    client=AsyncOpenAI(api_key="sk-..."),
 )
 ```
 
@@ -1522,11 +1501,14 @@ embeddings = embedding_factory(
 from ragas.prompt.pydantic_prompt import PydanticPrompt
 from pydantic import BaseModel
 
+
 class Input(BaseModel):
     query: str
 
+
 class Output(BaseModel):
     is_relevant: bool
+
 
 class RelevancePrompt(PydanticPrompt[Input, Output]):
     instruction = "Is this relevant?"
@@ -1538,6 +1520,7 @@ class RelevancePrompt(PydanticPrompt[Input, Output]):
 ```python
 # Use BasePrompt classes instead - see Prompt System Migration section
 from ragas.metrics.collections.faithfulness.util import FaithfulnessPrompt
+
 
 class CustomPrompt(FaithfulnessPrompt):
     @property
@@ -1572,6 +1555,7 @@ score = result.value
 **Before (v0.3):**
 ```python
 from ragas.metrics import ContextUtilization
+
 metric = ContextUtilization(llm=llm)
 score = await metric.single_turn_ascore(sample)
 ```
@@ -1579,6 +1563,7 @@ score = await metric.single_turn_ascore(sample)
 **After (v0.4):**
 ```python
 from ragas.metrics.collections import ContextUtilization
+
 # or use the modern name directly:
 from ragas.metrics.collections import ContextPrecisionWithoutReference
 
@@ -1586,11 +1571,7 @@ metric = ContextUtilization(llm=llm)  # Still works (wrapper)
 # or
 metric = ContextPrecisionWithoutReference(llm=llm)  # Preferred
 
-result = await metric.ascore(
-    user_input="...",
-    response="...",
-    retrieved_contexts=[...]
-)
+result = await metric.ascore(user_input="...", response="...", retrieved_contexts=[...])
 score = result.value
 ```
 
@@ -1662,6 +1643,7 @@ If you were using removed metrics like `AspectCritic` or `SimpleCriteria`, v0.4 
 **Before (v0.3) - AspectCritic:**
 ```python
 from ragas.metrics import AspectCritic
+
 metric = AspectCritic(name="clarity", allowed_values=["clear", "unclear"])
 result = await metric.single_turn_ascore(sample)
 ```
@@ -1670,9 +1652,11 @@ result = await metric.single_turn_ascore(sample)
 ```python
 from ragas.metrics import discrete_metric
 
+
 @discrete_metric(name="clarity", allowed_values=["clear", "unclear"])
 def clarity(response: str) -> str:
     return "clear" if len(response) > 50 else "unclear"
+
 
 metric = clarity()
 result = await metric.ascore(response="...")
@@ -1688,14 +1672,17 @@ Use `@numeric_metric` for any scoring on a numerical scale:
 ```python
 from ragas.metrics import numeric_metric
 
+
 @numeric_metric(name="length_score", allowed_values=(0.0, 1.0))
 def length_score(response: str) -> float:
     return min(len(response) / 500, 1.0)
+
 
 # Custom range
 @numeric_metric(name="quality_score", allowed_values=(0.0, 10.0))
 def quality_score(response: str) -> float:
     return 7.5
+
 
 metric = length_score()
 result = await metric.ascore(response="...")
@@ -1709,11 +1696,13 @@ Use `@ranking_metric` to rank or order multiple items:
 ```python
 from ragas.metrics import ranking_metric
 
+
 @ranking_metric(name="context_rank", allowed_values=5)
 def context_ranking(question: str, contexts: list[str]) -> list[str]:
     """Rank contexts by relevance."""
     scored = [(len(set(question.split()) & set(c.split())), c) for c in contexts]
     return [c for _, c in sorted(scored, reverse=True)]
+
 
 metric = context_ranking()
 result = await metric.ascore(question="...", contexts=[...])

@@ -44,11 +44,12 @@ Ragas provides an `@experiment` decorator to streamline the experiment creation 
 from ragas import experiment
 import asyncio
 
+
 @experiment()
 async def my_experiment(row):
     # Process the input through your system
     response = await asyncio.to_thread(my_system_function, row["input"])
-    
+
     # Return results for evaluation
     return {
         **row,  # Include original data
@@ -56,7 +57,7 @@ async def my_experiment(row):
         "experiment_name": "baseline_v1",
         # Add any additional metadata
         "model_version": "gpt-4o",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
 ```
 
@@ -81,30 +82,25 @@ You can create parameterized experiments to test different configurations:
 async def model_comparison_experiment(row, model_name: str, temperature: float):
     # Configure your system with the parameters
     response = await my_system_function(
-        row["input"], 
-        model=model_name, 
-        temperature=temperature
+        row["input"], model=model_name, temperature=temperature
     )
-    
+
     return {
         **row,
         "response": response,
         "experiment_name": f"{model_name}_temp_{temperature}",
         "model_name": model_name,
-        "temperature": temperature
+        "temperature": temperature,
     }
+
 
 # Run with different parameters
 results_gpt4 = await model_comparison_experiment.arun(
-    dataset, 
-    model_name="gpt-4o", 
-    temperature=0.1
+    dataset, model_name="gpt-4o", temperature=0.1
 )
 
 results_gpt35 = await model_comparison_experiment.arun(
-    dataset, 
-    model_name="gpt-3.5-turbo", 
-    temperature=0.1
+    dataset, model_name="gpt-3.5-turbo", temperature=0.1
 )
 ```
 
@@ -145,7 +141,7 @@ return {
     "environment": "staging",
     "model_version": "gpt-4o-2024-08-06",
     "total_tokens": response.usage.total_tokens,
-    "response_time_ms": response_time
+    "response_time_ms": response_time,
 }
 ```
 
@@ -162,13 +158,14 @@ async def ab_test_experiment(row, variant: str):
         response = await system_variant_a(row["input"])
     else:
         response = await system_variant_b(row["input"])
-    
+
     return {
         **row,
         "response": response,
         "variant": variant,
-        "experiment_name": f"ab_test_variant_{variant}"
+        "experiment_name": f"ab_test_variant_{variant}",
     }
+
 
 # Run both variants
 results_a = await ab_test_experiment.arun(dataset, variant="A")
@@ -184,16 +181,16 @@ For complex systems with multiple components:
 async def multi_stage_experiment(row):
     # Stage 1: Retrieval
     retrieved_docs = await retriever(row["query"])
-    
+
     # Stage 2: Generation
     response = await generator(row["query"], retrieved_docs)
-    
+
     return {
         **row,
         "retrieved_docs": retrieved_docs,
         "response": response,
         "num_docs_retrieved": len(retrieved_docs),
-        "experiment_name": "multi_stage_v1"
+        "experiment_name": "multi_stage_v1",
     }
 ```
 
@@ -210,13 +207,13 @@ async def robust_experiment(row):
     except Exception as e:
         response = None
         error = str(e)
-    
+
     return {
         **row,
         "response": response,
         "error": error,
         "success": error is None,
-        "experiment_name": "robust_v1"
+        "experiment_name": "robust_v1",
     }
 ```
 
@@ -227,22 +224,22 @@ Experiments work seamlessly with Ragas metrics:
 ```python
 from ragas.metrics import FactualCorrectness
 
+
 @experiment()
 async def evaluated_experiment(row):
     response = await my_system_function(row["input"])
-    
+
     # Calculate metrics inline
     factual_score = FactualCorrectness().score(
-        response=response,
-        reference=row["expected_output"]
+        response=response, reference=row["expected_output"]
     )
-    
+
     return {
         **row,
         "response": response,
         "factual_correctness": factual_score.value,
         "factual_reason": factual_score.reason,
-        "experiment_name": "evaluated_v1"
+        "experiment_name": "evaluated_v1",
     }
 ```
 

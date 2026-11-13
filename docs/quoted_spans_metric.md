@@ -19,7 +19,7 @@ metric = QuotedSpansAlignment()
 
 result = await metric.ascore(
     response='The study found that "machine learning improves accuracy".',
-    retrieved_contexts=["Machine learning improves accuracy by 15%."]
+    retrieved_contexts=["Machine learning improves accuracy by 15%."],
 )
 print(f"Score: {result.value}")  # 1.0
 print(f"Reason: {result.reason}")  # "Matched 1/1 quoted spans"
@@ -63,9 +63,9 @@ print(f"Reason: {result.reason}")  # "Matched 1/1 quoted spans"
 
 ```python
 {
-  "citation_alignment_quoted_spans": float,  # score in [0,1]
-  "matched": float,                          # number of spans found in sources
-  "total": float                            # total number of spans considered
+    "citation_alignment_quoted_spans": float,  # score in [0,1]
+    "matched": float,  # number of spans found in sources
+    "total": float,  # total number of spans considered
 }
 ```
 

@@ -16,9 +16,11 @@ For production async applications, use `aevaluate()` to avoid event loop conflic
 import asyncio
 from ragas import aevaluate
 
+
 async def evaluate_app():
     result = await aevaluate(dataset, metrics)
     return result
+
 
 # In your async application
 result = await evaluate_app()

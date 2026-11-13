@@ -41,23 +41,21 @@ from ragas import Dataset
 dataset = Dataset(name="my_evaluation", backend="local/csv", root_dir="./data")
 
 # Add a sample to the dataset
-dataset.append({
-    "id": "sample_1",
-    "query": "What is the capital of France?",
-    "expected_answer": "Paris",
-    "metadata": {"complexity": "simple", "language": "en"}
-})
+dataset.append(
+    {
+        "id": "sample_1",
+        "query": "What is the capital of France?",
+        "expected_answer": "Paris",
+        "metadata": {"complexity": "simple", "language": "en"},
+    }
+)
 ```
 
 ### Loading an Existing Dataset
 
 ```python
 # Load an existing dataset
-dataset = Dataset.load(
-    name="my_evaluation",
-    backend="local/csv",
-    root_dir="./data"
-)
+dataset = Dataset.load(name="my_evaluation", backend="local/csv", root_dir="./data")
 ```
 
 ### Dataset Structure
@@ -121,18 +119,20 @@ from ragas import experiment, Dataset
 # Load your dataset
 dataset = Dataset.load(name="my_evaluation", backend="local/csv", root_dir="./data")
 
+
 # Define your experiment
 @experiment()
 async def my_experiment(row):
     # Process the input through your AI system
     response = await my_ai_system(row["query"])
-    
+
     # Return results for metric evaluation
     return {
         **row,  # Include original data
         "response": response,
-        "experiment_name": "baseline_v1"
+        "experiment_name": "baseline_v1",
     }
+
 
 # Run evaluation on the dataset
 results = await my_experiment.arun(dataset)

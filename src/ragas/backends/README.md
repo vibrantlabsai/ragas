@@ -19,18 +19,21 @@ Registry (dict-like) → Backend (implements BaseBackend) → Storage
 ```python
 from ragas.backends.base import BaseBackend
 
+
 class MyBackend(BaseBackend):
     def __init__(self, connection_string: str):
         self.conn = connection_string
-    
+
     def load_dataset(self, name: str) -> List[Dict[str, Any]]:
         # Load dataset from your storage
         return [{"id": 1, "text": "example"}]
-    
-    def save_dataset(self, name: str, data: List[Dict], model: Optional[Type[BaseModel]]):
+
+    def save_dataset(
+        self, name: str, data: List[Dict], model: Optional[Type[BaseModel]]
+    ):
         # Save dataset to your storage
         pass
-    
+
     # ... implement other 4 methods (see base.py)
 ```
 
@@ -44,6 +47,7 @@ class MyBackend(BaseBackend):
 **3. Use:**
 ```python
 from ragas.backends import get_registry
+
 registry = get_registry()
 backend = registry["my_backend"](connection_string="...")
 ```
@@ -202,6 +206,7 @@ python -c "from ragas.backends import get_registry; print(get_registry())"
 **Debugging:**
 ```python
 from ragas.backends import get_registry
+
 registry = get_registry()
 
 # Check what's available

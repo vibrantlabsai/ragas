@@ -40,26 +40,23 @@ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 # Initialize generator with your preferred models
 generator = TestsetGenerator(
     llm=llm_factory("gpt-4o-mini", client=client),
-    embedding_model=OpenAIEmbeddings(client=client)
+    embedding_model=OpenAIEmbeddings(client=client),
 )
 
 # Your pre-chunked documents
 chunks = [
     Document(
-        page_content="""The Eiffel Tower (Tour Eiffel) is a wrought-iron lattice tower on the Champ de Mars in Paris, France. It is named after the engineer Gustave Eiffel, whose company designed and built the tower. Locally nicknamed "La Dame de Fer" (French for "The Iron Lady"), it was constructed from 1887 to 1889 as the centerpiece of the 1889 World's Fair. Although initially criticized by some of France's leading artists and intellectuals for its design, it has since become a global cultural icon of France and one of the most recognizable structures in the world.""", 
-        metadata={"source": "doc1", "chunk_id": 1}
+        page_content="""The Eiffel Tower (Tour Eiffel) is a wrought-iron lattice tower on the Champ de Mars in Paris, France. It is named after the engineer Gustave Eiffel, whose company designed and built the tower. Locally nicknamed "La Dame de Fer" (French for "The Iron Lady"), it was constructed from 1887 to 1889 as the centerpiece of the 1889 World's Fair. Although initially criticized by some of France's leading artists and intellectuals for its design, it has since become a global cultural icon of France and one of the most recognizable structures in the world.""",
+        metadata={"source": "doc1", "chunk_id": 1},
     ),
     Document(
-        page_content="""The tower is 330 metres (1,083 ft) tall, about the same height as an 81-storey building, and the tallest structure in Paris. Its base is square, measuring 125 metres (410 ft) on each side. During its construction, the Eiffel Tower surpassed the Washington Monument to become the tallest man-made structure in the world, a title it held for 41 years until the Chrysler Building in New York City was finished in 1930. It was the first structure to reach a height of 300 metres. Due to the addition of a broadcasting aerial at the top of the tower in 1957, it is now taller than the Chrysler Building by 5.2 metres (17 ft).""", 
-        metadata={"source": "doc1", "chunk_id": 2}
-    )
+        page_content="""The tower is 330 metres (1,083 ft) tall, about the same height as an 81-storey building, and the tallest structure in Paris. Its base is square, measuring 125 metres (410 ft) on each side. During its construction, the Eiffel Tower surpassed the Washington Monument to become the tallest man-made structure in the world, a title it held for 41 years until the Chrysler Building in New York City was finished in 1930. It was the first structure to reach a height of 300 metres. Due to the addition of a broadcasting aerial at the top of the tower in 1957, it is now taller than the Chrysler Building by 5.2 metres (17 ft).""",
+        metadata={"source": "doc1", "chunk_id": 2},
+    ),
 ]
 
 # Generate testset
-testset = generator.generate_with_chunks(
-    chunks=chunks,
-    testset_size=10
-)
+testset = generator.generate_with_chunks(chunks=chunks, testset_size=10)
 
 # Save to CSV
 output_file = "testset.csv"
@@ -105,21 +102,18 @@ from openai import OpenAI
 client = OpenAI()
 generator = TestsetGenerator(
     llm=llm_factory("gpt-4o-mini", client=client),
-    embedding_model=OpenAIEmbeddings(client=client)
+    embedding_model=OpenAIEmbeddings(client=client),
 )
 
 # Simple text chunks
 text_chunks = [
     "Artificial Intelligence (AI) is the simulation of human intelligence by machines. It involves machine learning, natural language processing, and computer vision.",
     "Machine Learning is a subset of AI that enables systems to learn from data without explicit programming. Popular algorithms include neural networks and decision trees.",
-    "Deep Learning uses neural networks with multiple layers to process complex patterns in large datasets. It powers modern applications like image recognition and language translation."
+    "Deep Learning uses neural networks with multiple layers to process complex patterns in large datasets. It powers modern applications like image recognition and language translation.",
 ]
 
 # Generate testset
-testset = generator.generate_with_chunks(
-    chunks=text_chunks,
-    testset_size=5
-)
+testset = generator.generate_with_chunks(chunks=text_chunks, testset_size=5)
 
 # Save to CSV
 output_file = "testset.csv"

@@ -13,6 +13,9 @@ import requests
 from PIL import Image
 from pydantic import BaseModel, Field
 
+from ragas._safe_fetch import BlockedAddressError, fetch_url_bytes
+from ragas.prompt import multi_modal_prompt as _image_policy
+
 logger = logging.getLogger(__name__)
 
 # Constants for security/processing
@@ -121,36 +124,21 @@ def _try_process_base64_uri(item: str) -> t.Optional[t.Dict[str, str]]:
 
 
 def _try_process_url(item: str) -> t.Optional[t.Dict[str, str]]:
-    """Download and process image from URL."""
+    """Download and process image from URL (SSRF-guarded)."""
     try:
         parsed_url = urlparse(item)
         if parsed_url.scheme not in ALLOWED_URL_SCHEMES:
             return None
 
-        response = requests.get(
-            item,
-            timeout=REQUESTS_TIMEOUT_SECONDS,
-            stream=True,
+        # Download (refuses non-public targets and enforces the size limit)
+        image_data = BytesIO(
+            fetch_url_bytes(
+                item,
+                timeout=REQUESTS_TIMEOUT_SECONDS,
+                max_bytes=MAX_DOWNLOAD_SIZE_BYTES,
+                allow_internal=_image_policy.ALLOW_INTERNAL_TARGETS,
+            )
         )
-        response.raise_for_status()
-
-        # Check content length
-        content_length = response.headers.get("Content-Length")
-        if content_length and int(content_length) > MAX_DOWNLOAD_SIZE_BYTES:
-            logger.error(f"URL {item} content too large")
-            return None
-
-        # Download and validate
-        image_data = BytesIO()
-        downloaded_size = 0
-        for chunk in response.iter_content(chunk_size=8192):
-            downloaded_size += len(chunk)
-            if downloaded_size > MAX_DOWNLOAD_SIZE_BYTES:
-                logger.error(f"URL {item} download exceeded size limit")
-                return None
-            image_data.write(chunk)
-
-        image_data.seek(0)
 
         # Validate with PIL
         try:
@@ -169,27 +157,69 @@ def _try_process_url(item: str) -> t.Optional[t.Dict[str, str]]:
         except (Image.UnidentifiedImageError, SyntaxError, IOError):
             return None
 
+    except BlockedAddressError as e:
+        logger.error(
+            f"Refused to fetch image URL {item}: {e}. Set "
+            "ragas.prompt.multi_modal_prompt.ALLOW_INTERNAL_TARGETS = True "
+            "to allow internal targets."
+        )
+        return None
     except requests.exceptions.RequestException:
         return None
     except Exception:
         return None
 
 
+def _looks_like_local_image_path(item: str) -> bool:
+    """Heuristic used only to decide whether a refusal is worth logging."""
+    _, ext = os.path.splitext(item)
+    return ext.lower() in COMMON_IMAGE_EXTENSIONS and "://" not in item
+
+
 def _try_process_local_file(item: str) -> t.Optional[t.Dict[str, str]]:
-    """Process local image file."""
+    """Process local image file (opt-in, restricted to ALLOWED_IMAGE_BASE_DIR)."""
+    if not _image_policy.ALLOW_LOCAL_FILE_ACCESS:
+        if _looks_like_local_image_path(item):
+            logger.warning(
+                f"Local image path '{item}' was not loaded: local file access "
+                "is disabled. Set ALLOW_LOCAL_FILE_ACCESS = True and "
+                "ALLOWED_IMAGE_BASE_DIR in ragas.prompt.multi_modal_prompt to "
+                "enable it."
+            )
+        return None
+
+    base_dir = _image_policy.ALLOWED_IMAGE_BASE_DIR
+    if not base_dir or not os.path.isdir(base_dir):
+        if _looks_like_local_image_path(item):
+            logger.critical(
+                "Local file access enabled, but ALLOWED_IMAGE_BASE_DIR is not configured or invalid."
+            )
+        return None
+
     try:
+        # Resolve relative to the allowed directory (following symlinks) and
+        # refuse anything that ends up outside it.
+        abs_base_dir = os.path.realpath(base_dir)
+        path = os.path.realpath(os.path.join(abs_base_dir, item))
+        if os.path.commonpath([abs_base_dir, path]) != abs_base_dir:
+            if _looks_like_local_image_path(item):
+                logger.warning(
+                    f"Local image path '{item}' is outside ALLOWED_IMAGE_BASE_DIR; not loaded."
+                )
+            return None
+
         # Check if file exists
-        if not os.path.isfile(item):
+        if not os.path.isfile(path):
             return None
 
         # Check file size
-        file_size = os.path.getsize(item)
+        file_size = os.path.getsize(path)
         if file_size > MAX_DOWNLOAD_SIZE_BYTES:
             logger.error(f"Local file {item} too large")
             return None
 
         # Read and validate
-        with open(item, "rb") as f:
+        with open(path, "rb") as f:
             file_content = f.read()
 
         try:

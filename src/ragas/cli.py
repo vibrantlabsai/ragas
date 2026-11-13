@@ -257,7 +257,7 @@ def load_eval_module(eval_path: str) -> Any:
         raise typer.Exit(1)
 
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    spec.loader.exec_module(module)  # type: ignore[attr-defined]
     return module
 
 

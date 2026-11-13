@@ -58,6 +58,7 @@ All LLM based metrics in ragas are inherited from `MetricWithLLM` class. These m
 
 ```python
 from ragas.metrics import FactualCorrectness
+
 scorer = FactualCorrectness(llm=evaluation_llm)
 ```
 
@@ -101,6 +102,7 @@ Example:
 ```python
 from ragas.metrics import discrete_metric
 
+
 @discrete_metric(name="response_quality", allowed_values=["pass", "fail"])
 def my_metric(predicted: str, expected: str) -> str:
     return "pass" if predicted.lower() == expected.lower() else "fail"
@@ -115,9 +117,11 @@ These return an integer or float value within a specified range. Numeric metrics
 ```python
 from ragas.metrics import numeric_metric
 
+
 @numeric_metric(name="response_accuracy", allowed_values=(0, 1))
 def my_metric(predicted: float, expected: float) -> float:
     return abs(predicted - expected) / max(expected, 1e-5)
+
 
 my_metric.score(predicted=0.8, expected=1.0)  # Returns a float value
 ```
@@ -128,13 +132,20 @@ These evaluate multiple outputs at once and return a ranked list based on a defi
 
 ```python
 from ragas.metrics import ranking_metric
-@ranking_metric(name="response_ranking", allowed_values=[0,1])
+
+
+@ranking_metric(name="response_ranking", allowed_values=[0, 1])
 def my_metric(responses: list) -> list:
     response_lengths = [len(response) for response in responses]
-    sorted_indices = sorted(range(len(response_lengths)), key=lambda i: response_lengths[i])
+    sorted_indices = sorted(
+        range(len(response_lengths)), key=lambda i: response_lengths[i]
+    )
     return sorted_indices
 
-my_metric.score(responses=["short", "a bit longer", "the longest response"])  # Returns a ranked list of indices
+
+my_metric.score(
+    responses=["short", "a bit longer", "the longest response"]
+)  # Returns a ranked list of indices
 ```
 
 ## Metric Design Principles

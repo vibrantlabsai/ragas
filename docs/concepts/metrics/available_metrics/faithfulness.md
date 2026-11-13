@@ -34,7 +34,7 @@ result = await scorer.ascore(
     response="The first superbowl was held on Jan 15, 1967",
     retrieved_contexts=[
         "The First AFL–NFL World Championship Game was an American football game played on January 15, 1967, at the Los Angeles Memorial Coliseum in Los Angeles."
-    ]
+    ],
 )
 print(f"Faithfulness Score: {result.value}")
 ```
@@ -52,7 +52,7 @@ Faithfulness Score: 1.0
     result = scorer.score(
         user_input="When was the first super bowl?",
         response="The first superbowl was held on Jan 15, 1967",
-        retrieved_contexts=[...]
+        retrieved_contexts=[...],
     )
     ```
 
@@ -100,12 +100,12 @@ from ragas.dataset_schema import SingleTurnSample
 from ragas.metrics import Faithfulness
 
 sample = SingleTurnSample(
-        user_input="When was the first super bowl?",
-        response="The first superbowl was held on Jan 15, 1967",
-        retrieved_contexts=[
-            "The First AFL–NFL World Championship Game was an American football game played on January 15, 1967, at the Los Angeles Memorial Coliseum in Los Angeles."
-        ]
-    )
+    user_input="When was the first super bowl?",
+    response="The first superbowl was held on Jan 15, 1967",
+    retrieved_contexts=[
+        "The First AFL–NFL World Championship Game was an American football game played on January 15, 1967, at the Los Angeles Memorial Coliseum in Los Angeles."
+    ],
+)
 scorer = Faithfulness(llm=evaluator_llm)
 await scorer.single_turn_ascore(sample)
 ```
@@ -128,12 +128,12 @@ from ragas.metrics import FaithfulnesswithHHEM
 
 
 sample = SingleTurnSample(
-        user_input="When was the first super bowl?",
-        response="The first superbowl was held on Jan 15, 1967",
-        retrieved_contexts=[
-            "The First AFL–NFL World Championship Game was an American football game played on January 15, 1967, at the Los Angeles Memorial Coliseum in Los Angeles."
-        ]
-    )
+    user_input="When was the first super bowl?",
+    response="The first superbowl was held on Jan 15, 1967",
+    retrieved_contexts=[
+        "The First AFL–NFL World Championship Game was an American football game played on January 15, 1967, at the Los Angeles Memorial Coliseum in Los Angeles."
+    ],
+)
 scorer = FaithfulnesswithHHEM(llm=evaluator_llm)
 await scorer.single_turn_ascore(sample)
 ```

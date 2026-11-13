@@ -25,8 +25,10 @@ llm = llm_factory("gpt-4o-mini", client=client, cache=cache)
 # All LLM calls are now cached!
 from pydantic import BaseModel
 
+
 class Response(BaseModel):
     answer: str
+
 
 response = llm.generate("Evaluate this...", Response)
 ```
@@ -92,23 +94,20 @@ llm = llm_factory("gpt-4o-mini", client=client, cache=cache)
 # Use in metric
 metric = FactualCorrectness(llm=llm)
 
+
 @experiment()
 async def evaluate_model(row):
-    score = metric.score(
-        response=row["response"],
-        reference=row["reference"]
-    )
-    return {
-        **row,
-        "factual_correctness": score.value,
-        "reason": score.reason
-    }
+    score = metric.score(response=row["response"], reference=row["reference"])
+    return {**row, "factual_correctness": score.value, "reason": score.reason}
+
 
 # Load your dataset
-dataset = Dataset.from_list([
-    {"response": "Paris is the capital of France", "reference": "Paris"},
-    {"response": "London is the capital of UK", "reference": "London"},
-])
+dataset = Dataset.from_list(
+    [
+        {"response": "Paris is the capital of France", "reference": "Paris"},
+        {"response": "London is the capital of UK", "reference": "London"},
+    ]
+)
 
 # First run - makes API calls and caches results
 print("First run (populating cache)...")
@@ -138,8 +137,8 @@ cache.cache.clear()
 ```python
 # Limit cache to 1GB
 cache = DiskCacheBackend()
-cache.cache.reset('size_limit', 1e9)  # 1GB
-cache.cache.reset('cull_limit', 10)   # Remove 10% when full
+cache.cache.reset("size_limit", 1e9)  # 1GB
+cache.cache.reset("cull_limit", 10)  # Remove 10% when full
 ```
 
 #### Cache Location
@@ -256,9 +255,7 @@ answer_correctness = AspectCritic(
 metrics = [answer_correctness, FactualCorrectness(llm=cached_llm)]
 
 # load the dataset
-dataset = load_dataset(
-    "vibrantlabsai/amnesty_qa", "english_v3", trust_remote_code=True
-)
+dataset = load_dataset("vibrantlabsai/amnesty_qa", "english_v3", trust_remote_code=True)
 eval_dataset = EvaluationDataset.from_hf_dataset(dataset["eval"])
 
 # evaluate the dataset

@@ -60,6 +60,7 @@ The template provides modular functions you can customize:
 from ragas.dataset_schema import SingleTurnSample
 from ragas import EvaluationDataset
 
+
 def load_dataset():
     """Load test dataset for evaluation."""
     data_samples = [
@@ -145,7 +146,7 @@ Your quickstart project initializes the OpenAI LLM by default in the `_init_clie
 
     client = OpenAI(
         api_key="ollama",  # Ollama doesn't require a real key
-        base_url="http://localhost:11434/v1"
+        base_url="http://localhost:11434/v1",
     )
     llm = llm_factory("mistral", provider="openai", client=client)
     ```
@@ -157,10 +158,7 @@ Your quickstart project initializes the OpenAI LLM by default in the `_init_clie
     from openai import OpenAI
     from ragas.llms import llm_factory
 
-    client = OpenAI(
-        api_key="your-api-key",
-        base_url="https://your-api-endpoint"
-    )
+    client = OpenAI(api_key="your-api-key", base_url="https://your-api-endpoint")
     llm = llm_factory("model-name", provider="openai", client=client)
     ```
 
@@ -188,14 +186,14 @@ metric = DiscreteMetric(
 
 Response: {response}
 
-Answer with only 'accurate' or 'inaccurate'."""
+Answer with only 'accurate' or 'inaccurate'.""",
 )
+
 
 # Score your application's output
 async def main():
     score = await metric.ascore(
-        llm=evaluator_llm,
-        response="The summary of the text is..."
+        llm=evaluator_llm, response="The summary of the text is..."
     )
     print(f"Score: {score.value}")  # 'accurate' or 'inaccurate'
     print(f"Reason: {score.reason}")
@@ -229,12 +227,12 @@ data_samples = [
     {
         "user_input": "What is ragas?",
         "response": "Ragas is an evaluation framework...",
-        "expected": "Ragas provides objective metrics..."
+        "expected": "Ragas provides objective metrics...",
     },
     {
         "user_input": "How do metrics work?",
         "response": "Metrics score your application...",
-        "expected": "Metrics evaluate performance..."
+        "expected": "Metrics evaluate performance...",
     },
 ]
 

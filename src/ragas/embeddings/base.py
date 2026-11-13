@@ -498,7 +498,7 @@ class HuggingfaceEmbeddings(BaseRagasEmbeddings):
         assert isinstance(self.model, SentenceTransformer), (
             "Model is not of the type Bi-encoder"
         )
-        embeddings = self.model.encode(
+        embeddings = self.model.encode(  # type: ignore[operator]
             texts, normalize_embeddings=True, **self.encode_kwargs
         )
 

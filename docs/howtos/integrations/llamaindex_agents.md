@@ -29,6 +29,7 @@ To demonstrate evaluations using Ragas metrics, we will create a simple workflow
         """Dummy function to simulate sending an email."""
         return f"Successfully sent mail to {to}"
 
+
     llm = OpenAI(model="gpt-4o-mini")
     ```
 
@@ -59,12 +60,12 @@ With Reference is ideal for scenarios where the expected outcome is well-defined
 from llama_index.core.agent.workflow import (
     AgentInput,
     AgentOutput,
-	AgentStream, 
+    AgentStream,
     ToolCall as LlamaToolCall,
     ToolCallResult,
 )
 
-handler =  agent.run(user_msg="Send a message to jhon asking for a meeting")
+handler = agent.run(user_msg="Send a message to jhon asking for a meeting")
 
 events = []
 
@@ -104,7 +105,9 @@ sample = MultiTurnSample(
     user_input=ragas_messages,
 )
 
-agent_goal_accuracy_without_reference = AgentGoalAccuracyWithoutReference(llm=evaluator_llm)
+agent_goal_accuracy_without_reference = AgentGoalAccuracyWithoutReference(
+    llm=evaluator_llm
+)
 await agent_goal_accuracy_without_reference.multi_turn_ascore(sample)
 ```
 Output:
@@ -117,7 +120,7 @@ from ragas.metrics import AgentGoalAccuracyWithReference
 
 sample = MultiTurnSample(
     user_input=ragas_messages,
-    reference="Successfully sent a message to Jhon asking for a meeting"
+    reference="Successfully sent a message to Jhon asking for a meeting",
 )
 
 
@@ -144,7 +147,10 @@ sample = MultiTurnSample(
     reference_tool_calls=[
         RagasToolCall(
             name="send_message",
-            args={'to': 'jhon', 'content': 'Hi Jhon,\n\nI hope this message finds you well. I would like to schedule a meeting to discuss some important matters. Please let me know your availability.\n\nBest regards,\nJane'},
+            args={
+                "to": "jhon",
+                "content": "Hi Jhon,\n\nI hope this message finds you well. I would like to schedule a meeting to discuss some important matters. Please let me know your availability.\n\nBest regards,\nJane",
+            },
         ),
     ],
 )
@@ -252,9 +258,7 @@ LlamaIndex offers a prebuilt CodeAct Agent that can be used to write and execute
             return_value = None
             try:
                 # Execute with captured output
-                with contextlib.redirect_stdout(
-                    stdout
-                ), contextlib.redirect_stderr(stderr):
+                with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                     # Try to detect if there's a return value (last expression)
                     try:
                         tree = ast.parse(code)
@@ -265,9 +269,7 @@ LlamaIndex offers a prebuilt CodeAct Agent that can be used to write and execute
                             # Split code to add a return value assignment
                             last_line = code.rstrip().split("\n")[-1]
                             exec_code = (
-                                code[: -len(last_line)]
-                                + "\n__result__ = "
-                                + last_line
+                                code[: -len(last_line)] + "\n__result__ = " + last_line
                             )
 
                             # Execute modified code
@@ -414,7 +416,8 @@ def is_compilable(code_str: str, mode="exec") -> bool:
         return True
     except Exception:
         return False
-    
+
+
 is_compilable(agent_code)
 ```
 Output
@@ -477,14 +480,10 @@ We will extract all instances where the query engine tool was called during user
     from llama_index.core import StorageContext, load_index_from_storage
 
     try:
-        storage_context = StorageContext.from_defaults(
-            persist_dir="./storage/lyft"
-        )
+        storage_context = StorageContext.from_defaults(persist_dir="./storage/lyft")
         lyft_index = load_index_from_storage(storage_context)
 
-        storage_context = StorageContext.from_defaults(
-            persist_dir="./storage/uber"
-        )
+        storage_context = StorageContext.from_defaults(persist_dir="./storage/uber")
         uber_index = load_index_from_storage(storage_context)
 
         index_loaded = True
@@ -573,7 +572,7 @@ from llama_index.core.agent.workflow import (
     AgentOutput,
     ToolCall,
     ToolCallResult,
-    AgentStream, 
+    AgentStream,
 )
 
 handler = agent.run("What's the revenue for Lyft in 2021 vs Uber?", ctx=ctx)
@@ -602,14 +601,16 @@ from ragas.dataset_schema import SingleTurnSample
 ragas_samples = []
 
 for event in events:
-	if isinstance(event, ToolCallResult):
-		if event.tool_name in ["lyft_10k", "uber_10k"]:
-			sample = SingleTurnSample(
-				user_input=event.tool_kwargs["input"],
-				response=event.tool_output.content,
-				retrieved_contexts=[node.text for node in event.tool_output.raw_output.source_nodes]
-				)
-			ragas_samples.append(sample)
+    if isinstance(event, ToolCallResult):
+        if event.tool_name in ["lyft_10k", "uber_10k"]:
+            sample = SingleTurnSample(
+                user_input=event.tool_kwargs["input"],
+                response=event.tool_output.content,
+                retrieved_contexts=[
+                    node.text for node in event.tool_output.raw_output.source_nodes
+                ],
+            )
+            ragas_samples.append(sample)
 ```
 
 

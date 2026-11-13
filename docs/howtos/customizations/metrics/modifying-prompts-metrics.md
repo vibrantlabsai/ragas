@@ -38,8 +38,7 @@ from ragas.metrics.collections.faithfulness.util import StatementGeneratorInput
 
 # Create sample input
 sample_input = StatementGeneratorInput(
-    question="What is the Eiffel Tower?",
-    answer="The Eiffel Tower is located in Paris."
+    question="What is the Eiffel Tower?", answer="The Eiffel Tower is located in Paris."
 )
 
 # Generate the prompt string
@@ -70,16 +69,19 @@ from ragas.metrics.collections.factual_correctness.util import (
     NLIStatementPrompt,
 )
 
+
 # Create a custom claim decomposition prompt by subclassing
 class CustomClaimDecompositionPrompt(ClaimDecompositionPrompt):
     instruction = """You are an expert at breaking down complex statements into atomic claims.
 Break down the input text into clear, verifiable claims.
 Only output valid JSON with a "claims" array."""
 
+
 # Optionally customize the NLI prompt too
 class CustomNLIPrompt(NLIStatementPrompt):
     instruction = """Carefully evaluate if each statement is supported by the context.
 Be strict in your verification - only mark as supported if directly stated."""
+
 
 # Create metric instance and replace prompts
 scorer = FactualCorrectness(llm=llm)
@@ -89,7 +91,7 @@ scorer.nli_prompt = CustomNLIPrompt()
 # Now the metric will use the custom prompts
 result = await scorer.ascore(
     response="The Eiffel Tower is in Paris and was built in 1889.",
-    reference="The Eiffel Tower is located in Paris. It was completed in 1889."
+    reference="The Eiffel Tower is located in Paris. It was completed in 1889.",
 )
 ```
 
@@ -105,6 +107,7 @@ from ragas.metrics.collections.faithfulness.util import (
     NLIStatementPrompt,
     StatementFaithfulnessAnswer,
 )
+
 
 # Create custom prompt with domain-specific examples
 class DomainSpecificNLIPrompt(NLIStatementPrompt):
@@ -122,17 +125,18 @@ class DomainSpecificNLIPrompt(NLIStatementPrompt):
                     StatementFaithfulnessAnswer(
                         statement="Machine learning is a subset of AI.",
                         reason="The context states ML is 'a field within artificial intelligence', supporting this claim.",
-                        verdict=1
+                        verdict=1,
                     ),
                     StatementFaithfulnessAnswer(
                         statement="Machine learning uses statistical techniques.",
                         reason="The context doesn't mention statistical techniques.",
-                        verdict=0
+                        verdict=0,
                     ),
                 ]
             ),
         ),
     ]
+
 
 # Update the metric with custom prompt
 scorer = Faithfulness(llm=llm)
@@ -142,7 +146,9 @@ scorer.nli_statement_prompt = DomainSpecificNLIPrompt()
 result = await scorer.ascore(
     user_input="How do neural networks work?",
     response="Neural networks are inspired by biological neurons.",
-    retrieved_contexts=["Artificial neural networks are computing systems loosely inspired by biological neural networks."]
+    retrieved_contexts=[
+        "Artificial neural networks are computing systems loosely inspired by biological neural networks."
+    ],
 )
 ```
 
@@ -159,7 +165,7 @@ scorer = Faithfulness(llm=llm)
 adapted_prompt = await scorer.statement_generator_prompt.adapt(
     target_language="spanish",
     llm=llm,
-    adapt_instruction=False  # Keep instruction in English, only translate examples
+    adapt_instruction=False,  # Keep instruction in English, only translate examples
 )
 
 # Replace the prompt with the adapted version
@@ -169,7 +175,7 @@ scorer.statement_generator_prompt = adapted_prompt
 result = await scorer.ascore(
     user_input="¿Dónde nació Einstein?",
     response="Einstein nació en Alemania.",
-    retrieved_contexts=["Albert Einstein nació en Alemania..."]
+    retrieved_contexts=["Albert Einstein nació en Alemania..."],
 )
 ```
 
@@ -183,7 +189,7 @@ from ragas.metrics.collections.faithfulness.util import NLIStatementInput
 # Create sample input to test the prompt
 sample_input = NLIStatementInput(
     context="Paris is the capital and most populous city of France.",
-    statements=["The capital of France is Paris.", "Paris is in Germany."]
+    statements=["The capital of France is Paris.", "Paris is in Germany."],
 )
 
 # Generate and view the full prompt string

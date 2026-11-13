@@ -2,6 +2,9 @@ name: CI
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -53,7 +56,9 @@ jobs:
       matrix:
         include:
           # Critical path: Latest + oldest Python on Ubuntu (full test suite)
-          - os: ubuntu-latest
+          # setup-python has no Python 3.9 build for Ubuntu 26.04 (ubuntu-latest),
+          # so the oldest supported Python stays on the 24.04 image.
+          - os: ubuntu-24.04
             python-version: "3.9"
             test-type: "full"
           - os: ubuntu-latest
@@ -186,3 +191,30 @@ jobs:
 
       - name: Type check
         run: make type
+
+  package_smoke:
+    # Builds the package and installs the wheel on its own, the way a user gets it.
+    # The unit test jobs run in the full dev environment, so only this job notices a
+    # missing or broken core dependency.
+    name: package_smoke (clean install of the built wheel)
+    runs-on: ubuntu-latest
+    needs:
+      - diff
+
+    if: ${{ (github.event_name == 'pull_request' && needs.diff.outputs.ragas == 'true') || github.event_name == 'push' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # setuptools_scm reads the version from tags
+
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build, install the wheel in a clean environment and import it
+        run: make package-smoke

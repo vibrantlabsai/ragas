@@ -41,11 +41,7 @@ from ragas.llms import llm_factory
 client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 
 # Create LLM - adapter is auto-detected for google provider
-llm = llm_factory(
-    "gemini-2.0-flash",
-    provider="google",
-    client=client
-)
+llm = llm_factory("gemini-2.0-flash", provider="google", client=client)
 ```
 
 ### Option 2: Using Legacy SDK (Deprecated)
@@ -64,11 +60,7 @@ genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
 client = genai.GenerativeModel("gemini-2.0-flash")
 
 # Create LLM
-llm = llm_factory(
-    "gemini-2.0-flash",
-    provider="google",
-    client=client
-)
+llm = llm_factory("gemini-2.0-flash", provider="google", client=client)
 ```
 
 ### Option 3: Using LiteLLM Proxy (Advanced)
@@ -83,7 +75,7 @@ from ragas.llms import llm_factory
 # Requires running: litellm --model gemini-2.0-flash
 client = OpenAI(
     api_key="anything",
-    base_url="http://0.0.0.0:4000"  # LiteLLM proxy endpoint
+    base_url="http://0.0.0.0:4000",  # LiteLLM proxy endpoint
 )
 
 # Create LLM with explicit adapter selection
@@ -135,7 +127,7 @@ from ragas.metrics import (
     AnswerCorrectness,
     ContextPrecision,
     ContextRecall,
-    Faithfulness
+    Faithfulness,
 )
 
 # Initialize Gemini client (new SDK)
@@ -147,7 +139,7 @@ data = {
     "question": ["What is the capital of France?"],
     "answer": ["Paris is the capital of France."],
     "contexts": [["France is a country in Western Europe. Paris is its capital."]],
-    "ground_truth": ["Paris"]
+    "ground_truth": ["Paris"],
 }
 
 dataset = Dataset.from_dict(data)
@@ -157,7 +149,7 @@ metrics = [
     ContextPrecision(llm=llm),
     ContextRecall(llm=llm),
     Faithfulness(llm=llm),
-    AnswerCorrectness(llm=llm)  # Uses Google embeddings automatically
+    AnswerCorrectness(llm=llm),  # Uses Google embeddings automatically
 ]
 
 # Run evaluation
@@ -177,7 +169,12 @@ from ragas.embeddings import GoogleEmbeddings
 from ragas.embeddings.base import embedding_factory
 from datasets import Dataset
 from ragas import evaluate
-from ragas.metrics import AnswerCorrectness, ContextPrecision, ContextRecall, Faithfulness
+from ragas.metrics import (
+    AnswerCorrectness,
+    ContextPrecision,
+    ContextRecall,
+    Faithfulness,
+)
 
 # Initialize Gemini client (new SDK)
 client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
@@ -199,7 +196,7 @@ data = {
     "question": ["What is the capital of France?"],
     "answer": ["Paris is the capital of France."],
     "contexts": [["France is a country in Western Europe. Paris is its capital."]],
-    "ground_truth": ["Paris"]
+    "ground_truth": ["Paris"],
 }
 
 dataset = Dataset.from_dict(data)
@@ -209,7 +206,7 @@ metrics = [
     ContextPrecision(llm=llm),
     ContextRecall(llm=llm),
     Faithfulness(llm=llm),
-    AnswerCorrectness(llm=llm, embeddings=embeddings)
+    AnswerCorrectness(llm=llm, embeddings=embeddings),
 ]
 
 # Run evaluation
@@ -231,7 +228,7 @@ from ragas.metrics import (
     AnswerCorrectness,
     ContextPrecision,
     ContextRecall,
-    Faithfulness
+    Faithfulness,
 )
 
 # Initialize Gemini client (new SDK)
@@ -243,7 +240,7 @@ data = {
     "question": ["What is the capital of France?"],
     "answer": ["Paris is the capital of France."],
     "contexts": [["France is a country in Western Europe. Paris is its capital."]],
-    "ground_truth": ["Paris"]
+    "ground_truth": ["Paris"],
 }
 
 dataset = Dataset.from_dict(data)
@@ -253,7 +250,7 @@ metrics = [
     ContextPrecision(llm=llm),
     ContextRecall(llm=llm),
     Faithfulness(llm=llm),
-    AnswerCorrectness(llm=llm)
+    AnswerCorrectness(llm=llm),
 ]
 
 # Run evaluation
@@ -307,11 +304,12 @@ Ragas automatically selects the appropriate adapter based on your setup:
 llm = llm_factory(
     "gemini-2.0-flash",
     client=client,
-    adapter="litellm"  # Explicit adapter selection
+    adapter="litellm",  # Explicit adapter selection
 )
 
 # Check auto-detected adapter
 from ragas.llms.adapters import auto_detect_adapter
+
 adapter_name = auto_detect_adapter(client, "google")
 print(f"Using adapter: {adapter_name}")  # Output: Using adapter: litellm
 ```
@@ -323,6 +321,7 @@ print(f"Using adapter: {adapter_name}")  # Output: Using adapter: litellm
 ```python
 # Make sure your API key is set
 import os
+
 if not os.environ.get("GOOGLE_API_KEY"):
     raise ValueError("GOOGLE_API_KEY environment variable not set")
 ```
@@ -340,9 +339,10 @@ Invalid value at 'safety_settings[5].category'... "HARM_CATEGORY_JAILBREAK"
 1. Use the OpenAI-compatible endpoint (recommended for now):
 ```python
 from openai import OpenAI
+
 client = OpenAI(
     api_key=os.environ.get("GOOGLE_API_KEY"),
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
 )
 llm = llm_factory("gemini-2.0-flash", provider="openai", client=client)
 ```
@@ -370,11 +370,13 @@ If a model isn't available:
 ```python
 # Before: OpenAI-only
 from openai import OpenAI
+
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 llm = llm_factory("gpt-4o", client=client)
 
 # After: Gemini with new SDK
 from google import genai
+
 client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 llm = llm_factory("gemini-2.0-flash", provider="google", client=client)
 ```
@@ -384,11 +386,13 @@ llm = llm_factory("gemini-2.0-flash", provider="google", client=client)
 ```python
 # Before: Anthropic
 from anthropic import Anthropic
+
 client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 llm = llm_factory("claude-3-sonnet", provider="anthropic", client=client)
 
 # After: Gemini with new SDK
 from google import genai
+
 client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 llm = llm_factory("gemini-2.0-flash", provider="google", client=client)
 ```
@@ -398,12 +402,14 @@ llm = llm_factory("gemini-2.0-flash", provider="google", client=client)
 ```python
 # Before: Legacy SDK (deprecated)
 import google.generativeai as genai
+
 genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
 client = genai.GenerativeModel("gemini-2.0-flash")
 llm = llm_factory("gemini-2.0-flash", provider="google", client=client)
 
 # After: New SDK (recommended)
 from google import genai
+
 client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 llm = llm_factory("gemini-2.0-flash", provider="google", client=client)
 ```
@@ -438,7 +444,7 @@ metrics = [
 result = await metrics[1].ascore(
     user_input="What is the capital of France?",
     response="Paris",
-    reference="Paris is the capital of France."
+    reference="Paris is the capital of France.",
 )
 ```
 

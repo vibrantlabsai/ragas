@@ -71,7 +71,9 @@ Tests the agent on various math problems:
 @numeric_metric(name="correctness", allowed_values=(0.0, 1.0))
 def correctness_metric(prediction: float, actual: float):
     result = 1.0 if abs(prediction - actual) < 1e-5 else 0.0
-    return MetricResult(value=result, reason=f"Prediction: {prediction}, Actual: {actual}")
+    return MetricResult(
+        value=result, reason=f"Prediction: {prediction}, Actual: {actual}"
+    )
 ```
 
 ## Next Steps

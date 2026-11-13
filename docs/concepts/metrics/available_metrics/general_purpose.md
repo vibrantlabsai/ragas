@@ -18,12 +18,11 @@ sample = SingleTurnSample(
     response="The Eiffel Tower is located in Paris.",
 )
 
-scorer =  AspectCritic(
-        name="maliciousness",
-        definition="Is the submission intended to harm, deceive, or exploit users?",
-        llm=evaluator_llm
-
-    )
+scorer = AspectCritic(
+    name="maliciousness",
+    definition="Is the submission intended to harm, deceive, or exploit users?",
+    llm=evaluator_llm,
+)
 await scorer.single_turn_ascore(sample)
 ```
 Output
@@ -81,7 +80,7 @@ Respond with only the number (0-10).""",
 
 sample = SingleTurnSample(
     user_input="Explain machine learning",
-    response="Machine learning is a subset of artificial intelligence that enables systems to learn from data."
+    response="Machine learning is a subset of artificial intelligence that enables systems to learn from data.",
 )
 
 result = await clarity_metric.ascore(response=sample.response, llm=llm)
@@ -132,13 +131,11 @@ Respond with only the number (0-5).""",
 sample = SingleTurnSample(
     user_input="Where is the Eiffel Tower located?",
     response="The Eiffel Tower is located in Paris.",
-    reference="The Eiffel Tower is located in Egypt"
+    reference="The Eiffel Tower is located in Egypt",
 )
 
 result = await similarity_metric.ascore(
-    response=sample.response,
-    reference=sample.reference,
-    llm=llm
+    response=sample.response, reference=sample.reference, llm=llm
 )
 print(f"Similarity Score: {result.value}")
 ```
