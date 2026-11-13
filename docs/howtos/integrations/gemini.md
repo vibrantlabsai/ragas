@@ -461,7 +461,7 @@ All Ragas metrics work with Gemini:
 - Context Entities Recall
 - Faithfulness
 - NLI Eval
-- Response Relevancy
+- Answer Relevancy
 
 See [Metrics Reference](../../concepts/metrics/index.md) for details.
 
