@@ -1,10 +1,5 @@
-# This workflow will upload Python Packages using Twine when a release is created
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries
-
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
+# Uploads `ragas` and `ragas-examples` to PyPI when a GitHub release is published.
+# Nothing is uploaded until the `verify` job passes.
 
 name: Upload Python Packages
 
@@ -16,7 +11,51 @@ permissions:
   contents: read
 
 jobs:
+  verify:
+    # Gate for the upload: the release tag must match the version the build produces,
+    # the unit tests must pass, and the built wheel must install and import on its own.
+    name: verify (tag, unit tests, clean install)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # setuptools_scm reads the version from tags
+
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Check that the release tag matches the package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="$(uv run --no-project --with setuptools_scm python -m setuptools_scm)"
+          echo "Release tag: ${RELEASE_TAG}"
+          echo "Package version: ${version}"
+          if [ "v${version}" != "${RELEASE_TAG}" ]; then
+            echo "::error::Release tag ${RELEASE_TAG} would publish version ${version}. Tag the release commit as v<version>, for example v0.4.4 or v0.4.4rc1."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: make install-minimal
+
+      - name: Run unit tests
+        run: uv run pytest --nbmake tests/unit --dist loadfile -n auto
+        env:
+          __RAGAS_DEBUG_TRACKING: true
+          RAGAS_DO_NOT_TRACK: true
+
+      - name: Build, install the wheel in a clean environment and import it
+        run: make package-smoke
+
   deploy:
+    needs:
+      - verify
     runs-on: ubuntu-latest
     environment: pypi-release
     strategy:
@@ -25,27 +64,31 @@ jobs:
           - name: ragas
             directory: .
             token: PYPI_API_TOKEN
+          - name: ragas-examples
+            directory: examples
+            token: PYPI_API_TOKEN
+    name: deploy (${{ matrix.package.name }})
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - name: Set up Python
-      uses: actions/setup-python@v3
-      with:
-        python-version: '3.x'
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install --upgrade setuptools setuptools_scm[toml] build 
-    - name: get setuptools-scm version 
-      run: python -m setuptools_scm
-      working-directory: ${{ matrix.package.directory }}
-    - name: Build package
-      run: python -m build
-      working-directory: ${{ matrix.package.directory }}
-    - name: Publish package
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        password: ${{ secrets[matrix.package.token] }}
-        packages-dir: ${{ matrix.package.directory }}/dist/
-        attestations: false
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade setuptools setuptools_scm[toml] build
+      - name: get setuptools-scm version
+        run: python -m setuptools_scm
+        working-directory: ${{ matrix.package.directory }}
+      - name: Build package
+        run: python -m build
+        working-directory: ${{ matrix.package.directory }}
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets[matrix.package.token] }}
+          packages-dir: ${{ matrix.package.directory }}/dist/
+          attestations: false
