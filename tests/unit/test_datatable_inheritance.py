@@ -259,17 +259,11 @@ class TestComplexDataHandling:
 
     def test_dataset_complex_data_preservation(self, mock_backend, complex_test_data):
         """Test Dataset with complex data maintains type."""
-        # Note: This test focuses on type preservation, not CSV serialization issues
         dataset = Dataset("test_dataset", mock_backend, data=complex_test_data)
 
         # Validate should return Dataset
-        try:
-            validated = dataset.validate_with(ComplexTestModel)
-            assert isinstance(validated, Dataset)
-        except Exception as e:
-            # If validation fails due to CSV serialization, that's a separate issue
-            # The important thing is that the return type would be Dataset
-            pytest.skip(f"Validation failed due to serialization: {e}")
+        validated = dataset.validate_with(ComplexTestModel)
+        assert isinstance(validated, Dataset)
 
     def test_experiment_complex_data_preservation(
         self, mock_backend, complex_test_data
@@ -278,9 +272,5 @@ class TestComplexDataHandling:
         experiment = Experiment("test_experiment", mock_backend, data=complex_test_data)
 
         # Validate should return Experiment
-        try:
-            validated = experiment.validate_with(ComplexTestModel)
-            assert isinstance(validated, Experiment)
-        except Exception as e:
-            # If validation fails due to CSV serialization, that's a separate issue
-            pytest.skip(f"Validation failed due to serialization: {e}")
+        validated = experiment.validate_with(ComplexTestModel)
+        assert isinstance(validated, Experiment)
