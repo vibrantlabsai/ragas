@@ -617,7 +617,7 @@ memorable_names = MemorableNames()
 
 
 def find_git_root(start_path: t.Union[str, Path, None] = None) -> Path:
-    """Find the root directory of a git repository by traversing up from the start path."""
+    """Find a repository or worktree root by traversing up from the start path."""
     # Start from the current directory if no path is provided
     if start_path is None:
         start_path = Path.cwd()
@@ -627,14 +627,14 @@ def find_git_root(start_path: t.Union[str, Path, None] = None) -> Path:
     # Check if the current directory is a git repository
     current_path = start_path
     while current_path != current_path.parent:  # Stop at filesystem root
-        if (current_path / ".git").exists() and (current_path / ".git").is_dir():
+        if (current_path / ".git").exists():
             return current_path
 
         # Move up to the parent directory
         current_path = current_path.parent
 
     # Final check for the root directory
-    if (current_path / ".git").exists() and (current_path / ".git").is_dir():
+    if (current_path / ".git").exists():
         return current_path
 
     # No git repository found
