@@ -87,6 +87,9 @@ The metric supports multiple types of context inputs:
 
 ### Image Loading and Security
 
+!!! note "Changed in version 0.4.4"
+    Local image paths are no longer loaded by default, and image URLs on internal or private addresses are refused. Earlier versions loaded both. If your contexts use either, the image is now passed to the model as text until you opt in as shown below. This change fixes CVE-2026-6587.
+
 Retrieved contexts usually come from a dataset, so Ragas treats image references as untrusted input:
 
 - **Image URLs** are downloaded only from public internet addresses. A URL that points to `localhost`, a private or link-local address (including cloud metadata endpoints), or that redirects to one, is not fetched.
