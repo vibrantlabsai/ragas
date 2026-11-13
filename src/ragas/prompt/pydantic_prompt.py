@@ -11,7 +11,7 @@ from langchain_core.exceptions import OutputParserException
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompt_values import StringPromptValue as PromptValue
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from ragas._analytics import PromptUsageEvent, track
 from ragas._version import __version__
@@ -316,7 +316,11 @@ class PydanticPrompt(BasePrompt, t.Generic[InputModel, OutputModel]):
                 # For the parser, we need a BaseRagasLLM, so if it's a LangChain LLM, we need to handle this
                 if is_langchain_llm(llm) or isinstance(llm, InstructorBaseRagasLLM):
                     # Skip parsing retry for LangChain LLMs since parser expects BaseRagasLLM
-                    answer = self.output_model.model_validate_json(output_string)
+                    try:
+                        answer = self.output_model.model_validate_json(output_string)
+                    except ValidationError:
+                        jsonstr = extract_json(output_string)
+                        answer = self.output_model.model_validate_json(jsonstr)
                 else:
                     ragas_llm = t.cast(BaseRagasLLM, llm)
                     answer = await parser.parse_output_string(
