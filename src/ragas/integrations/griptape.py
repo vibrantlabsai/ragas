@@ -6,7 +6,7 @@ try:
     from griptape.engines.rag import RagContext  # type: ignore
 except ImportError:
     raise ImportError(
-        "Opik is not installed. Please install it using `pip install opik` to use the Opik tracer."
+        "Griptape is not installed. Please install it using `pip install griptape` to use the Griptape integration."
     )
 
 
