@@ -1,9 +1,12 @@
 import typing as t
 
+import numpy as np
 import pytest
 
+from ragas.callbacks import ChainRun
 from ragas.dataset_schema import (
     EvaluationDataset,
+    EvaluationResult,
     HumanMessage,
     MultiTurnSample,
     PromptAnnotation,
@@ -196,6 +199,65 @@ def test_evaluation_dataset_type():
 
     dataset = EvaluationDataset(samples=[multi_turn_sample])
     assert dataset.get_sample_type() == MultiTurnSample
+
+
+@pytest.fixture
+def evaluation_traces():
+    return {
+        "evaluation": ChainRun(
+            run_id="evaluation",
+            parent_run_id=None,
+            name="evaluation",
+            inputs={},
+            metadata={},
+        )
+    }
+
+
+@pytest.mark.parametrize(
+    "metric_scores, expected_repr, n_scored",
+    [
+        ([0.0, 1.0], "{'metric': 0.5000}", 2),
+        ([0.8, np.nan, np.nan], "{'metric': 0.8000}", 1),
+        ([np.nan, np.nan], "{'metric': nan}", 0),
+    ],
+)
+def test_evaluation_result_missing_scores(
+    metric_scores, expected_repr, n_scored, evaluation_traces
+):
+    dataset = EvaluationDataset(
+        samples=[SingleTurnSample(response="answer") for _ in metric_scores]
+    )
+    result = EvaluationResult(
+        scores=[{"metric": score} for score in metric_scores],
+        dataset=dataset,
+        ragas_traces=evaluation_traces,
+    )
+
+    assert repr(result) == expected_repr
+    np.testing.assert_equal(result["metric"], metric_scores)
+    frame = result.to_pandas()
+    assert len(frame) == len(metric_scores)
+    assert frame["metric"].count() == n_scored
+
+
+def test_evaluation_result_missing_scores_are_per_metric(evaluation_traces):
+    result = EvaluationResult(
+        scores=[
+            {"first": 0.0, "second": np.nan},
+            {"first": 1.0, "second": 0.8},
+            {"first": np.nan, "second": np.nan},
+        ],
+        dataset=EvaluationDataset(
+            samples=[SingleTurnSample(response="answer") for _ in range(3)]
+        ),
+        ragas_traces=evaluation_traces,
+    )
+
+    assert repr(result) == "{'first': 0.5000, 'second': 0.8000}"
+    frame = result.to_pandas()
+    assert frame["first"].count() == 2
+    assert frame["second"].count() == 1
 
 
 def test_multiturn_sample_validate_user_input_invalid_type():
