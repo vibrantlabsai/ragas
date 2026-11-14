@@ -18,6 +18,7 @@ from ragas.embeddings.base import (
 )
 from ragas.executor import Executor
 from ragas.llms import BaseRagasLLM, LangchainLLMWrapper, LlamaIndexLLMWrapper
+from ragas.prompt import PromptMixin
 from ragas.run_config import RunConfig
 from ragas.testset.graph import KnowledgeGraph, Node, NodeType
 from ragas.testset.persona import Persona, generate_personas_from_kg
@@ -25,6 +26,7 @@ from ragas.testset.synthesizers import default_query_distribution
 from ragas.testset.synthesizers.testset_schema import Testset, TestsetSample
 from ragas.testset.synthesizers.utils import calculate_split_values
 from ragas.testset.transforms import (
+    Parallel,
     Transforms,
     apply_transforms,
     default_transforms,
@@ -42,7 +44,7 @@ if t.TYPE_CHECKING:
     from llama_index.core.schema import Document as LlamaIndexDocument
 
     from ragas.embeddings.base import BaseRagasEmbeddings
-    from ragas.llms.base import BaseRagasLLM
+    from ragas.llms.base import BaseRagasLLM, InstructorBaseRagasLLM
     from ragas.testset.synthesizers import QueryDistribution
     from ragas.testset.synthesizers.base import BaseScenario
 
@@ -410,6 +412,96 @@ class TestsetGenerator:
             raise_exceptions=raise_exceptions,
             return_executor=return_executor,
         )
+
+    async def adapt_all_prompts(
+        self,
+        language: str,
+        llm: t.Union[BaseRagasLLM, "InstructorBaseRagasLLM"],
+        query_distribution: t.Optional["QueryDistribution"] = None,
+        transforms: t.Optional[Transforms] = None,
+    ) -> None:
+        """
+        Adapt all prompts — synthesizers *and* transforms — to the target language.
+
+        Calling :meth:`~ragas.prompt.mixin.PromptMixin.adapt_prompts` on a single
+        synthesizer only adapts that synthesizer's own prompts.  LLM-based transforms
+        such as ``NERExtractor`` and ``SummaryExtractor`` keep their English prompts,
+        causing non-English QA generation to silently produce English output.
+        This method fixes that gap (closes :issue:`1970`).
+
+        Parameters
+        ----------
+        language : str
+            Target language name, e.g. ``"chinese"``, ``"uzbek"``, ``"arabic"``.
+        llm : BaseRagasLLM
+            LLM used to translate the few-shot examples inside each prompt.
+        query_distribution : Optional[QueryDistribution]
+            Synthesizer distribution to adapt.  If ``None``, uses
+            :func:`~ragas.testset.synthesizers.default_query_distribution`.
+        transforms : Optional[Transforms]
+            Transform pipeline to adapt.  Pass the same list you will later pass to
+            ``generate_with_langchain_docs`` / ``generate_with_llamaindex_docs`` so
+            that NER/summary extractors are covered.
+
+        Example
+        -------
+        .. code-block:: python
+
+            import asyncio
+            from ragas.testset import TestsetGenerator
+            from ragas.testset.synthesizers.single_hop.specific import (
+                SingleHopSpecificQuerySynthesizer,
+            )
+            from ragas.testset.transforms.extractors.llm_based import NERExtractor
+            from ragas.testset.transforms.splitters import HeadlineSplitter
+
+            generator = TestsetGenerator(llm=my_llm, embedding_model=my_embed)
+            distribution = [(SingleHopSpecificQuerySynthesizer(llm=my_llm), 1.0)]
+            transforms = [HeadlineSplitter(), NERExtractor(llm=my_llm)]
+
+            # Adapt ALL prompts — synthesizer + transforms — in one call
+            asyncio.run(
+                generator.adapt_all_prompts(
+                    language="chinese",
+                    llm=my_llm,
+                    query_distribution=distribution,
+                    transforms=transforms,
+                )
+            )
+
+            testset = generator.generate_with_langchain_docs(
+                documents,
+                testset_size=5,
+                transforms=transforms,
+                query_distribution=distribution,
+            )
+        """
+        if query_distribution is None:
+            query_distribution = default_query_distribution(
+                self.llm, self.knowledge_graph, self.llm_context
+            )
+
+        def iter_prompt_mixins(value: t.Any) -> t.Iterator[PromptMixin]:
+            if isinstance(value, PromptMixin):
+                yield value
+            if isinstance(value, Parallel):
+                for transformation in value.transformations:
+                    yield from iter_prompt_mixins(transformation)
+            elif isinstance(value, t.Sequence) and not isinstance(value, (str, bytes)):
+                for transformation in value:
+                    yield from iter_prompt_mixins(transformation)
+
+        components = [synthesizer for synthesizer, _ in query_distribution]
+        if transforms is not None:
+            components.extend(iter_prompt_mixins(transforms))
+
+        seen: t.Set[int] = set()
+        for component in components:
+            if id(component) in seen:
+                continue
+            seen.add(id(component))
+            adapted = await component.adapt_prompts(language=language, llm=llm)
+            component.set_prompts(**adapted)
 
     def generate(
         self,
