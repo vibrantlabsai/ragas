@@ -33,11 +33,10 @@ class ChrfScore(SingleTurnMetric):
     ) -> float:
         reference, response = sample.reference, sample.response
 
-        if reference is None or response is None:
-            return 0.0
-        if not isinstance(reference, str) or not isinstance(response, str):
-            return 0.0
-        if not reference.strip() or not response.strip():
+        if not isinstance(reference, str) or not reference.strip():
+            raise ValueError("ChrfScore requires a non-empty reference string")
+
+        if not isinstance(response, str) or not response.strip():
             return 0.0
 
         assert isinstance(reference, str), "ChrfScore expects a valid reference string"

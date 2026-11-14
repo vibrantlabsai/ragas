@@ -54,19 +54,37 @@ async def test_chrf_score_single_turn_ascore(mock_sacrebleu):
 
 
 @pytest.mark.asyncio
-async def test_chrf_score_single_turn_ascore_none_values(mock_sacrebleu):
-    """Test single turn async score with None values."""
+@pytest.mark.parametrize("reference", [None, "", "   "])
+async def test_chrf_score_rejects_missing_reference(mock_sacrebleu, reference):
+    """Missing or empty ground truth must not become a zero score."""
     metric = ChrfScore()
 
-    # Test with None reference
-    sample = SingleTurnSample(reference=None, response="Hello there")
-    score = await metric._single_turn_ascore(sample, None)
-    assert score == 0.0
+    sample = SingleTurnSample(
+        reference=reference,
+        response="Hello there",
+    )
 
-    # Test with None response
-    sample = SingleTurnSample(reference="Hello world", response=None)
+    with pytest.raises(ValueError, match="non-empty reference string"):
+        await metric._single_turn_ascore(sample, None)
+
+    mock_sacrebleu.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("response", [None, "", "   "])
+async def test_chrf_score_returns_zero_for_empty_response(mock_sacrebleu, response):
+    """An empty model response may still receive a zero score."""
+    metric = ChrfScore()
+
+    sample = SingleTurnSample(
+        reference="Hello world",
+        response=response,
+    )
+
     score = await metric._single_turn_ascore(sample, None)
+
     assert score == 0.0
+    mock_sacrebleu.assert_not_called()
 
 
 @pytest.mark.asyncio
