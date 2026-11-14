@@ -17,6 +17,8 @@ from typing import get_args, get_origin, get_type_hints
 
 from pydantic import ConfigDict, ValidationError, create_model
 
+from ragas.async_utils import FailurePolicy
+
 if t.TYPE_CHECKING:
     from typing_extensions import Protocol
 else:
@@ -52,9 +54,13 @@ class BaseMetricProtocol(Protocol):
         ...
 
     async def abatch_score(
-        self, inputs: t.List[t.Dict[str, t.Any]]
+        self,
+        inputs: t.List[t.Dict[str, t.Any]],
+        *,
+        max_concurrency: t.Optional[int] = None,
+        failure_policy: FailurePolicy = "raise",
     ) -> t.List[MetricResult]:
-        """Asynchronous batch scoring method."""
+        """Asynchronous batch scoring method with optional execution controls."""
         ...
 
     def __call__(self, *args, **kwargs):

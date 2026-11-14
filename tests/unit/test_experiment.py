@@ -8,9 +8,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import BaseModel
 
+from ragas.async_utils import BatchExecutionError
 from ragas.backends.inmemory import InMemoryBackend
 from ragas.dataset import Dataset
-from ragas.experiment import Experiment, experiment, version_experiment
+from ragas.experiment import (
+    Experiment,
+    ExperimentExecutionConfig,
+    experiment,
+    version_experiment,
+)
 from ragas.utils import find_git_root, memorable_names
 
 
@@ -342,6 +348,198 @@ class TestExperimentDecorator:
 
         # Should have 2 successful results (3 items - 1 failure)
         assert len(experiment_result) == 2
+        assert len(experiment_result.run_errors) == 1
+        assert experiment_result.run_errors[0].index == 1
+        assert experiment_result.run_errors[0].error_type == "ValueError"
+        assert experiment_result.run_errors[0].message == "Test error"
+        assert experiment_result.run_summary is not None
+        assert experiment_result.run_summary.total_rows == 3
+        assert experiment_result.run_summary.succeeded == 2
+        assert experiment_result.run_summary.failed == 1
+        assert experiment_result.run_summary.skipped == 1
+        assert experiment_result.run_summary.failure_policy == "skip"
+
+    @pytest.mark.asyncio
+    async def test_experiment_default_keeps_completion_order(
+        self, sample_dataset, experiment_backend
+    ):
+        """Test the default result order remains completion order."""
+
+        release_events = {
+            "What is Python?": asyncio.Event(),
+            "What is AI?": asyncio.Event(),
+            "What is ML?": asyncio.Event(),
+        }
+        ready_count = 0
+        all_ready = asyncio.Event()
+
+        @experiment(experiment_model=ExperimentResultRow, backend=experiment_backend)
+        async def delayed_experiment(row: SampleDataRow) -> ExperimentResultRow:
+            nonlocal ready_count
+            ready_count += 1
+            if ready_count == 3:
+                all_ready.set()
+            await release_events[row.question].wait()
+            return ExperimentResultRow(
+                question=row.question,
+                processed_answer=row.answer,
+                sentiment="neutral",
+                processing_time=0.01,
+            )
+
+        run_task = asyncio.create_task(delayed_experiment.arun(sample_dataset))
+        await asyncio.wait_for(all_ready.wait(), timeout=1)
+        release_events["What is AI?"].set()
+        await asyncio.sleep(0.05)
+        release_events["What is ML?"].set()
+        await asyncio.sleep(0.05)
+        release_events["What is Python?"].set()
+        experiment_result = await run_task
+
+        assert [row.question for row in experiment_result] == [
+            "What is AI?",
+            "What is ML?",
+            "What is Python?",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_experiment_preserve_order_config(
+        self, sample_dataset, experiment_backend
+    ):
+        """Test preserve_order returns successful rows in dataset order."""
+
+        release_events = {
+            "What is Python?": asyncio.Event(),
+            "What is AI?": asyncio.Event(),
+            "What is ML?": asyncio.Event(),
+        }
+        ready_count = 0
+        all_ready = asyncio.Event()
+
+        @experiment(experiment_model=ExperimentResultRow, backend=experiment_backend)
+        async def delayed_experiment(row: SampleDataRow) -> ExperimentResultRow:
+            nonlocal ready_count
+            ready_count += 1
+            if ready_count == 3:
+                all_ready.set()
+            await release_events[row.question].wait()
+            return ExperimentResultRow(
+                question=row.question,
+                processed_answer=row.answer,
+                sentiment="neutral",
+                processing_time=0.01,
+            )
+
+        run_task = asyncio.create_task(
+            delayed_experiment.arun(
+                sample_dataset,
+                execution_config=ExperimentExecutionConfig(preserve_order=True),
+            )
+        )
+        await asyncio.wait_for(all_ready.wait(), timeout=1)
+        release_events["What is AI?"].set()
+        await asyncio.sleep(0.05)
+        release_events["What is ML?"].set()
+        await asyncio.sleep(0.05)
+        release_events["What is Python?"].set()
+        experiment_result = await run_task
+
+        assert [row.question for row in experiment_result] == [
+            "What is Python?",
+            "What is AI?",
+            "What is ML?",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_experiment_preserve_order_config_with_failures(
+        self, sample_dataset, experiment_backend
+    ):
+        """Test preserve_order keeps successful rows in dataset order after failures."""
+
+        @experiment(experiment_model=ExperimentResultRow, backend=experiment_backend)
+        async def failing_experiment(row: SampleDataRow) -> ExperimentResultRow:
+            if "AI" in row.question:
+                raise ValueError("Test error")
+            return ExperimentResultRow(
+                question=row.question,
+                processed_answer=row.answer,
+                sentiment="neutral",
+                processing_time=0.01,
+            )
+
+        experiment_result = await failing_experiment.arun(
+            sample_dataset,
+            execution_config=ExperimentExecutionConfig(preserve_order=True),
+        )
+
+        assert [row.question for row in experiment_result] == [
+            "What is Python?",
+            "What is ML?",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_experiment_max_concurrency(self, sample_dataset, experiment_backend):
+        """Test max_concurrency limits active experiment calls."""
+
+        active = 0
+        max_seen = 0
+
+        @experiment(experiment_model=ExperimentResultRow, backend=experiment_backend)
+        async def concurrent_experiment(row: SampleDataRow) -> ExperimentResultRow:
+            nonlocal active, max_seen
+            active += 1
+            max_seen = max(max_seen, active)
+            try:
+                await asyncio.sleep(0.01)
+                return ExperimentResultRow(
+                    question=row.question,
+                    processed_answer=row.answer,
+                    sentiment="neutral",
+                    processing_time=0.01,
+                )
+            finally:
+                active -= 1
+
+        experiment_result = await concurrent_experiment.arun(
+            sample_dataset,
+            execution_config=ExperimentExecutionConfig(max_concurrency=2),
+        )
+
+        assert len(experiment_result) == 3
+        assert max_seen <= 2
+
+    @pytest.mark.asyncio
+    async def test_experiment_failure_policy_raise(
+        self, sample_dataset, experiment_backend
+    ):
+        """Test failure_policy='raise' raises structured batch errors."""
+
+        @experiment(experiment_model=ExperimentResultRow, backend=experiment_backend)
+        async def failing_experiment(row: SampleDataRow) -> ExperimentResultRow:
+            if "AI" in row.question:
+                raise ValueError("Test error")
+            await asyncio.sleep(0.02)
+            return ExperimentResultRow(
+                question=row.question,
+                processed_answer=row.answer,
+                sentiment="neutral",
+                processing_time=0.02,
+            )
+
+        with pytest.raises(BatchExecutionError) as exc_info:
+            await failing_experiment.arun(
+                sample_dataset,
+                execution_config=ExperimentExecutionConfig(failure_policy="raise"),
+            )
+
+        assert len(exc_info.value.errors) == 1
+        assert exc_info.value.errors[0].index == 1
+        assert exc_info.value.errors[0].error_type == "ValueError"
+
+    def test_experiment_execution_config_invalid_max_concurrency(self):
+        """Test invalid max_concurrency values are rejected."""
+        with pytest.raises(ValueError, match="max_concurrency"):
+            ExperimentExecutionConfig(max_concurrency=0)
 
     @pytest.mark.asyncio
     async def test_experiment_with_no_model(self, sample_dataset, experiment_backend):

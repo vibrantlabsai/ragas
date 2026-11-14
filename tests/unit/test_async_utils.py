@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from ragas.async_utils import run_async_tasks
+from ragas.async_utils import BatchExecutionError, run_async_tasks, run_indexed_batch
 
 
 def test_is_event_loop_running_in_script():
@@ -88,3 +88,75 @@ def test_run_async_tasks_batched(tasks):
 def test_run_async_tasks_no_progress(tasks):
     results = run_async_tasks(tasks, show_progress=False)
     assert sorted(results) == sorted(range(1, 11))
+
+
+@pytest.mark.asyncio
+async def test_run_indexed_batch_limits_concurrency():
+    active = 0
+    max_seen = 0
+
+    async def make_coro(index: int, item: int):
+        nonlocal active, max_seen
+        active += 1
+        max_seen = max(max_seen, active)
+        try:
+            await asyncio.sleep(0.01)
+            return item
+        finally:
+            active -= 1
+
+    result = await run_indexed_batch(
+        [1, 2, 3, 4],
+        make_coro,
+        max_concurrency=2,
+    )
+
+    assert sorted(result.successes) == [(0, 1), (1, 2), (2, 3), (3, 4)]
+    assert result.errors == []
+    assert max_seen <= 2
+
+
+@pytest.mark.asyncio
+async def test_run_indexed_batch_records_errors():
+    async def make_coro(index: int, item: int):
+        if item == 2:
+            raise ValueError("bad item")
+        return item
+
+    result = await run_indexed_batch(
+        [1, 2, 3],
+        make_coro,
+        failure_policy="record",
+    )
+
+    assert sorted(result.successes) == [(0, 1), (2, 3)]
+    assert len(result.errors) == 1
+    assert result.errors[0].index == 1
+    assert result.errors[0].error_type == "ValueError"
+    assert result.errors[0].message == "bad item"
+
+
+@pytest.mark.asyncio
+async def test_run_indexed_batch_raise_cancels_pending():
+    release = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def make_coro(index: int, item: int):
+        if item == 1:
+            raise ValueError("bad item")
+        try:
+            await release.wait()
+            return item
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    with pytest.raises(BatchExecutionError) as exc_info:
+        await run_indexed_batch(
+            [1, 2],
+            make_coro,
+            failure_policy="raise",
+        )
+
+    assert exc_info.value.errors[0].index == 0
+    assert cancelled.is_set()
