@@ -254,8 +254,17 @@ class PydanticPrompt(BasePrompt, t.Generic[InputModel, OutputModel]):
             # This is an InstructorLLM - use its generate()/agenerate() method
             # InstructorLLM.generate()/agenerate() only takes prompt and response_model parameters
             from ragas.llms.base import InstructorLLM
+            from langchain_core.outputs import Generation, LLMResult
 
             instructor_llm = t.cast(InstructorLLM, llm)
+
+            # Fire on_llm_start so that registered callbacks (e.g. cost-tracking)
+            # are aware that an LLM call is beginning.
+            llm_run_managers = prompt_cb.on_llm_start(
+                {"name": instructor_llm.__class__.__name__},
+                [prompt_value.text],
+            )
+
             if instructor_llm.is_async:
                 result = await llm.agenerate(
                     prompt=prompt_value.text,
@@ -266,11 +275,37 @@ class PydanticPrompt(BasePrompt, t.Generic[InputModel, OutputModel]):
                     prompt=prompt_value.text,
                     response_model=self.output_model,
                 )
-            # Wrap the single response in an LLMResult-like structure for consistency
-            from langchain_core.outputs import Generation, LLMResult
 
+            # Extract token usage from the raw API response when available
+            # (Instructor >=1.14 exposes the raw response via _raw_response).
+            llm_output: t.Dict[str, t.Any] = {}
+            raw_response = getattr(result, "_raw_response", None)
+            if raw_response is not None:
+                usage = getattr(raw_response, "usage", None)
+                if usage is not None:
+                    llm_output["token_usage"] = {
+                        # OpenAI-style keys; fall back to Anthropic-style keys.
+                        "prompt_tokens": getattr(
+                            usage, "prompt_tokens",
+                            getattr(usage, "input_tokens", 0),
+                        ),
+                        "completion_tokens": getattr(
+                            usage, "completion_tokens",
+                            getattr(usage, "output_tokens", 0),
+                        ),
+                        "total_tokens": getattr(usage, "total_tokens", 0),
+                    }
+
+            # Wrap the single response in an LLMResult for consistency and
+            # fire on_llm_end so that cost/token-tracking callbacks receive
+            # the result just as they would for other LLM types.
             generation = Generation(text=result.model_dump_json())
-            resp = LLMResult(generations=[[generation]])
+            resp = LLMResult(
+                generations=[[generation]],
+                llm_output=llm_output or None,
+            )
+            for run_manager in llm_run_managers:
+                run_manager.on_llm_end(resp)
         else:
             # This is a standard BaseRagasLLM - use generate()
             ragas_llm = t.cast(BaseRagasLLM, llm)
