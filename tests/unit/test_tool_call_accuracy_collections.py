@@ -160,5 +160,54 @@ class TestToolCallAccuracyCollections:
                 user_input=user_input,
                 reference_tool_calls=ref_tool_calls,
             )
-        # Sequences don't align (different lengths), so score is 0
+        # One matched call out of two references (0.5) times the 1/2
+        # coverage penalty for the missing reference call.
+        assert result.value == 0.25
+
+    @pytest.mark.asyncio
+    async def test_length_mismatch_more_predicted(self, tool_call_accuracy):
+        """Extra predicted calls score 1.0 when the overlap matches."""
+        ref_tool_calls = [
+            ToolCall(name="search", args={"query": "python"}),
+        ]
+
+        pred_tool_calls = [
+            ToolCall(name="search", args={"query": "python"}),
+            ToolCall(name="filter", args={"type": "recent"}),
+        ]
+
+        user_input = [
+            HumanMessage(content="Search"),
+            AIMessage(content="Searching...", tool_calls=pred_tool_calls),
+        ]
+
+        with pytest.warns(UserWarning, match="Length mismatch"):
+            result = await tool_call_accuracy.ascore(
+                user_input=user_input,
+                reference_tool_calls=ref_tool_calls,
+            )
+        assert result.value == 1.0
+
+    @pytest.mark.asyncio
+    async def test_length_mismatch_misaligned_overlap(self, tool_call_accuracy):
+        """Overlapping portion misaligned on a length mismatch still scores 0."""
+        ref_tool_calls = [
+            ToolCall(name="search", args={"query": "python"}),
+            ToolCall(name="filter", args={"type": "recent"}),
+        ]
+
+        pred_tool_calls = [
+            ToolCall(name="filter", args={"type": "recent"}),
+        ]
+
+        user_input = [
+            HumanMessage(content="Search"),
+            AIMessage(content="Searching...", tool_calls=pred_tool_calls),
+        ]
+
+        with pytest.warns(UserWarning, match="Length mismatch"):
+            result = await tool_call_accuracy.ascore(
+                user_input=user_input,
+                reference_tool_calls=ref_tool_calls,
+            )
         assert result.value == 0.0
