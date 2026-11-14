@@ -224,3 +224,142 @@ def test_multiturn_sample_validate_user_input_valid_types():
     assert len(sample.user_input) == 2
     assert isinstance(sample.user_input[0], HumanMessage)
     assert isinstance(sample.user_input[1], AIMessage)
+
+
+# ---------------------------------------------------------------------------
+# EvaluationResult coverage exposure (issue #3028)
+# ---------------------------------------------------------------------------
+
+
+def _make_dataset(n: int) -> EvaluationDataset:
+    return EvaluationDataset(
+        samples=[
+            SingleTurnSample(user_input=f"q{i}", response=f"a{i}") for i in range(n)
+        ]
+    )
+
+
+def test_evaluation_result_full_coverage_is_silent():
+    import warnings
+
+    import numpy as np
+
+    from ragas.dataset_schema import EvaluationResult
+
+    scores = [{"faithfulness": 1.0}, {"faithfulness": 0.0}]
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = EvaluationResult(scores=scores, dataset=_make_dataset(2))
+
+    assert [str(w.message) for w in caught if issubclass(w.category, UserWarning)] == []
+    assert result.nan_counts == {"faithfulness": 0}
+    assert result.total_counts == {"faithfulness": 2}
+    assert result.coverage == {"faithfulness": 1.0}
+    assert result.summary() == {
+        "faithfulness": {"mean": 0.5, "n_scored": 2, "n_total": 2, "coverage": 1.0}
+    }
+    assert repr(result) == "{'faithfulness': 0.5000}"
+    # sanity: mean must not be moved by the new machinery
+    assert result._repr_dict["faithfulness"] == 0.5
+    _ = np  # silence unused import lint when not otherwise used
+
+
+def test_evaluation_result_partial_coverage_warns_and_marks_repr():
+    import inspect
+
+    import numpy as np
+
+    from ragas.dataset_schema import EvaluationResult
+
+    scores = [{"faithfulness": 1.0}, {"faithfulness": float("nan")}]
+    with pytest.warns(UserWarning, match="faithfulness: 1/2") as caught:
+        constructor_line = inspect.currentframe().f_lineno + 1
+        result = EvaluationResult(scores=scores, dataset=_make_dataset(2))
+
+    assert len(caught) == 1
+    assert caught[0].filename == __file__
+    assert caught[0].lineno == constructor_line
+
+    # backward compat: nanmean semantics preserved
+    assert result._repr_dict["faithfulness"] == 1.0
+
+    # coverage reported alongside the mean
+    assert result.nan_counts == {"faithfulness": 1}
+    assert result.total_counts == {"faithfulness": 2}
+    assert result.coverage == {"faithfulness": 0.5}
+
+    summary = result.summary()
+    assert summary["faithfulness"]["n_scored"] == 1
+    assert summary["faithfulness"]["n_total"] == 2
+    assert summary["faithfulness"]["coverage"] == 0.5
+    assert summary["faithfulness"]["mean"] == 1.0
+
+    # repr surfaces the shrunken denominator
+    assert "(1/2)" in repr(result)
+    _ = np
+
+
+def test_evaluation_result_all_nan_reports_zero_coverage():
+    from ragas.dataset_schema import EvaluationResult
+
+    scores = [{"faithfulness": float("nan")}, {"faithfulness": float("nan")}]
+    with pytest.warns(UserWarning):
+        result = EvaluationResult(scores=scores, dataset=_make_dataset(2))
+
+    assert result.coverage == {"faithfulness": 0.0}
+    summary = result.summary()
+    assert summary["faithfulness"]["n_scored"] == 0
+    assert summary["faithfulness"]["n_total"] == 2
+    assert summary["faithfulness"]["coverage"] == 0.0
+    # mean is nan when everything is nan
+    assert summary["faithfulness"]["mean"] != summary["faithfulness"]["mean"]
+
+
+def test_evaluation_result_mixed_metric_coverage_is_per_metric():
+    from ragas.dataset_schema import EvaluationResult
+
+    scores = [
+        {"faithfulness": 1.0, "answer_relevancy": 0.8},
+        {"faithfulness": float("nan"), "answer_relevancy": 0.6},
+        {"faithfulness": 0.5, "answer_relevancy": 0.7},
+    ]
+    with pytest.warns(UserWarning, match="faithfulness: 2/3"):
+        result = EvaluationResult(scores=scores, dataset=_make_dataset(3))
+
+    assert result.coverage == {"faithfulness": 2 / 3, "answer_relevancy": 1.0}
+    summary = result.summary()
+    assert summary["faithfulness"] == {
+        "mean": 0.75,
+        "n_scored": 2,
+        "n_total": 3,
+        "coverage": 2 / 3,
+    }
+    assert summary["answer_relevancy"] == {
+        "mean": pytest.approx(0.7),
+        "n_scored": 3,
+        "n_total": 3,
+        "coverage": 1.0,
+    }
+    repr_str = repr(result)
+    assert "'faithfulness': 0.7500 (2/3)" in repr_str
+    assert "'answer_relevancy': 0.7000" in repr_str
+    assert "(3/3)" not in repr_str  # full-coverage metrics stay clean
+
+
+def test_evaluation_result_warn_on_missing_scores_can_be_disabled():
+    import warnings
+
+    from ragas.dataset_schema import EvaluationResult
+
+    scores = [{"faithfulness": 1.0}, {"faithfulness": float("nan")}]
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = EvaluationResult(
+            scores=scores,
+            dataset=_make_dataset(2),
+            warn_on_missing_scores=False,
+        )
+
+    assert [w for w in caught if issubclass(w.category, UserWarning)] == []
+    # coverage data still exposed even when the warning is silenced
+    assert result.coverage == {"faithfulness": 0.5}

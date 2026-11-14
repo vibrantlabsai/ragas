@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import random
 import typing as t
+import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -15,6 +17,8 @@ from ragas.callbacks import parse_run_traces
 from ragas.cost import CostCallbackHandler
 from ragas.messages import AIMessage, HumanMessage, ToolCall, ToolMessage
 from ragas.utils import safe_nanmean
+
+logger = logging.getLogger(__name__)
 
 if t.TYPE_CHECKING:
     from pathlib import Path
@@ -423,6 +427,10 @@ class EvaluationResult:
         List of columns that are binary metrics. Default is an empty list.
     cost_cb : CostCallbackHandler, optional
         The callback handler for cost computation. Default is None.
+    warn_on_missing_scores : bool, optional
+        Emit a ``UserWarning`` when any metric has NaN scores excluded from the
+        reported mean (i.e. coverage < 100%). The reported mean itself is
+        unchanged. Default is True.
     """
 
     scores: t.List[t.Dict[str, t.Any]]
@@ -432,6 +440,7 @@ class EvaluationResult:
     traces: t.List[t.Dict[str, t.Any]] = field(default_factory=list)
     ragas_traces: t.Dict[str, ChainRun] = field(default_factory=dict, repr=False)
     run_id: t.Optional[UUID] = None
+    warn_on_missing_scores: bool = True
 
     def __post_init__(self):
         # transform scores from list of dicts to dict of lists
@@ -440,24 +449,119 @@ class EvaluationResult:
         }
 
         values = []
-        self._repr_dict = {}
-        for metric_name in self._scores_dict.keys():
-            value = safe_nanmean(self._scores_dict[metric_name])
+        self._repr_dict: t.Dict[str, float] = {}
+        self._nan_counts: t.Dict[str, int] = {}
+        self._total_counts: t.Dict[str, int] = {}
+        for metric_name, raw in self._scores_dict.items():
+            value = safe_nanmean(raw)
             self._repr_dict[metric_name] = value
+            total = len(raw)
+            nan_count = sum(
+                1
+                for v in raw
+                if v is None or (isinstance(v, (float, np.floating)) and np.isnan(v))
+            )
+            self._total_counts[metric_name] = total
+            self._nan_counts[metric_name] = nan_count
             if metric_name not in self.binary_columns:
                 value = t.cast(float, value)
                 values.append(value + 1e-10)
 
         # parse the traces
         run_id = str(self.run_id) if self.run_id is not None else None
-        self.traces = parse_run_traces(self.ragas_traces, run_id)
+        # parse_run_traces raises IndexError on an empty ragas_traces dict;
+        # skipping it here matches the "no traces recorded" contract used by
+        # callers that construct EvaluationResult directly (e.g. tests).
+        if self.ragas_traces:
+            self.traces = parse_run_traces(self.ragas_traces, run_id)
+        else:
+            self.traces = []
+
+        # Coverage < 100% means the reported mean was computed over a strict
+        # subset of the attempted rows. Silently dropping errored rows can
+        # *raise* the reported score as the pipeline degrades, so surface it
+        # once per result construction.
+        if self.warn_on_missing_scores:
+            incomplete = {
+                name: (self._total_counts[name] - self._nan_counts[name], total)
+                for name, total in self._total_counts.items()
+                if self._nan_counts[name] > 0
+            }
+            if incomplete:
+                parts = [
+                    f"{name}: {scored}/{total}"
+                    for name, (scored, total) in incomplete.items()
+                ]
+                msg = (
+                    "Some metrics have NaN scores excluded from the reported mean "
+                    f"(n_scored/n_total: {', '.join(parts)}). The mean is computed "
+                    "over surviving rows only, so failures can inflate it. Inspect "
+                    "`result.summary()` or `result.coverage` for details; pass "
+                    "`raise_exceptions=True` to evaluate() to surface underlying errors."
+                )
+                logger.warning(msg)
+                warnings.warn(msg, UserWarning, stacklevel=3)
 
     def __repr__(self) -> str:
-        score_strs = [f"'{k}': {v:0.4f}" for k, v in self._repr_dict.items()]
-        return "{" + ", ".join(score_strs) + "}"
+        parts = []
+        for k, v in self._repr_dict.items():
+            total = self._total_counts.get(k, 0)
+            nan_count = self._nan_counts.get(k, 0)
+            if nan_count > 0 and total > 0:
+                parts.append(f"'{k}': {v:0.4f} ({total - nan_count}/{total})")
+            else:
+                parts.append(f"'{k}': {v:0.4f}")
+        return "{" + ", ".join(parts) + "}"
 
     def __getitem__(self, key: str) -> t.List[float]:
         return self._scores_dict[key]
+
+    @property
+    def nan_counts(self) -> t.Dict[str, int]:
+        """Number of NaN/None scores per metric (excluded from the reported mean).
+
+        A non-zero value means the mean for that metric was computed over a
+        strict subset of the attempted rows.
+        """
+        return dict(self._nan_counts)
+
+    @property
+    def total_counts(self) -> t.Dict[str, int]:
+        """Number of rows attempted per metric (denominator before NaN drop)."""
+        return dict(self._total_counts)
+
+    @property
+    def coverage(self) -> t.Dict[str, float]:
+        """Fraction of attempted rows that produced a non-NaN score, per metric.
+
+        1.0 means every row scored. Lower values mean the reported mean is
+        computed over a subset. Empty metrics report 0.0.
+        """
+        return {
+            name: (total - self._nan_counts[name]) / total if total > 0 else 0.0
+            for name, total in self._total_counts.items()
+        }
+
+    def summary(self) -> t.Dict[str, t.Dict[str, t.Union[float, int]]]:
+        """Per-metric aggregate: ``{mean, n_scored, n_total, coverage}``.
+
+        Machine-readable alternative to parsing ``__repr__``. ``mean`` uses the
+        same ``safe_nanmean`` as the headline number, so it matches. ``n_scored``
+        is rows that produced a real score; ``n_total`` is rows attempted;
+        ``coverage`` is ``n_scored / n_total`` in ``[0, 1]``. Compare across
+        runs to distinguish "the model improved" from "a different subset
+        survived".
+        """
+        summary: t.Dict[str, t.Dict[str, t.Union[float, int]]] = {}
+        for name, total in self._total_counts.items():
+            n_scored = total - self._nan_counts[name]
+            summary[name] = {
+                "mean": self._repr_dict[name],
+                "n_scored": n_scored,
+                "n_total": total,
+                "coverage": n_scored / total if total > 0 else 0.0,
+            }
+        return summary
 
     def to_pandas(self, batch_size: int | None = None, batched: bool = False):
         """

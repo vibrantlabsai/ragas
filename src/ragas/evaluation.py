@@ -74,6 +74,7 @@ async def aevaluate(
     _run_id: t.Optional[UUID] = None,
     _pbar: t.Optional[tqdm] = None,
     return_executor: bool = False,
+    warn_on_missing_scores: bool = True,
 ) -> t.Union[EvaluationResult, Executor]:
     """
     Async version of evaluate that performs evaluation without applying nest_asyncio.
@@ -323,6 +324,7 @@ async def aevaluate(
             ),
             ragas_traces=tracer.traces,
             run_id=_run_id,
+            warn_on_missing_scores=warn_on_missing_scores,
         )
         if not evaluation_group_cm.ended:
             evaluation_rm.on_chain_end({"scores": result.scores})
@@ -365,6 +367,7 @@ def evaluate(
     _pbar: t.Optional[tqdm] = None,
     return_executor: bool = False,
     allow_nest_asyncio: bool = True,
+    warn_on_missing_scores: bool = True,
 ) -> t.Union[EvaluationResult, Executor]:
     """
     Perform the evaluation on the dataset with different metrics
@@ -412,6 +415,12 @@ def evaluate(
     allow_nest_asyncio : bool, optional
         Whether to allow nest_asyncio patching for Jupyter compatibility.
         Set to False in production async applications to avoid event loop conflicts. Default is True.
+    warn_on_missing_scores : bool, optional
+        Whether to warn and log when NaN scores are excluded from a metric's mean.
+        Default is True. Set to False to silence this warning; coverage remains
+        available through result.coverage and result.summary(). Means are computed
+        over scored rows, not all attempted rows. Only applies when returning an
+        EvaluationResult, not an Executor.
 
     Returns
     -------
@@ -470,6 +479,7 @@ def evaluate(
             _run_id=_run_id,
             _pbar=_pbar,
             return_executor=return_executor,
+            warn_on_missing_scores=warn_on_missing_scores,
         )
 
     if not allow_nest_asyncio:
