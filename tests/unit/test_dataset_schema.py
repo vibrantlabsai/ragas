@@ -1,9 +1,11 @@
 import typing as t
 
+import numpy as np
 import pytest
 
 from ragas.dataset_schema import (
     EvaluationDataset,
+    EvaluationResult,
     HumanMessage,
     MultiTurnSample,
     PromptAnnotation,
@@ -43,6 +45,120 @@ def create_sample_annotation(metric_output):
         is_accepted=True,
         target=None,
     )
+
+
+def create_evaluation_result(
+    scores: t.Optional[t.List[t.Dict[str, t.Any]]] = None,
+) -> EvaluationResult:
+    class EmptyTrace:
+        parent_run_id = None
+        children: t.List[str] = []
+
+    dataset = EvaluationDataset(
+        samples=[
+            SingleTurnSample(user_input="What is X", response="Y"),
+            SingleTurnSample(user_input="What is A", response="B"),
+        ]
+    )
+    return EvaluationResult(
+        scores=scores
+        or [
+            {"faithfulness": 0.8, "answer_relevancy": 0.7, "error_rate": 0.1},
+            {"faithfulness": 0.9, "answer_relevancy": 0.9, "error_rate": 0.3},
+        ],
+        dataset=dataset,
+        ragas_traces={"root": EmptyTrace()},
+    )
+
+
+def test_evaluation_result_summary_returns_aggregate_scores():
+    result = create_evaluation_result()
+
+    assert result.summary() == pytest.approx(
+        {
+            "faithfulness": 0.85,
+            "answer_relevancy": 0.8,
+            "error_rate": 0.2,
+        }
+    )
+
+
+def test_evaluation_result_check_thresholds_passes_all_rules():
+    result = create_evaluation_result()
+
+    report = result.check_thresholds(
+        min_scores={"faithfulness": 0.8},
+        max_scores={"error_rate": 0.25},
+        ranges={"answer_relevancy": (0.75, 0.85)},
+        baseline_scores={"faithfulness": 0.84},
+        relative_thresholds={"faithfulness": 0.05},
+    )
+
+    assert report["passed"] is True
+    assert len(report["checks"]) == 4
+
+
+def test_evaluation_result_check_thresholds_reports_failures_without_raising():
+    result = create_evaluation_result()
+
+    report = result.check_thresholds(
+        min_scores={"faithfulness": 0.9, "missing_metric": 0.5},
+        max_scores={"error_rate": 0.1},
+        ranges={"answer_relevancy": (0.1, 0.5)},
+    )
+
+    assert report["passed"] is False
+    assert [check["passed"] for check in report["checks"]] == [
+        False,
+        False,
+        False,
+        False,
+    ]
+    assert report["checks"][1]["reason"] == "missing metric"
+
+
+def test_evaluation_result_check_thresholds_reports_nan_scores():
+    result = create_evaluation_result(
+        scores=[
+            {"faithfulness": np.nan},
+            {"faithfulness": np.nan},
+        ]
+    )
+
+    report = result.check_thresholds(min_scores={"faithfulness": 0.5})
+
+    assert report["passed"] is False
+    assert report["checks"][0]["reason"] == "score is missing, NaN, or non-numeric"
+
+
+def test_evaluation_result_check_thresholds_reports_non_numeric_scores():
+    result = create_evaluation_result()
+    result._repr_dict["faithfulness"] = "bad-score"
+
+    report = result.check_thresholds(min_scores={"faithfulness": 0.5})
+
+    assert report["passed"] is False
+    assert report["checks"][0]["reason"] == "score is missing, NaN, or non-numeric"
+
+
+def test_evaluation_result_check_thresholds_validates_configuration():
+    result = create_evaluation_result()
+
+    with pytest.raises(ValueError, match="min_scores"):
+        result.check_thresholds(min_scores={"faithfulness": np.nan})
+
+    with pytest.raises(ValueError, match="ranges"):
+        result.check_thresholds(ranges={"faithfulness": (0.9, 0.1)})
+
+    with pytest.raises(ValueError, match="baseline_scores"):
+        result.check_thresholds(relative_thresholds={"faithfulness": 0.1})
+
+
+def test_evaluation_result_assert_thresholds_raises_on_failure():
+    result = create_evaluation_result()
+
+    with pytest.raises(AssertionError, match="faithfulness"):
+        result.assert_thresholds(min_scores={"faithfulness": 0.9})
 
 
 def test_loader_sample():

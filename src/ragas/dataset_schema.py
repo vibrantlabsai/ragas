@@ -459,6 +459,268 @@ class EvaluationResult:
     def __getitem__(self, key: str) -> t.List[float]:
         return self._scores_dict[key]
 
+    def summary(self) -> t.Dict[str, float]:
+        """
+        Return aggregate metric scores as a plain dictionary.
+
+        Returns
+        -------
+        dict of str to float
+            Metric names mapped to their aggregate scores.
+        """
+        return dict(self._repr_dict)
+
+    def check_thresholds(
+        self,
+        min_scores: t.Optional[t.Mapping[str, float]] = None,
+        max_scores: t.Optional[t.Mapping[str, float]] = None,
+        ranges: t.Optional[t.Mapping[str, t.Tuple[float, float]]] = None,
+        baseline_scores: t.Optional[t.Mapping[str, float]] = None,
+        relative_thresholds: t.Optional[t.Mapping[str, float]] = None,
+    ) -> t.Dict[str, t.Any]:
+        """
+        Check aggregate scores against threshold rules.
+
+        Parameters
+        ----------
+        min_scores : mapping of str to float, optional
+            Metric scores must be greater than or equal to these values.
+        max_scores : mapping of str to float, optional
+            Metric scores must be less than or equal to these values.
+        ranges : mapping of str to tuple of float, optional
+            Metric scores must fall within the inclusive ``(min, max)`` range.
+        baseline_scores : mapping of str to float, optional
+            Baseline values used with ``relative_thresholds``.
+        relative_thresholds : mapping of str to float, optional
+            Allowed relative change from the corresponding baseline value.
+
+        Returns
+        -------
+        dict
+            A structured report with overall pass/fail status and per-check
+            details.
+
+        Raises
+        ------
+        ValueError
+            If a threshold configuration is malformed.
+        """
+        min_scores = self._validate_threshold_mapping("min_scores", min_scores)
+        max_scores = self._validate_threshold_mapping("max_scores", max_scores)
+        ranges = self._validate_range_mapping(ranges)
+        baseline_scores = self._validate_threshold_mapping(
+            "baseline_scores", baseline_scores
+        )
+        relative_thresholds = self._validate_threshold_mapping(
+            "relative_thresholds", relative_thresholds
+        )
+
+        if relative_thresholds and not baseline_scores:
+            raise ValueError("baseline_scores is required for relative_thresholds")
+
+        checks = []
+        for metric_name, threshold in min_scores.items():
+            checks.append(
+                self._build_threshold_check(metric_name, ">=", threshold, "min")
+            )
+
+        for metric_name, threshold in max_scores.items():
+            checks.append(
+                self._build_threshold_check(metric_name, "<=", threshold, "max")
+            )
+
+        for metric_name, bounds in ranges.items():
+            checks.append(self._build_range_check(metric_name, bounds))
+
+        for metric_name, relative_threshold in relative_thresholds.items():
+            if metric_name not in baseline_scores:
+                checks.append(
+                    self._failed_threshold_check(
+                        metric_name,
+                        "relative",
+                        relative_threshold,
+                        "missing baseline score",
+                    )
+                )
+                continue
+            checks.append(
+                self._build_relative_check(
+                    metric_name, baseline_scores[metric_name], relative_threshold
+                )
+            )
+
+        return {
+            "passed": all(check["passed"] for check in checks),
+            "summary": self.summary(),
+            "checks": checks,
+        }
+
+    def assert_thresholds(
+        self,
+        min_scores: t.Optional[t.Mapping[str, float]] = None,
+        max_scores: t.Optional[t.Mapping[str, float]] = None,
+        ranges: t.Optional[t.Mapping[str, t.Tuple[float, float]]] = None,
+        baseline_scores: t.Optional[t.Mapping[str, float]] = None,
+        relative_thresholds: t.Optional[t.Mapping[str, float]] = None,
+    ) -> None:
+        """
+        Raise an AssertionError when threshold checks fail.
+        """
+        report = self.check_thresholds(
+            min_scores=min_scores,
+            max_scores=max_scores,
+            ranges=ranges,
+            baseline_scores=baseline_scores,
+            relative_thresholds=relative_thresholds,
+        )
+        if report["passed"]:
+            return
+
+        failures = [
+            f"{check['metric']} {check['rule']} failed: {check['reason']}"
+            for check in report["checks"]
+            if not check["passed"]
+        ]
+        raise AssertionError("; ".join(failures))
+
+    @staticmethod
+    def _validate_threshold_mapping(
+        name: str, values: t.Optional[t.Mapping[str, float]]
+    ) -> t.Dict[str, float]:
+        if values is None:
+            return {}
+        if not isinstance(values, t.Mapping):
+            raise ValueError(f"{name} must be a mapping")
+
+        clean = {}
+        for metric_name, threshold in values.items():
+            if not isinstance(metric_name, str) or not metric_name:
+                raise ValueError(f"{name} metric names must be non-empty strings")
+            if not EvaluationResult._is_finite_number(threshold):
+                raise ValueError(f"{name}[{metric_name!r}] must be a finite number")
+            clean[metric_name] = float(threshold)
+        return clean
+
+    @staticmethod
+    def _validate_range_mapping(
+        values: t.Optional[t.Mapping[str, t.Tuple[float, float]]],
+    ) -> t.Dict[str, t.Tuple[float, float]]:
+        if values is None:
+            return {}
+        if not isinstance(values, t.Mapping):
+            raise ValueError("ranges must be a mapping")
+
+        clean = {}
+        for metric_name, bounds in values.items():
+            if not isinstance(metric_name, str) or not metric_name:
+                raise ValueError("ranges metric names must be non-empty strings")
+            if not isinstance(bounds, tuple) or len(bounds) != 2:
+                raise ValueError(f"ranges[{metric_name!r}] must be a (min, max) tuple")
+            lower, upper = bounds
+            if not EvaluationResult._is_finite_number(
+                lower
+            ) or not EvaluationResult._is_finite_number(upper):
+                raise ValueError(
+                    f"ranges[{metric_name!r}] values must be finite numbers"
+                )
+            if float(lower) > float(upper):
+                raise ValueError(
+                    f"ranges[{metric_name!r}] lower bound exceeds upper bound"
+                )
+            clean[metric_name] = (float(lower), float(upper))
+        return clean
+
+    def _build_threshold_check(
+        self, metric_name: str, operator: str, threshold: float, rule: str
+    ) -> t.Dict[str, t.Any]:
+        value, reason = self._threshold_value(metric_name)
+        if reason is not None:
+            return self._failed_threshold_check(metric_name, rule, threshold, reason)
+
+        passed = value >= threshold if operator == ">=" else value <= threshold
+        reason = "passed" if passed else f"{value} is not {operator} {threshold}"
+        return {
+            "metric": metric_name,
+            "rule": rule,
+            "threshold": threshold,
+            "value": value,
+            "passed": passed,
+            "reason": reason,
+        }
+
+    def _build_range_check(
+        self, metric_name: str, bounds: t.Tuple[float, float]
+    ) -> t.Dict[str, t.Any]:
+        value, reason = self._threshold_value(metric_name)
+        if reason is not None:
+            return self._failed_threshold_check(metric_name, "range", bounds, reason)
+
+        lower, upper = bounds
+        passed = lower <= value <= upper
+        reason = "passed" if passed else f"{value} is not between {lower} and {upper}"
+        return {
+            "metric": metric_name,
+            "rule": "range",
+            "threshold": bounds,
+            "value": value,
+            "passed": passed,
+            "reason": reason,
+        }
+
+    def _build_relative_check(
+        self, metric_name: str, baseline: float, relative_threshold: float
+    ) -> t.Dict[str, t.Any]:
+        value, reason = self._threshold_value(metric_name)
+        if reason is not None:
+            return self._failed_threshold_check(
+                metric_name, "relative", relative_threshold, reason
+            )
+
+        allowed_delta = abs(baseline) * relative_threshold
+        if baseline == 0:
+            allowed_delta = relative_threshold
+        delta = abs(value - baseline)
+        passed = delta <= allowed_delta
+        reason = "passed" if passed else f"delta {delta} exceeds {allowed_delta}"
+        return {
+            "metric": metric_name,
+            "rule": "relative",
+            "threshold": relative_threshold,
+            "baseline": baseline,
+            "value": value,
+            "passed": passed,
+            "reason": reason,
+        }
+
+    def _threshold_value(
+        self, metric_name: str
+    ) -> t.Tuple[t.Optional[float], t.Optional[str]]:
+        if metric_name not in self._repr_dict:
+            return None, "missing metric"
+        value = self._repr_dict[metric_name]
+        if not self._is_finite_number(value):
+            return None, "score is missing, NaN, or non-numeric"
+        return float(value), None
+
+    @staticmethod
+    def _failed_threshold_check(
+        metric_name: str, rule: str, threshold: t.Any, reason: str
+    ) -> t.Dict[str, t.Any]:
+        return {
+            "metric": metric_name,
+            "rule": rule,
+            "threshold": threshold,
+            "value": None,
+            "passed": False,
+            "reason": reason,
+        }
+
+    @staticmethod
+    def _is_finite_number(value: t.Any) -> bool:
+        if isinstance(value, bool) or not isinstance(value, (int, float, np.number)):
+            return False
+        return bool(np.isfinite(value))
+
     def to_pandas(self, batch_size: int | None = None, batched: bool = False):
         """
         Convert the result to a pandas DataFrame.
