@@ -139,9 +139,15 @@ class ToolCallAccuracy(BaseMetric):
                 f"tool calls will be compared."
             )
 
-        # Extract sequences and check alignment
-        tool_call_pred_sequence = [tc.name for tc in pred_tool_calls]
-        tool_call_ref_sequence = [tc.name for tc in reference_tool_calls]
+        # Extract sequences and check alignment. Only the overlapping portion
+        # is compared on a length mismatch: comparing the full sequences
+        # would always fail alignment and zero the score, even when the
+        # overlap matches.
+        compared_count = min(len(pred_tool_calls), len(reference_tool_calls))
+        tool_call_pred_sequence = [tc.name for tc in pred_tool_calls[:compared_count]]
+        tool_call_ref_sequence = [
+            tc.name for tc in reference_tool_calls[:compared_count]
+        ]
 
         sequence_aligned = int(
             self._is_sequence_aligned(tool_call_pred_sequence, tool_call_ref_sequence)
@@ -149,7 +155,6 @@ class ToolCallAccuracy(BaseMetric):
 
         # Calculate argument accuracy for matching tool calls
         score = 0.0
-        compared_count = min(len(pred_tool_calls), len(reference_tool_calls))
 
         for ref_tool_call, pred_tool_call in zip(reference_tool_calls, pred_tool_calls):
             if ref_tool_call.name == pred_tool_call.name:
