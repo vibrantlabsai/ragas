@@ -69,38 +69,74 @@ def update_strings(obj: t.Any, old_strings: list[str], new_strings: list[str]) -
 def extract_json(text: str) -> str:
     """Identify json from a text blob by matching '[]' or '{}'.
 
-    Warning: This will identify the first json structure!"""
+    Extracts the LAST complete JSON object, not the first. The LLM-judge's own
+    verdict is the authoritative JSON and appears last in the response; JSON that
+    appeared earlier may have originated from the model-under-test's output (which
+    is embedded in the judge prompt) and was referenced in the judge's reasoning.
+    Extracting the first JSON object allowed verdict injection.
+    """
 
     # check for markdown indicator; if present, start there
     md_json_idx = text.find("```json")
     if md_json_idx != -1:
         text = text[md_json_idx:]
 
-    # search for json delimiter pairs
+    # Find ALL complete JSON objects, return the LAST one.
+    # Walk forward tracking brace/bracket depth, collecting complete objects.
+    objects: list[str] = []
+    i = 0
+    while i < len(text):
+        if text[i] in "{[":
+            open_char = text[i]
+            close_char = "]" if open_char == "[" else "}"
+            depth = 0
+            in_string = False
+            escape = False
+            for j in range(i, len(text)):
+                ch = text[j]
+                if escape:
+                    escape = False
+                    continue
+                if ch == "\\":
+                    escape = True
+                    continue
+                if ch == '"':
+                    in_string = not in_string
+                    continue
+                if in_string:
+                    continue
+                if ch == open_char:
+                    depth += 1
+                elif ch == close_char:
+                    depth -= 1
+                    if depth == 0:
+                        objects.append(text[i : j + 1])
+                        i = j + 1
+                        break
+            else:
+                # Unbalanced — incomplete JSON, skip
+                break
+        else:
+            i += 1
+
+    if objects:
+        return objects[-1]  # the LAST complete JSON object
+
+    # Fallback: original behavior for backward compat (unbalanced/incomplete JSON)
     left_bracket_idx = text.find("[")
     left_brace_idx = text.find("{")
-
     indices = [idx for idx in (left_bracket_idx, left_brace_idx) if idx != -1]
     start_idx = min(indices) if indices else None
-
-    # If no delimiter found, return the original text
     if start_idx is None:
         return text
-
-    # Identify the exterior delimiters defining JSON
     open_char = text[start_idx]
     close_char = "]" if open_char == "[" else "}"
-
-    # Initialize a count to keep track of delimiter pairs
     count = 0
     for i, char in enumerate(text[start_idx:], start=start_idx):
         if char == open_char:
             count += 1
         elif char == close_char:
             count -= 1
-
-        # When count returns to zero, we've found a complete structure
         if count == 0:
             return text[start_idx : i + 1]
-
-    return text  # In case of unbalanced JSON, return the original text
+    return text

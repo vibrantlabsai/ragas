@@ -441,9 +441,31 @@ class EvaluationResult:
 
         values = []
         self._repr_dict = {}
+        # worst-case scores: NaN counted as 0 (the conservative bound). When no
+        # scores are NaN this equals the usual safe_nanmean; when some are NaN
+        # the gap between _repr_dict (NaN excluded from denominator) and
+        # _worst_case_repr (NaN counted as 0) quantifies the denominator-drop
+        # risk — a model-under-test can crash the judge on its hardest metrics
+        # to erase them from the reported score. Exposed so downstream code can
+        # surface it, not just rely on a log warning being noticed.
+        self._worst_case_repr: t.Dict[str, float] = {}
+        self._nan_counts: t.Dict[str, int] = {}
         for metric_name in self._scores_dict.keys():
-            value = safe_nanmean(self._scores_dict[metric_name])
+            raw = self._scores_dict[metric_name]
+            value = safe_nanmean(raw)
             self._repr_dict[metric_name] = value
+            # count NaN/None scores for this metric
+            nan_count = sum(
+                1 for v in raw if v is None or (isinstance(v, float) and v != v)
+            )
+            self._nan_counts[metric_name] = nan_count
+            # worst case: NaN -> 0, mean over the FULL denominator
+            worst = (
+                float(np.nan_to_num(np.asarray(raw, dtype=float), nan=0.0).mean())
+                if raw
+                else float("nan")
+            )
+            self._worst_case_repr[metric_name] = worst
             if metric_name not in self.binary_columns:
                 value = t.cast(float, value)
                 values.append(value + 1e-10)
@@ -454,7 +476,31 @@ class EvaluationResult:
 
     def __repr__(self) -> str:
         score_strs = [f"'{k}': {v:0.4f}" for k, v in self._repr_dict.items()]
-        return "{" + ", ".join(score_strs) + "}"
+        repr_str = "{" + ", ".join(score_strs) + "}"
+        # Surface denominator-drop risk inline when any metric has NaN scores.
+        total_nan = sum(self._nan_counts.values())
+        if total_nan:
+            repr_str += f"  ⚠ {total_nan} NaN score(s) excluded from denominator — see .worst_case_scores"
+        return repr_str
+
+    @property
+    def nan_counts(self) -> t.Dict[str, int]:
+        """Number of NaN/None scores per metric (excluded from the reported mean).
+
+        Non-zero values indicate the reported score's denominator was shrunk —
+        a model-under-test can exploit this by crashing the judge on its hardest
+        metrics. Compare with ``worst_case_scores`` to see the gap.
+        """
+        return dict(self._nan_counts)
+
+    @property
+    def worst_case_scores(self) -> t.Dict[str, float]:
+        """Conservative bound: NaN scores counted as 0, mean over the FULL set.
+
+        When no scores are NaN this equals the reported mean. The gap between
+        the reported mean and this value quantifies the denominator-drop risk.
+        """
+        return dict(self._worst_case_repr)
 
     def __getitem__(self, key: str) -> t.List[float]:
         return self._scores_dict[key]

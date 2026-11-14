@@ -74,6 +74,7 @@ async def aevaluate(
     _run_id: t.Optional[UUID] = None,
     _pbar: t.Optional[tqdm] = None,
     return_executor: bool = False,
+    warn_on_error: bool = True,
 ) -> t.Union[EvaluationResult, Executor]:
     """
     Async version of evaluate that performs evaluation without applying nest_asyncio.
@@ -312,6 +313,33 @@ async def aevaluate(
     else:
         # evalution run was successful
         # now lets process the results
+
+        # Security: warn when NaN scores are present. NaN can originate from
+        # metric errors (when raise_exceptions=False, the default) or from
+        # edge-case data (denominator=0). When the user computes aggregate
+        # scores via df.mean(), pandas skips NaN by default (skipna=True),
+        # which drops the affected metrics from the denominator. A model-
+        # under-test that causes the judge to error on its hardest metrics
+        # can exploit this to inflate its average score. Warn so the user
+        # is aware of the denominator impact.
+        if warn_on_error:
+            nan_count = sum(
+                1 for row in scores for v in row.values() if v is None
+                or (isinstance(v, float) and v != v)
+            )
+            if nan_count:
+                import warnings
+                warnings.warn(
+                    f"{nan_count} metric score(s) are NaN (likely from errors or edge-case data). "
+                    "These will be skipped by df.mean(skipna=True), which can inflate "
+                    "aggregate scores. A model-under-test can exploit this by producing "
+                    "output that crashes the judge on hard metrics. "
+                    "Pass raise_exceptions=True to surface errors instead, or use "
+                    "df.mean(skipna=False) to include NaN metrics as failures.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+
         cost_cb = ragas_callbacks["cost_cb"] if "cost_cb" in ragas_callbacks else None
         result = EvaluationResult(
             scores=scores,
