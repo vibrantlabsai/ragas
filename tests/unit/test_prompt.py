@@ -1,5 +1,6 @@
 import copy
 import typing as t
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -267,3 +268,33 @@ def test_in_memory_example_store():
     assert store.get_examples(FakeInputModel(text="hello", embedding=[1, 2, 3])) == [
         FakeOutputModel(text="hello")
     ]
+
+
+def test_get_nearest_examples_without_embeddings():
+    from ragas.prompt import InMemoryExampleStore
+
+    assert InMemoryExampleStore.get_nearest_examples([1.0, 0.0], []) == []
+
+
+def test_get_examples_without_examples_skips_embedding():
+    from ragas.prompt import InMemoryExampleStore
+
+    embeddings = Mock()
+    embeddings.embed_query.side_effect = AssertionError("No embedding is needed")
+    store = InMemoryExampleStore(embeddings=embeddings)
+
+    assert store.get_examples(StringIO(text="query")) == []
+    embeddings.embed_query.assert_not_called()
+
+
+def test_get_examples_after_adding_example():
+    from ragas.prompt import InMemoryExampleStore
+
+    embeddings = Mock()
+    embeddings.embed_query.return_value = [1.0, 0.0]
+    store = InMemoryExampleStore(embeddings=embeddings)
+    example = (StringIO(text="input"), StringIO(text="output"))
+    store.add_example(*example)
+
+    assert store.get_examples(StringIO(text="query")) == [example]
+    assert embeddings.embed_query.call_count == 2

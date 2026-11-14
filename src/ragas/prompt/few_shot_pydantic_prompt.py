@@ -53,6 +53,9 @@ class InMemoryExampleStore(ExampleStore):
     def get_examples(
         self, data: BaseModel, top_k: int = 5, threshold: float = 0.7
     ) -> t.Sequence[t.Tuple[BaseModel, BaseModel]]:
+        if not self._examples_list:
+            return []
+
         data_embedding = self.embeddings.embed_query(data.model_dump_json())
         return [
             self._examples_list[i]
@@ -68,6 +71,9 @@ class InMemoryExampleStore(ExampleStore):
         top_k: int = 3,
         threshold: float = 0.7,
     ) -> t.List[int]:
+        if not embeddings:
+            return []
+
         # Convert to numpy arrays for efficient computation
         query = np.array(query_embedding)
         embed_matrix = np.array(embeddings)
