@@ -944,7 +944,11 @@ class InstructorLLM(InstructorBaseRagasLLM):
 
             return False
 
-        requires_max_completion_tokens = is_reasoning_model(model_lower)
+        # Amazon Bedrock prefixes OpenAI model IDs with ``openai.`` and may
+        # add a region prefix such as ``us.`` or ``global.``. Keep the original
+        # ID for the API call, but detect the underlying model name.
+        reasoning_model_name = model_lower.split("openai.", 1)[-1]
+        requires_max_completion_tokens = is_reasoning_model(reasoning_model_name)
 
         # If max_tokens is provided and model requires max_completion_tokens, map it
         if requires_max_completion_tokens and "max_tokens" in mapped_args:

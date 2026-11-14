@@ -116,6 +116,40 @@ def test_llm_factory_with_model_args(mock_sync_client, monkeypatch):
     assert llm.model_args.get("temperature") == 0.7  # type: ignore
 
 
+@pytest.mark.parametrize(
+    "model",
+    [
+        "openai.gpt-6-sol",
+        "us.openai.gpt-6-luna",
+        "global.openai.gpt-6-astra",
+    ],
+)
+def test_openai_params_mapping_for_bedrock_model_ids(model):
+    """Bedrock's provider prefixes should not hide reasoning model names."""
+    from ragas.llms.base import InstructorLLM
+
+    llm = InstructorLLM(client=Mock(), model=model, provider="openai")
+
+    assert llm._map_openai_params() == {
+        "temperature": 1.0,
+        "max_completion_tokens": 1024,
+    }
+
+
+@pytest.mark.parametrize("model", ["openai.gpt-4.1", "openai.gpt-oss-120b-1:0"])
+def test_openai_params_mapping_for_non_reasoning_bedrock_model_ids(model):
+    """Bedrock prefixes should not classify legacy models as reasoning models."""
+    from ragas.llms.base import InstructorLLM
+
+    llm = InstructorLLM(client=Mock(), model=model, provider="openai")
+
+    assert llm._map_openai_params() == {
+        "temperature": 0.01,
+        "top_p": 0.1,
+        "max_tokens": 1024,
+    }
+
+
 def test_unsupported_provider(monkeypatch):
     """Test that invalid clients are handled gracefully for unknown providers."""
     mock_client = Mock()
