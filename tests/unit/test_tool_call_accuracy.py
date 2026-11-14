@@ -141,8 +141,9 @@ class TestToolCallAccuracy:
         with pytest.warns(UserWarning, match="Length mismatch"):
             score = await tool_call_accuracy._multi_turn_ascore(sample, mock_callbacks)
 
-        # Should be 0 because sequences don't align (different lengths)
-        assert score == 0.0
+        # The overlapping portion matches perfectly and no reference call is
+        # missing, so there is no coverage penalty.
+        assert score == 1.0
 
     @pytest.mark.asyncio
     async def test_length_mismatch_fewer_predicted(
@@ -168,7 +169,34 @@ class TestToolCallAccuracy:
         with pytest.warns(UserWarning, match="Length mismatch"):
             score = await tool_call_accuracy._multi_turn_ascore(sample, mock_callbacks)
 
-        # Should be 0 because sequences don't align (different lengths)
+        # One matched call out of two references (0.5) times the 1/2
+        # coverage penalty for the missing reference call.
+        assert score == 0.25
+
+    @pytest.mark.asyncio
+    async def test_length_mismatch_misaligned_overlap(
+        self, tool_call_accuracy, mock_callbacks
+    ):
+        """Overlapping portion misaligned on a length mismatch still scores 0."""
+        ref_tool_calls = [
+            ToolCall(name="search", args={"query": "python"}),
+            ToolCall(name="filter", args={"type": "recent"}),
+        ]
+
+        pred_tool_calls = [ToolCall(name="filter", args={"type": "recent"})]
+
+        sample = MultiTurnSample(
+            user_input=[AIMessage(content="Searching...", tool_calls=pred_tool_calls)],
+            reference_tool_calls=ref_tool_calls,
+        )
+
+        tool_call_accuracy.arg_comparison_metric.single_turn_ascore = AsyncMock(
+            return_value=1.0
+        )
+
+        with pytest.warns(UserWarning, match="Length mismatch"):
+            score = await tool_call_accuracy._multi_turn_ascore(sample, mock_callbacks)
+
         assert score == 0.0
 
     @pytest.mark.asyncio
