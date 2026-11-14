@@ -256,21 +256,54 @@ class PydanticPrompt(BasePrompt, t.Generic[InputModel, OutputModel]):
             from ragas.llms.base import InstructorLLM
 
             instructor_llm = t.cast(InstructorLLM, llm)
-            if instructor_llm.is_async:
-                result = await llm.agenerate(
-                    prompt=prompt_value.text,
-                    response_model=self.output_model,
+            
+            # trigger llm start callbacks
+            if prompt_cb:
+                prompt_cb.on_llm_start(
+                    serialized={"name": instructor_llm.model},
+                    prompts=[prompt_value.text],
                 )
-            else:
-                result = llm.generate(
-                    prompt=prompt_value.text,
-                    response_model=self.output_model,
-                )
-            # Wrap the single response in an LLMResult-like structure for consistency
-            from langchain_core.outputs import Generation, LLMResult
 
-            generation = Generation(text=result.model_dump_json())
-            resp = LLMResult(generations=[[generation]])
+            try:
+                if instructor_llm.is_async:
+                    result = await llm.agenerate(
+                        prompt=prompt_value.text,
+                        response_model=self.output_model,
+                    )
+                else:
+                    result = llm.generate(
+                        prompt=prompt_value.text,
+                        response_model=self.output_model,
+                    )
+                
+                # Wrap the single response in an LLMResult-like structure for consistency
+                from langchain_core.outputs import Generation, LLMResult
+
+                generation = Generation(text=result.model_dump_json())
+                
+                llm_output = {}
+                if hasattr(result, "_raw_response") and getattr(result, "_raw_response", None):
+                    raw_resp = result._raw_response
+                    if hasattr(raw_resp, "usage") and getattr(raw_resp, "usage", None):
+                        usage = raw_resp.usage
+                        llm_output["token_usage"] = {
+                            "prompt_tokens": getattr(usage, "prompt_tokens", 0),
+                            "completion_tokens": getattr(usage, "completion_tokens", 0),
+                            "total_tokens": getattr(usage, "total_tokens", 0),
+                        }
+                    if hasattr(raw_resp, "model") and getattr(raw_resp, "model", None):
+                        llm_output["model_name"] = raw_resp.model
+
+                resp = LLMResult(generations=[[generation]], llm_output=llm_output)
+
+                # trigger llm end callbacks
+                if prompt_cb:
+                    prompt_cb.on_llm_end(resp)
+
+            except Exception as e:
+                if prompt_cb:
+                    prompt_cb.on_llm_error(e)
+                raise
         else:
             # This is a standard BaseRagasLLM - use generate()
             ragas_llm = t.cast(BaseRagasLLM, llm)
