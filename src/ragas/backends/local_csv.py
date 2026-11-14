@@ -88,7 +88,17 @@ class LocalCSVBackend(BaseBackend):
 
         # Write data to CSV
         with open(file_path, "w", newline="", encoding="utf-8") as f:
-            fieldnames = data[0].keys()
+            # Rows can have heterogeneous keys (e.g. an unvalidated Dataset/Experiment
+            # where only some rows carry an optional field). Collect the union of keys
+            # across every row instead of just the first, preserving first-seen order,
+            # so csv.DictWriter doesn't raise on rows with keys the first row lacks.
+            fieldnames: t.List[str] = []
+            seen: t.Set[str] = set()
+            for row in data:
+                for key in row.keys():
+                    if key not in seen:
+                        seen.add(key)
+                        fieldnames.append(key)
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(data)

@@ -449,6 +449,34 @@ class TestErrorHandling:
         assert len(loaded_data[0]["large_field"]) == 10000
         assert loaded_data[0]["large_field"] == large_text
 
+    def test_heterogeneous_row_keys(self, backend):
+        """Rows with different key sets must not crash save_dataset.
+
+        Dataset.append()/Experiment rows aren't required to share identical keys
+        when no data_model/validation is configured (e.g. only some rows carry an
+        optional "reason" field). csv.DictWriter defaults to extrasaction="raise",
+        so if fieldnames are taken from only the first row, any later row with an
+        extra key raises ValueError instead of being saved.
+        """
+        data = [
+            {"question": "capital of France?", "response": "Paris", "score": 1.0},
+            {
+                "question": "capital of UK?",
+                "response": "London",
+                "score": 0.0,
+                "reason": "wrong span matched",
+            },
+        ]
+
+        backend.save_dataset("heterogeneous_test", data)
+        loaded_data = backend.load_dataset("heterogeneous_test")
+
+        assert len(loaded_data) == 2
+        # Row that never had "reason" should round-trip as an empty string, not
+        # be dropped or misaligned.
+        assert loaded_data[0]["reason"] == ""
+        assert loaded_data[1]["reason"] == "wrong span matched"
+
     def test_malformed_csv_handling(self, backend, temp_dir):
         """Test behavior with malformed CSV files."""
         # Create a malformed CSV file manually
