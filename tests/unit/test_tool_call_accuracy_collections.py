@@ -160,5 +160,49 @@ class TestToolCallAccuracyCollections:
                 user_input=user_input,
                 reference_tool_calls=ref_tool_calls,
             )
-        # Sequences don't align (different lengths), so score is 0
-        assert result.value == 0.0
+        # Overlapping portion (first call) aligns and its args match:
+        # mean arg score 1.0, coverage penalty 1/2 for the missing call.
+        assert result.value == 0.5
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "strict_order,pred_calls,ref_calls,expected",
+        [
+            # equal length: unchanged behavior
+            (
+                True,
+                [("a", {"x": 1}), ("b", {"y": 2})],
+                [("a", {"x": 1}), ("b", {"y": 2})],
+                1.0,
+            ),
+            (True, [("b", {}), ("a", {})], [("a", {}), ("b", {})], 0.0),
+            (False, [("b", {}), ("a", {})], [("a", {}), ("b", {})], 1.0),
+            # length mismatch: overlap aligned -> partial credit (#3079),
+            # extra predictions still penalized (#1893)
+            (True, [("a", {"x": 1}), ("b", {})], [("a", {"x": 1})], 0.5),
+            (True, [("a", {"x": 1})], [("a", {"x": 1}), ("b", {})], 0.5),
+            (False, [("a", {"x": 1}), ("b", {})], [("a", {"x": 1})], 0.5),
+            # misaligned overlapping portion still scores 0
+            (True, [("b", {}), ("a", {})], [("a", {})], 0.0),
+            # duplicates
+            (True, [("a", {}), ("a", {})], [("a", {})], 0.5),
+            (True, [("a", {}), ("a", {})], [("a", {}), ("a", {})], 1.0),
+            # flexible mode pairs positionally after sorting: a reference
+            # subset past the first min-length positions does not match
+            (False, [("a", {}), ("b", {}), ("c", {})], [("b", {}), ("c", {})], 0.0),
+        ],
+    )
+    async def test_scoring_matrix(self, strict_order, pred_calls, ref_calls, expected):
+        """Regression matrix for alignment, length mismatch, and duplicates."""
+        metric = ToolCallAccuracy(strict_order=strict_order)
+        pred = [ToolCall(name=name, args=args) for name, args in pred_calls]
+        ref = [ToolCall(name=name, args=args) for name, args in ref_calls]
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            result = await metric.ascore(
+                user_input=[AIMessage(content="Working...", tool_calls=pred)],
+                reference_tool_calls=ref,
+            )
+        assert result.value == expected
