@@ -423,6 +423,10 @@ class EvaluationResult:
         List of columns that are binary metrics. Default is an empty list.
     cost_cb : CostCallbackHandler, optional
         The callback handler for cost computation. Default is None.
+    missing_score_policy : {"exclude", "zero"}, optional
+        How to aggregate NaN scores. "exclude" (default) averages only scored
+        rows. "zero" counts each NaN as zero and divides by all attempted rows.
+        Per-row scores are preserved under either policy.
     """
 
     scores: t.List[t.Dict[str, t.Any]]
@@ -432,8 +436,12 @@ class EvaluationResult:
     traces: t.List[t.Dict[str, t.Any]] = field(default_factory=list)
     ragas_traces: t.Dict[str, ChainRun] = field(default_factory=dict, repr=False)
     run_id: t.Optional[UUID] = None
+    missing_score_policy: t.Literal["exclude", "zero"] = "exclude"
 
     def __post_init__(self):
+        if self.missing_score_policy not in ("exclude", "zero"):
+            raise ValueError("missing_score_policy must be 'exclude' or 'zero'")
+
         # transform scores from list of dicts to dict of lists
         self._scores_dict = {
             k: [d[k] for d in self.scores] for k in self.scores[0].keys()
@@ -442,7 +450,12 @@ class EvaluationResult:
         values = []
         self._repr_dict = {}
         for metric_name in self._scores_dict.keys():
-            value = safe_nanmean(self._scores_dict[metric_name])
+            metric_scores = self._scores_dict[metric_name]
+            if self.missing_score_policy == "zero":
+                arr = np.asarray(metric_scores)
+                value = float(np.mean(np.where(np.isnan(arr), 0.0, arr)))
+            else:
+                value = safe_nanmean(metric_scores)
             self._repr_dict[metric_name] = value
             if metric_name not in self.binary_columns:
                 value = t.cast(float, value)

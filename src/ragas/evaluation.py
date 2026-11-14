@@ -74,6 +74,7 @@ async def aevaluate(
     _run_id: t.Optional[UUID] = None,
     _pbar: t.Optional[tqdm] = None,
     return_executor: bool = False,
+    missing_score_policy: t.Literal["exclude", "zero"] = "exclude",
 ) -> t.Union[EvaluationResult, Executor]:
     """
     Async version of evaluate that performs evaluation without applying nest_asyncio.
@@ -109,6 +110,9 @@ async def aevaluate(
         DeprecationWarning,
         stacklevel=2,
     )
+
+    if missing_score_policy not in ("exclude", "zero"):
+        raise ValueError("missing_score_policy must be 'exclude' or 'zero'")
 
     column_map = column_map or {}
     callbacks = callbacks or []
@@ -323,6 +327,7 @@ async def aevaluate(
             ),
             ragas_traces=tracer.traces,
             run_id=_run_id,
+            missing_score_policy=missing_score_policy,
         )
         if not evaluation_group_cm.ended:
             evaluation_rm.on_chain_end({"scores": result.scores})
@@ -365,6 +370,7 @@ def evaluate(
     _pbar: t.Optional[tqdm] = None,
     return_executor: bool = False,
     allow_nest_asyncio: bool = True,
+    missing_score_policy: t.Literal["exclude", "zero"] = "exclude",
 ) -> t.Union[EvaluationResult, Executor]:
     """
     Perform the evaluation on the dataset with different metrics
@@ -412,6 +418,16 @@ def evaluate(
     allow_nest_asyncio : bool, optional
         Whether to allow nest_asyncio patching for Jupyter compatibility.
         Set to False in production async applications to avoid event loop conflicts. Default is True.
+    missing_score_policy : {"exclude", "zero"}, optional
+        How to aggregate NaN scores in the returned EvaluationResult.
+        "exclude" (default) averages only successfully scored rows, so failures
+        can increase the reported mean. "zero" counts every NaN as zero and
+        divides by all attempted rows, including when all scores are NaN.
+        This also applies to undefined metric scores, not just exceptions.
+        Per-row scores remain NaN. Choose "zero" only when zero is an appropriate
+        penalty for the metrics being evaluated. Exceptions still propagate when
+        raise_exceptions=True. Has no effect when return_executor=True, which
+        returns raw per-job scores without aggregation.
 
     Returns
     -------
@@ -470,6 +486,7 @@ def evaluate(
             _run_id=_run_id,
             _pbar=_pbar,
             return_executor=return_executor,
+            missing_score_policy=missing_score_policy,
         )
 
     if not allow_nest_asyncio:
