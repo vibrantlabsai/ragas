@@ -193,6 +193,12 @@ class SummarizationScore(MetricWithLLM, SingleTurnMetric):
         )
 
     def _compute_qa_score(self, answers: t.List[str]) -> float:
+        if not answers:
+            # No questions could be generated/answered (e.g. keyphrase or
+            # question extraction returned nothing) — same "log and degrade"
+            # convention as _extract_keyphrases/_get_questions rather than
+            # raising ZeroDivisionError.
+            return 0.0
         correct = sum([1 for a in answers if a.lower() == "1"])
         return correct / len(answers)
 
