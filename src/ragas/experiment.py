@@ -122,11 +122,13 @@ class ExperimentWrapper:
         experiment_model: t.Optional[t.Type[BaseModel]] = None,
         default_backend: t.Optional[t.Union[BaseBackend, str]] = None,
         name_prefix: str = "",
+        run_config: t.Optional[t.Dict[str, t.Any]] = None,
     ):
         self.func = func
         self.experiment_model = experiment_model
         self.default_backend = default_backend
         self.name_prefix = name_prefix
+        self.run_config = run_config or {}
         # Preserve function metadata
         self.__name__ = getattr(func, "__name__", "experiment_function")
         self.__doc__ = getattr(func, "__doc__", None)
@@ -143,6 +145,7 @@ class ExperimentWrapper:
         dataset: Dataset,
         name: t.Optional[str] = None,
         backend: t.Optional[t.Union[BaseBackend, str]] = None,
+        run_config: t.Optional[t.Dict[str, t.Any]] = None,
         *args,
         **kwargs,
     ) -> "Experiment":
@@ -167,10 +170,24 @@ class ExperimentWrapper:
             backend=resolved_backend,
         )
 
+        # Merge run_config
+        final_run_config = {**self.run_config, **(run_config or {})}
+        max_workers = final_run_config.get("max_workers", None)
+
+        # Create semaphore if max_workers is set
+        sem = asyncio.Semaphore(max_workers) if max_workers is not None else None
+
+        async def wrapped_func(item):
+            if sem:
+                async with sem:
+                    return await self(item, *args, **kwargs)
+            else:
+                return await self(item, *args, **kwargs)
+
         # Create tasks for all items
         tasks = []
         for item in dataset:
-            tasks.append(self(item, *args, **kwargs))
+            tasks.append(wrapped_func(item))
 
         progress_bar = None
         try:
@@ -202,6 +219,7 @@ def experiment(
     experiment_model: t.Optional[t.Type[BaseModel]] = None,
     backend: t.Optional[t.Union[BaseBackend, str]] = None,
     name_prefix: str = "",
+    run_config: t.Optional[t.Dict[str, t.Any]] = None,
 ) -> t.Callable[[t.Callable], ExperimentProtocol]:
     """Decorator for creating experiment functions.
 
@@ -209,6 +227,7 @@ def experiment(
         experiment_model: The Pydantic model type to use for experiment results
         backend: Optional backend to use for storing experiment results
         name_prefix: Optional prefix for experiment names
+        run_config: Optional configuration for experiment execution (e.g., {"max_workers": 5})
 
     Returns:
         Decorator function that wraps experiment functions
@@ -226,6 +245,7 @@ def experiment(
             experiment_model=experiment_model,
             default_backend=backend,
             name_prefix=name_prefix,
+            run_config=run_config,
         )
         return t.cast(ExperimentProtocol, wrapper)
 

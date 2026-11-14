@@ -13,6 +13,11 @@ from ragas.dataset import Dataset
 from ragas.experiment import Experiment, experiment, version_experiment
 from ragas.utils import find_git_root, memorable_names
 
+try:
+    import git
+except ImportError:
+    git = None
+
 
 # Test data models
 class SampleDataRow(BaseModel):
@@ -105,6 +110,7 @@ class TestExperiment:
         assert len(experiment) == 0
 
 
+@pytest.mark.skipif(git is None, reason="GitPython not installed")
 class TestVersionExperiment:
     """Test the version_experiment function."""
 
@@ -359,6 +365,43 @@ class TestExperimentDecorator:
 
         assert isinstance(experiment_result, Experiment)
         assert len(experiment_result) == 3
+
+    @pytest.mark.asyncio
+    async def test_experiment_concurrency(self, sample_dataset, experiment_backend):
+        """Test experiment with concurrency limit."""
+        import asyncio
+
+        # Setup tracking
+        current_operations = 0
+        max_seen_concurrency = 0
+
+        async def tracked_operation(row):
+            nonlocal current_operations, max_seen_concurrency
+            current_operations += 1
+            max_seen_concurrency = max(max_seen_concurrency, current_operations)
+            await asyncio.sleep(0.05)  # Simulate work
+            current_operations -= 1
+            return ExperimentResultRow(
+                question=row.question,
+                processed_answer=row.answer,
+                sentiment="neutral",
+                processing_time=0.01,
+            )
+
+        @experiment(experiment_model=ExperimentResultRow, backend=experiment_backend)
+        async def concurrent_experiment(row: SampleDataRow) -> ExperimentResultRow:
+            return await tracked_operation(row)
+
+        with patch(
+            "ragas.utils.memorable_names.generate_unique_name",
+            return_value="concurrency_test",
+        ):
+            # Run with max_workers=1. Since dataset has 3 items, without limit it would likely be 3.
+            await concurrent_experiment.arun(
+                sample_dataset, run_config={"max_workers": 1}
+            )
+
+        assert max_seen_concurrency == 1
 
 
 class TestMemorableNames:
