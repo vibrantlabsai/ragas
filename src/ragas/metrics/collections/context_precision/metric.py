@@ -62,6 +62,7 @@ class ContextPrecisionWithReference(BaseMetric):
         self,
         llm: "InstructorBaseRagasLLM",
         name: str = "context_precision_with_reference",
+        prompt: t.Optional[ContextPrecisionPrompt] = None,
         **kwargs,
     ):
         """
@@ -70,10 +71,11 @@ class ContextPrecisionWithReference(BaseMetric):
         Args:
             llm: Modern instructor-based LLM for context evaluation
             name: The metric name
+            prompt: Optional custom prompt; defaults to ContextPrecisionPrompt()
         """
         # Set attributes explicitly before calling super()
         self.llm = llm
-        self.prompt = ContextPrecisionPrompt()  # Initialize prompt class once
+        self.prompt = prompt if prompt is not None else ContextPrecisionPrompt()
 
         # Call super() for validation (without passing llm in kwargs)
         super().__init__(name=name, **kwargs)
@@ -182,6 +184,7 @@ class ContextPrecisionWithoutReference(BaseMetric):
         self,
         llm: "InstructorBaseRagasLLM",
         name: str = "context_precision_without_reference",
+        prompt: t.Optional[ContextPrecisionPrompt] = None,
         **kwargs,
     ):
         """
@@ -190,10 +193,11 @@ class ContextPrecisionWithoutReference(BaseMetric):
         Args:
             llm: Modern instructor-based LLM for context evaluation
             name: The metric name
+            prompt: Optional custom prompt; defaults to ContextPrecisionPrompt()
         """
         # Set attributes explicitly before calling super()
         self.llm = llm
-        self.prompt = ContextPrecisionPrompt()  # Initialize prompt class once
+        self.prompt = prompt if prompt is not None else ContextPrecisionPrompt()
 
         # Call super() for validation (without passing llm in kwargs)
         super().__init__(name=name, **kwargs)
@@ -288,10 +292,11 @@ class ContextPrecision(ContextPrecisionWithReference):
     def __init__(
         self,
         llm: "InstructorBaseRagasLLM",
+        prompt: t.Optional[ContextPrecisionPrompt] = None,
         **kwargs,
     ):
         """Initialize ContextPrecision with the legacy default name."""
-        super().__init__(llm, name="context_precision", **kwargs)
+        super().__init__(llm, name="context_precision", prompt=prompt, **kwargs)
 
 
 class ContextUtilization(ContextPrecisionWithoutReference):
