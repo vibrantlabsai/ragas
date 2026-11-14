@@ -1,5 +1,6 @@
 """Semantic Similarity metric."""
 
+import asyncio
 import typing as t
 
 import numpy as np
@@ -66,6 +67,12 @@ class SemanticSimilarity(BaseMetric):
 
         super().__init__(name=name, **kwargs)
 
+    async def _embed_text(self, text: str) -> t.List[float]:
+        # Some providers, such as OpenAI, reject async calls for sync clients.
+        if getattr(self.embeddings, "is_async", None) is False:
+            return await asyncio.to_thread(self.embeddings.embed_text, text)
+        return await self.embeddings.aembed_text(text)
+
     async def ascore(self, reference: str, response: str) -> MetricResult:
         """
         Calculate semantic similarity score asynchronously.
@@ -82,8 +89,8 @@ class SemanticSimilarity(BaseMetric):
         reference = reference or " "
         response = response or " "
 
-        embedding_1 = np.array(self.embeddings.embed_text(reference))
-        embedding_2 = np.array(self.embeddings.embed_text(response))
+        embedding_1 = np.array(await self._embed_text(reference))
+        embedding_2 = np.array(await self._embed_text(response))
 
         norms_1 = np.linalg.norm(embedding_1, keepdims=True)
         norms_2 = np.linalg.norm(embedding_2, keepdims=True)
