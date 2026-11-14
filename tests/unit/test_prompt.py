@@ -233,6 +233,32 @@ async def test_prompt_parse_retry():
         )
 
 
+@pytest.mark.asyncio
+async def test_pydantic_prompt_langchain_llm_markdown_json():
+    from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+
+    from ragas.prompt import PydanticPrompt, StringIO
+
+    class OutputModel(BaseModel):
+        answer: str
+
+    class Prompt(PydanticPrompt[StringIO, OutputModel]):
+        instruction = "Answer the query."
+        input_model = StringIO
+        output_model = OutputModel
+
+    fake_langchain_llm = GenericFakeChatModel(
+        messages=iter(['```json\n{"answer": "Paris"}\n```'])
+    )
+
+    prompt = Prompt()
+    result = await prompt.generate(
+        data=StringIO(text="What is the capital of France?"),
+        llm=fake_langchain_llm,
+    )
+    assert result.answer == "Paris"
+
+
 def cosine_similarity(v1: t.List[float], v2: t.List[float]) -> float:
     """Calculate cosine similarity between two vectors."""
     v1_array = np.array(v1)
