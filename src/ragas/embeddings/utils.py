@@ -1,7 +1,6 @@
 """Shared utilities for embedding implementations."""
 
 import asyncio
-import threading
 import typing as t
 from concurrent.futures import ThreadPoolExecutor
 
@@ -9,8 +8,9 @@ from concurrent.futures import ThreadPoolExecutor
 def run_async_in_current_loop(coro: t.Awaitable[t.Any]) -> t.Any:
     """Run an async coroutine in the current event loop if possible.
 
-    This handles Jupyter environments correctly by using a separate thread
-    when a running event loop is detected.
+    This handles Jupyter environments and async contexts correctly by
+    scheduling the coroutine on the already-running loop when one is detected,
+    avoiding event loop binding conflicts with async clients such as AsyncOpenAI.
 
     Args:
         coro: The coroutine to run
@@ -22,50 +22,27 @@ def run_async_in_current_loop(coro: t.Awaitable[t.Any]) -> t.Any:
         Any exception raised by the coroutine
     """
     try:
-        # Try to get the current event loop
-        loop = asyncio.get_event_loop()
+        # Check whether there is already a running event loop
+        loop = asyncio.get_running_loop()
 
-        if loop.is_running():
-            # If the loop is already running (like in Jupyter notebooks),
-            # we run the coroutine in a separate thread with its own event loop
-            result_container: t.Dict[str, t.Any] = {"result": None, "exception": None}
-
-            def run_in_thread():
-                # Create a new event loop for this thread
-                new_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(new_loop)
-                try:
-                    # Run the coroutine in this thread's event loop
-                    result_container["result"] = new_loop.run_until_complete(coro)
-                except Exception as e:
-                    # Capture any exceptions to re-raise in the main thread
-                    result_container["exception"] = e
-                finally:
-                    # Clean up the event loop
-                    new_loop.close()
-
-            # Start the thread and wait for it to complete
-            thread = threading.Thread(target=run_in_thread)
-            thread.start()
-            thread.join()
-
-            # Re-raise any exceptions that occurred in the thread
-            if result_container["exception"]:
-                raise result_container["exception"]
-
-            return result_container["result"]
-        else:
-            # Standard case - event loop exists but isn't running
-            return loop.run_until_complete(coro)
+        # A loop is running (e.g. inside asyncio.run(), Jupyter, or any async
+        # framework).  Schedule the coroutine on *that* loop so that async
+        # clients (AsyncOpenAI, httpx.AsyncClient, …) which are bound to it
+        # keep working correctly.  We submit from the current thread and block
+        # on the result via a concurrent.futures.Future; this does *not* block
+        # the event loop thread itself because run_coroutine_threadsafe posts
+        # the coroutine as a callback to the loop.
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
+        return future.result()
 
     except RuntimeError:
-        # If we get a runtime error about no event loop, create a new one
+        # No running event loop – we are in a plain synchronous context.
+        # Create a fresh loop, run the coroutine to completion, then clean up.
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
             return loop.run_until_complete(coro)
         finally:
-            # Clean up
             loop.close()
             asyncio.set_event_loop(None)
 
