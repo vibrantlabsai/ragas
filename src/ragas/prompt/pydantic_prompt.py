@@ -270,7 +270,35 @@ class PydanticPrompt(BasePrompt, t.Generic[InputModel, OutputModel]):
             from langchain_core.outputs import Generation, LLMResult
 
             generation = Generation(text=result.model_dump_json())
-            resp = LLMResult(generations=[[generation]])
+
+            # Try to extract usage data from the raw response if available
+            # Instructor attaches _raw_response to Pydantic models in newer versions
+            llm_output = {}
+            if hasattr(result, "_raw_response"):
+                raw_resp = result._raw_response
+                # Try to extract usage information from the raw response
+                if hasattr(raw_resp, "usage"):
+                    usage = raw_resp.usage
+                    llm_output = {
+                        "token_usage": {
+                            "prompt_tokens": getattr(usage, "prompt_tokens", 0),
+                            "completion_tokens": getattr(usage, "completion_tokens", 0),
+                            "total_tokens": getattr(usage, "total_tokens", 0),
+                        },
+                        "model_name": getattr(raw_resp, "model", instructor_llm.model),
+                    }
+
+            resp = LLMResult(
+                generations=[[generation]],
+                llm_output=llm_output if llm_output else None,
+            )
+
+            # Manually trigger callback handlers to track token usage
+            # InstructorLLM doesn't natively support callbacks, so we need to invoke them
+            if prompt_cb and hasattr(prompt_cb, "handlers"):
+                for handler in prompt_cb.handlers:
+                    if hasattr(handler, "on_llm_end"):
+                        handler.on_llm_end(resp)
         else:
             # This is a standard BaseRagasLLM - use generate()
             ragas_llm = t.cast(BaseRagasLLM, llm)
