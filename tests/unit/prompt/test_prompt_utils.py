@@ -212,3 +212,42 @@ class TestExtractJson:
         """
         expected = """{"text": "how does the provided commands be used to manage and troubleshoot namespaces in a Kubernetes environment?"}"""
         assert extract_json(text) == expected
+
+    def test_braces_inside_string_values(self):
+        # Statements generated from answers that mention code or sets can
+        # contain unbalanced braces/brackets inside JSON strings (issue #2585).
+        expected = (
+            '{"statements": ["A dict literal starts with {", "Close a list with ]"]}'
+        )
+        assert extract_json(self.prefix + expected + self.suffix) == expected
+
+    def test_escaped_quotes_inside_string_values(self):
+        expected = r'{"statements": ["He said \"use }\" here"]}'
+        assert extract_json(expected + self.suffix) == expected
+
+
+@pytest.mark.asyncio
+async def test_output_parser_handles_braces_in_statements():
+    from unittest.mock import MagicMock
+
+    from langchain_core.prompt_values import StringPromptValue
+
+    from ragas.metrics._faithfulness import StatementGeneratorOutput
+    from ragas.prompt.pydantic_prompt import RagasOutputParser
+
+    llm = MagicMock()  # must not be called: parsing should succeed first try
+    parser = RagasOutputParser(pydantic_object=StatementGeneratorOutput)
+    output = (
+        "Here is the output:\n"
+        '{"statements": ["In Python, a set literal looks like {1, 2}.", '
+        '"An empty dict is written as {"]}'
+    )
+    result = await parser.parse_output_string(
+        output_string=output,
+        prompt_value=StringPromptValue(text="prompt"),
+        llm=llm,
+        callbacks=None,
+        retries_left=1,
+    )
+    assert result.statements[1] == "An empty dict is written as {"
+    llm.generate.assert_not_called()
