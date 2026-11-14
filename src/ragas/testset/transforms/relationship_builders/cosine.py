@@ -118,6 +118,12 @@ class SummaryCosineSimilarityBuilder(CosineSimilarityBuilder):
     threshold: float = 0.1
     block_size: int = 1024
 
+    def generate_execution_plan(self, kg: KnowledgeGraph) -> t.List[t.Coroutine]:
+        """Schedule the document-only transform after applying the node filter."""
+        # The cosine builder's optimized plan bypasses transform(), including
+        # this subclass's document selection. Use the shared virtual dispatch.
+        return list(RelationshipBuilder.generate_execution_plan(self, kg))
+
     def _document_summary_filter(self, kg: KnowledgeGraph) -> KnowledgeGraph:
         """
         Filters the knowledge graph to only include nodes with a summary embedding.
