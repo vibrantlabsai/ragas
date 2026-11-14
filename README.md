@@ -7,6 +7,10 @@
 </p>
 
 <p align="center">
+  <b>English</b> · <a href="README.zh.md">简体中文</a>
+</p>
+
+<p align="center">
     <a href="https://github.com/vibrantlabsai/ragas/releases">
         <img alt="Latest release" src="https://img.shields.io/github/release/vibrantlabsai/ragas.svg">
     </a>
