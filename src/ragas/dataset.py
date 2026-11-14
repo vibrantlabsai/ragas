@@ -394,15 +394,16 @@ class DataTable(t.Generic[T]):
         if not self._data:
             self.load(self.name, self.backend, self.data_model)
 
+        data = self._data.copy()
+
         # Shuffle entries if random_state is set
         if random_state is not None:
             import random
 
-            random.seed(random_state)
-            random.shuffle(self._data)
+            random.Random(random_state).shuffle(data)
 
         # Calculate split index
-        split_index = int(len(self._data) * (1 - test_size))
+        split_index = int(len(data) * (1 - test_size))
 
         # Create new dataset instances with proper initialization
         # Use inmemory backend for split datasets (temporary datasets)
@@ -411,8 +412,8 @@ class DataTable(t.Generic[T]):
         # Handle type-safe constructor calls based on data_model presence
         if self.data_model is not None:
             # Validated dataset case - data should be List[T]
-            train_data = t.cast(t.List[T], self._data[:split_index])
-            test_data = t.cast(t.List[T], self._data[split_index:])
+            train_data = t.cast(t.List[T], data[:split_index])
+            test_data = t.cast(t.List[T], data[split_index:])
 
             train_dataset = type(self)(
                 name=f"{self.name}_train",
@@ -429,8 +430,8 @@ class DataTable(t.Generic[T]):
             )
         else:
             # Unvalidated dataset case - data should be List[Dict]
-            train_data = t.cast(t.List[t.Dict[str, t.Any]], self._data[:split_index])
-            test_data = t.cast(t.List[t.Dict[str, t.Any]], self._data[split_index:])
+            train_data = t.cast(t.List[t.Dict[str, t.Any]], data[:split_index])
+            test_data = t.cast(t.List[t.Dict[str, t.Any]], data[split_index:])
 
             train_dataset = type(self)(
                 name=f"{self.name}_train",
