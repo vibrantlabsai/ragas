@@ -181,17 +181,68 @@ _DEPRECATED_METRICS = {
     "AgentGoalAccuracyWithReference": _AgentGoalAccuracyWithReference,
 }
 
+# Deprecated names whose ragas.metrics.collections equivalent has a different
+# name; the deprecation warning points users at the new name.
+_COLLECTIONS_NAMES = {
+    "AnswerSimilarity": "SemanticSimilarity",
+    "answer_similarity": "SemanticSimilarity",
+    "ChrfScore": "CHRFScore",
+    "InstanceRubrics": "InstanceSpecificRubrics",
+    "LLMContextPrecisionWithoutReference": "ContextPrecisionWithoutReference",
+    "LLMContextPrecisionWithReference": "ContextPrecisionWithReference",
+    "LLMContextRecall": "ContextRecall",
+    "LLMSQLEquivalence": "SQLSemanticEquivalence",
+    "multimodal_faithness": "MultiModalFaithfulness",
+    "multimodal_relevance": "MultiModalRelevance",
+    "ResponseRelevancy": "AnswerRelevancy",
+    "RubricsScore": "DomainSpecificRubrics",
+    "SummarizationScore": "SummaryScore",
+    "summarization_score": "SummaryScore",
+    "TopicAdherenceScore": "TopicAdherence",
+    # lowercase legacy instances: collections exports only the CamelCase
+    # classes, and a submodule of the same name would otherwise shadow the
+    # suggested import
+    "answer_correctness": "AnswerCorrectness",
+    "answer_relevancy": "AnswerRelevancy",
+    "context_entity_recall": "ContextEntityRecall",
+    "context_precision": "ContextPrecision",
+    "context_recall": "ContextRecall",
+    "faithfulness": "Faithfulness",
+}
+
+# Deprecated names that have no direct equivalent in ragas.metrics.collections
+_NO_COLLECTIONS_EQUIVALENT = {
+    "AspectCritic",
+    "FaithfulnesswithHHEM",
+    "IDBasedContextPrecision",
+    "IDBasedContextRecall",
+    "NonLLMContextPrecisionWithReference",
+    "NonLLMContextRecall",
+    "SimpleCriteriaScore",
+}
+
 _DEPRECATION_MESSAGE = (
     "Importing {name} from 'ragas.metrics' is deprecated and will be removed in v1.0. "
     "Please use 'ragas.metrics.collections' instead. "
-    "Example: from ragas.metrics.collections import {name}"
+    "Example: from ragas.metrics.collections import {new_name}"
+)
+
+_DEPRECATION_MESSAGE_NO_EQUIVALENT = (
+    "Importing {name} from 'ragas.metrics' is deprecated and will be removed in "
+    "v1.0 and has no direct equivalent in 'ragas.metrics.collections'."
 )
 
 
 def __getattr__(name: str):
     if name in _DEPRECATED_METRICS:
+        if name in _NO_COLLECTIONS_EQUIVALENT:
+            message = _DEPRECATION_MESSAGE_NO_EQUIVALENT.format(name=name)
+        else:
+            message = _DEPRECATION_MESSAGE.format(
+                name=name, new_name=_COLLECTIONS_NAMES.get(name, name)
+            )
         warnings.warn(
-            _DEPRECATION_MESSAGE.format(name=name),
+            message,
             DeprecationWarning,
             stacklevel=2,
         )
