@@ -5,6 +5,7 @@ import typing as t
 from dataclasses import dataclass, field
 from typing import Dict
 
+import numpy as np
 from pydantic import BaseModel
 
 from ragas.dataset_schema import SingleTurnSample
@@ -193,6 +194,10 @@ class SummarizationScore(MetricWithLLM, SingleTurnMetric):
         )
 
     def _compute_qa_score(self, answers: t.List[str]) -> float:
+        if not answers:
+            # Upstream keyphrase / question generation can return [] when the LLM
+            # fails or the input is empty; signal "no score" instead of raising.
+            return np.nan
         correct = sum([1 for a in answers if a.lower() == "1"])
         return correct / len(answers)
 
