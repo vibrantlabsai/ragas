@@ -171,10 +171,12 @@ class ImageTextPrompt(PydanticPrompt, t.Generic[InputModel, OutputModel]):
         # LangChain LLMs have agenerate() for async, generate() for sync
         # Ragas LLMs have generate() as async method
         if is_langchain_llm(llm):
-            # This is a LangChain LLM - use agenerate_prompt()
+            # This is a LangChain LLM - use agenerate_prompt() with batch for multiple generations
             langchain_llm = t.cast(BaseLanguageModel, llm)
+            # LangChain doesn't support n parameter directly, so we batch multiple prompts
+            prompts = t.cast(t.List[t.Any], [prompt_value for _ in range(n)])
             resp = await langchain_llm.agenerate_prompt(
-                [prompt_value],
+                prompts,
                 stop=stop,
                 callbacks=prompt_cb,
             )
@@ -191,8 +193,34 @@ class ImageTextPrompt(PydanticPrompt, t.Generic[InputModel, OutputModel]):
 
         output_models = []
         parser = RagasOutputParser(pydantic_object=self.output_model)  # type: ignore
-        for i in range(n):
-            output_string = resp.generations[0][i].text
+
+        # Handle cases where LLM returns fewer generations than requested
+        if is_langchain_llm(llm):
+            available_generations = len(resp.generations)
+        else:
+            available_generations = len(resp.generations[0]) if resp.generations else 0
+
+        actual_n = min(n, available_generations)
+
+        if actual_n == 0:
+            logger.error(
+                f"LLM returned no generations when {n} were requested. Cannot proceed."
+            )
+            raise ValueError(f"LLM returned no generations when {n} were requested")
+
+        if actual_n < n:
+            logger.warning(
+                f"LLM returned {actual_n} generations instead of requested {n}. "
+                f"Proceeding with {actual_n} generations."
+            )
+
+        for i in range(actual_n):
+            if is_langchain_llm(llm):
+                # For LangChain LLMs, each generation is in a separate batch result
+                output_string = resp.generations[i][0].text
+            else:
+                # For Ragas LLMs, all generations are in the first batch
+                output_string = resp.generations[0][i].text
             try:
                 # For the parser, we need a BaseRagasLLM, so if it's a LangChain LLM, we need to handle this
                 if is_langchain_llm(llm):
