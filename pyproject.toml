@@ -47,6 +47,7 @@ all = [
     "rapidfuzz",
     "pandas",
     "datacompy",
+    "sqlparse",
     "sacrebleu",
     "llama_index",
     "r2r",

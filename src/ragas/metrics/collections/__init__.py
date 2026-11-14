@@ -42,6 +42,7 @@ from ragas.metrics.collections.multi_modal_relevance import MultiModalRelevance
 from ragas.metrics.collections.noise_sensitivity import NoiseSensitivity
 from ragas.metrics.collections.quoted_spans import QuotedSpansAlignment
 from ragas.metrics.collections.response_groundedness import ResponseGroundedness
+from ragas.metrics.collections.sql_schema_hallucination import SQLSchemaHallucination
 from ragas.metrics.collections.sql_semantic_equivalence import SQLSemanticEquivalence
 from ragas.metrics.collections.summary_score import SummaryScore
 from ragas.metrics.collections.tool_call_accuracy import ToolCallAccuracy
@@ -91,5 +92,6 @@ __all__ = [
     "RubricsScoreWithReference",
     # SQL & Data metrics
     "DataCompyScore",
+    "SQLSchemaHallucination",
     "SQLSemanticEquivalence",
 ]
