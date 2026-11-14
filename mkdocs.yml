@@ -34,6 +34,10 @@ nav:
                   - Noise Sensitivity: concepts/metrics/available_metrics/noise_sensitivity.md
                   - Response Relevancy: concepts/metrics/available_metrics/answer_relevance.md
                   - Faithfulness: concepts/metrics/available_metrics/faithfulness.md
+              - Consistency:
+                  - concepts/metrics/available_metrics/consistency.md
+                  - Answer Consistency: concepts/metrics/available_metrics/consistency/#answer-consistency
+                  - Retrieval Consistency: concepts/metrics/available_metrics/consistency/#retrieval-consistency
               - Nvidia Metrics:
                   - Answer Accuracy: concepts/metrics/available_metrics/nvidia_metrics/#answer-accuracy
                   - Context Relevance: concepts/metrics/available_metrics/nvidia_metrics/#context-relevance
