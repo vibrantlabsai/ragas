@@ -267,3 +267,20 @@ def test_in_memory_example_store():
     assert store.get_examples(FakeInputModel(text="hello", embedding=[1, 2, 3])) == [
         FakeOutputModel(text="hello")
     ]
+
+
+def test_get_nearest_examples_respects_top_k():
+    from ragas.prompt import InMemoryExampleStore
+
+    query = [1.0, 0.0]
+    embeddings = [[1.0, 0.0], [0.9, 0.1], [0.8, 0.2]]
+
+    top_2 = InMemoryExampleStore.get_nearest_examples(
+        query, embeddings, top_k=2, threshold=0.0
+    )
+    assert len(top_2) == 2
+
+    top_0 = InMemoryExampleStore.get_nearest_examples(
+        query, embeddings, top_k=0, threshold=0.0
+    )
+    assert top_0 == []

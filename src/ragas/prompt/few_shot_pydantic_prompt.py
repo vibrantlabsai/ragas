@@ -68,6 +68,10 @@ class InMemoryExampleStore(ExampleStore):
         top_k: int = 3,
         threshold: float = 0.7,
     ) -> t.List[int]:
+        # top_k=0 must select nothing; guard against numpy's -0 slice returning all
+        if top_k <= 0:
+            return []
+
         # Convert to numpy arrays for efficient computation
         query = np.array(query_embedding)
         embed_matrix = np.array(embeddings)
