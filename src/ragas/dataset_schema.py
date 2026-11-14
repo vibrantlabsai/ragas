@@ -456,6 +456,41 @@ class EvaluationResult:
         score_strs = [f"'{k}': {v:0.4f}" for k, v in self._repr_dict.items()]
         return "{" + ", ".join(score_strs) + "}"
 
+    def summary(self) -> t.Dict[str, t.Dict[str, t.Any]]:
+        """Return per-metric aggregate statistics as a structured dict.
+
+        Returns
+        -------
+        dict of str to dict
+            Mapping of metric name to ``{"mean", "count", "missing"}`` where
+            ``mean`` uses the same NaN-safe aggregation as ``__repr__``,
+            ``count`` is the number of non-missing scores, and ``missing`` is
+            the number of missing/NaN scores.
+
+        Examples
+        --------
+        >>> summary = result.summary()
+        >>> assert summary["faithfulness"]["mean"] >= 0.8
+        """
+        out: t.Dict[str, t.Dict[str, t.Any]] = {}
+        for metric_name, values in self._scores_dict.items():
+            missing = 0
+            present = 0
+            for v in values:
+                try:
+                    if v is None or (isinstance(v, float) and v != v):  # NaN != NaN
+                        missing += 1
+                    else:
+                        present += 1
+                except Exception:
+                    missing += 1
+            out[metric_name] = {
+                "mean": self._repr_dict.get(metric_name),
+                "count": present,
+                "missing": missing,
+            }
+        return out
+
     def __getitem__(self, key: str) -> t.List[float]:
         return self._scores_dict[key]
 
