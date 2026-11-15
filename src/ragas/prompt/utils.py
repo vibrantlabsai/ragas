@@ -93,8 +93,20 @@ def extract_json(text: str) -> str:
 
     # Initialize a count to keep track of delimiter pairs
     count = 0
+    in_string = False
+    escaped = False
     for i, char in enumerate(text[start_idx:], start=start_idx):
-        if char == open_char:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == open_char:
             count += 1
         elif char == close_char:
             count -= 1

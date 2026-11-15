@@ -267,3 +267,107 @@ def test_in_memory_example_store():
     assert store.get_examples(FakeInputModel(text="hello", embedding=[1, 2, 3])) == [
         FakeOutputModel(text="hello")
     ]
+
+
+@pytest.mark.asyncio
+async def test_pydantic_prompt_langchain_llm_markdown_code_fence():
+    from langchain_core.language_models.fake import FakeListLLM
+
+    from ragas.prompt import PydanticPrompt, StringIO
+
+    class OutputModel(BaseModel):
+        text: str
+
+    class Prompt(PydanticPrompt[StringIO, OutputModel]):
+        instruction = "Test instruction"
+        input_model = StringIO
+        output_model = OutputModel
+
+    llm = FakeListLLM(responses=['```json\n{"text": "extracted text"}\n```'])
+    prompt = Prompt()
+    result = await prompt.generate(data=StringIO(text="test"), llm=llm)
+    assert isinstance(result, OutputModel)
+    assert result.text == "extracted text"
+
+
+@pytest.mark.asyncio
+async def test_pydantic_prompt_langchain_llm_surrounding_text():
+    from langchain_core.language_models.fake import FakeListLLM
+
+    from ragas.prompt import PydanticPrompt, StringIO
+
+    class OutputModel(BaseModel):
+        statements: t.List[str]
+
+    class Prompt(PydanticPrompt[StringIO, OutputModel]):
+        instruction = "Test instruction"
+        input_model = StringIO
+        output_model = OutputModel
+
+    llm = FakeListLLM(
+        responses=[
+            'Here is the requested output:\n```json\n{"statements": ["fact 1", "fact 2"]}\n```\nHope this helps!'
+        ]
+    )
+    prompt = Prompt()
+    result = await prompt.generate(data=StringIO(text="test"), llm=llm)
+    assert isinstance(result, OutputModel)
+    assert result.statements == ["fact 1", "fact 2"]
+
+
+@pytest.mark.asyncio
+async def test_pydantic_prompt_langchain_llm_raw_json():
+    from langchain_core.language_models.fake import FakeListLLM
+
+    from ragas.prompt import PydanticPrompt, StringIO
+
+    class OutputModel(BaseModel):
+        text: str
+
+    class Prompt(PydanticPrompt[StringIO, OutputModel]):
+        instruction = "Test instruction"
+        input_model = StringIO
+        output_model = OutputModel
+
+    llm = FakeListLLM(responses=['{"text": "raw json text"}'])
+    prompt = Prompt()
+    result = await prompt.generate(data=StringIO(text="test"), llm=llm)
+    assert isinstance(result, OutputModel)
+    assert result.text == "raw json text"
+
+
+@pytest.mark.asyncio
+async def test_pydantic_prompt_langchain_llm_braces_in_strings():
+    import json
+
+    from langchain_core.language_models.fake import FakeListLLM
+
+    from ragas.prompt import PydanticPrompt, StringIO
+
+    class OutputModel(BaseModel):
+        statements: t.List[str]
+
+    class Prompt(PydanticPrompt[StringIO, OutputModel]):
+        instruction = "Test instruction"
+        input_model = StringIO
+        output_model = OutputModel
+
+    expected = {
+        "statements": [
+            "Use the } delimiter to close a JSON object.",
+            "Keep this second statement as well.",
+        ]
+    }
+    # Raw JSON
+    llm = FakeListLLM(responses=[json.dumps(expected)])
+    prompt = Prompt()
+    result = await prompt.generate(data=StringIO(text="test"), llm=llm)
+    assert isinstance(result, OutputModel)
+    assert result.statements == expected["statements"]
+
+    # Markdown fenced JSON with braces in string
+    fenced_resp = f"```json\n{json.dumps(expected)}\n```"
+    llm_fenced = FakeListLLM(responses=[fenced_resp])
+    result_fenced = await prompt.generate(data=StringIO(text="test"), llm=llm_fenced)
+    assert isinstance(result_fenced, OutputModel)
+    assert result_fenced.statements == expected["statements"]
