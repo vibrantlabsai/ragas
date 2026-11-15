@@ -315,8 +315,11 @@ class PydanticPrompt(BasePrompt, t.Generic[InputModel, OutputModel]):
             try:
                 # For the parser, we need a BaseRagasLLM, so if it's a LangChain LLM, we need to handle this
                 if is_langchain_llm(llm) or isinstance(llm, InstructorBaseRagasLLM):
-                    # Skip parsing retry for LangChain LLMs since parser expects BaseRagasLLM
-                    answer = self.output_model.model_validate_json(output_string)
+                    # Skip parsing retry for LangChain LLMs since parser expects BaseRagasLLM.
+                    # Still extract JSON from markdown fences / surrounding text so that
+                    # models that wrap their response in ```json ... ``` succeed.
+                    cleaned_output = extract_json(output_string)
+                    answer = self.output_model.model_validate_json(cleaned_output)
                 else:
                     ragas_llm = t.cast(BaseRagasLLM, llm)
                     answer = await parser.parse_output_string(
