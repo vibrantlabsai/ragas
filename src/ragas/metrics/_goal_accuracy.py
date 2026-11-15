@@ -154,6 +154,7 @@ class AgentGoalAccuracyWithoutReference(MetricWithLLM, MultiTurnMetric):
             }
         }
     )
+    output_type: t.Optional[MetricOutputType] = MetricOutputType.BINARY
     workflow_prompt: PydanticPrompt = field(
         default_factory=lambda: InferGoalOutcomePrompt()
     )
