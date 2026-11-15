@@ -95,6 +95,16 @@ Output
 1.1692900000000002
 ```
 
+If you would rather not keep prices by hand, install the `cost` extra and call `total_cost()` with no arguments. Ragas then looks up each model's input and output price in [llm-prices](https://pypi.org/project/llm-prices/), so runs that mix several models are priced per model. It raises a `ValueError` naming the model when it has no price for it.
+
+```bash
+pip install "ragas[cost]"
+```
+
+```python
+result.total_cost()
+```
+
 
 ## Token Usage for Testset Generation
 

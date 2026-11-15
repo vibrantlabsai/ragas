@@ -158,6 +158,34 @@ def get_token_usage_for_azure_ai(
     )
 
 
+def get_cost_per_token_from_llm_prices(model: str) -> t.Tuple[float, float]:
+    """
+    Look up the (input, output) USD cost per token for ``model`` in the
+    `llm-prices <https://pypi.org/project/llm-prices/>`_ table.
+
+    Dated snapshots (``gpt-4o-2024-08-06``), provider prefixes and Bedrock ids
+    (``us.anthropic.claude-sonnet-4-5-20250929-v1:0``) resolve to the base
+    model. Install it with ``pip install "ragas[cost]"``.
+    """
+    try:
+        import llm_prices
+    except ImportError as e:
+        raise ValueError(
+            "No cost table or cost per token provided. Please provide a cost table "
+            "if using multiple models or cost per token if using a single model, "
+            'or install llm-prices (pip install "ragas[cost]") to look up prices '
+            "by model name."
+        ) from e
+
+    price = llm_prices.lookup(model) if model else None
+    if price is None:
+        raise ValueError(
+            f"No llm-prices entry for model {model!r}. Pass per_model_costs or "
+            "cost_per_input_token/cost_per_output_token to total_cost() instead."
+        )
+    return price.input_per_token, price.output_per_token
+
+
 class CostCallbackHandler(BaseCallbackHandler):
     def __init__(self, token_usage_parser: TokenUsageParser):
         self.token_usage_parser = token_usage_parser
@@ -172,15 +200,14 @@ class CostCallbackHandler(BaseCallbackHandler):
         cost_per_output_token: t.Optional[float] = None,
         per_model_costs: t.Dict[str, t.Tuple[float, float]] = {},
     ) -> float:
-        if (
-            per_model_costs == {}
-            and cost_per_input_token is None
-            and cost_per_output_token is None
-        ):
-            raise ValueError(
-                "No cost table or cost per token provided. Please provide a cost table if using multiple models or cost per token if using a single model"
-            )
+        """
+        Compute the total cost of the recorded LLM calls.
 
+        Pass ``cost_per_input_token``/``cost_per_output_token`` for a single
+        model, or ``per_model_costs`` as ``{model: (input, output)}``. With no
+        arguments, each model's price is looked up in llm-prices (install with
+        ``pip install "ragas[cost]"``).
+        """
         # sum up everything
         first_usage = self.usage_data[0]
         total_table: t.Dict[str, TokenUsage] = {first_usage.model: first_usage}
@@ -189,6 +216,16 @@ class CostCallbackHandler(BaseCallbackHandler):
                 total_table[usage.model] += usage
             else:
                 total_table[usage.model] = usage
+
+        if (
+            per_model_costs == {}
+            and cost_per_input_token is None
+            and cost_per_output_token is None
+        ):
+            per_model_costs = {
+                model: get_cost_per_token_from_llm_prices(model)
+                for model in total_table
+            }
 
         # caculate total cost
         # if only one model is used

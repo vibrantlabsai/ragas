@@ -533,6 +533,9 @@ class EvaluationResult:
         per_model_costs : dict of str to tuple of float, optional
             The per model costs. Default is an empty dictionary.
 
+        If no costs are given, each model's price is looked up in llm-prices
+        (install with ``pip install "ragas[cost]"``).
+
         Returns
         -------
         float

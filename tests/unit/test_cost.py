@@ -229,3 +229,75 @@ def test_cost_callback_handler():
     assert (
         cost_cb.total_cost(cost_per_input_token=0.1, cost_per_output_token=0.1) == 2.0
     )
+
+
+class _FakePrice:
+    def __init__(self, input_per_token: float, output_per_token: float):
+        self.input_per_token = input_per_token
+        self.output_per_token = output_per_token
+
+
+def _fake_llm_prices(table):
+    import types
+
+    module = types.ModuleType("llm_prices")
+    module.lookup = lambda model: table.get(model)  # type: ignore[attr-defined]
+    return module
+
+
+def test_total_cost_looks_up_prices_when_none_given(monkeypatch):
+    import sys
+
+    monkeypatch.setitem(
+        sys.modules,
+        "llm_prices",
+        _fake_llm_prices(
+            {
+                "gpt-4o": _FakePrice(0.1, 0.2),
+                "claude-3-opus-20240229": _FakePrice(1.0, 3.0),
+            }
+        ),
+    )
+    cost_cb = CostCallbackHandler(token_usage_parser=get_token_usage_for_openai)
+    cost_cb.on_llm_end(openai_llm_result)
+    assert cost_cb.total_cost() == pytest.approx(10 * 0.1 + 10 * 0.2)
+
+    # one price per model when several models were used
+    cost_cb.usage_data.append(
+        TokenUsage(input_tokens=2, output_tokens=1, model="claude-3-opus-20240229")
+    )
+    assert cost_cb.total_cost() == pytest.approx(3.0 + 2 * 1.0 + 1 * 3.0)
+
+    # explicit costs still win over the lookup
+    assert cost_cb.total_cost(per_model_costs={"gpt-4o": (1.0, 1.0)}) == 20.0
+
+
+def test_total_cost_unknown_model_raises(monkeypatch):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "llm_prices", _fake_llm_prices({}))
+    cost_cb = CostCallbackHandler(token_usage_parser=get_token_usage_for_openai)
+    cost_cb.on_llm_end(openai_llm_result)
+    with pytest.raises(ValueError, match="gpt-4o"):
+        cost_cb.total_cost()
+
+
+def test_total_cost_without_llm_prices_raises(monkeypatch):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "llm_prices", None)
+    cost_cb = CostCallbackHandler(token_usage_parser=get_token_usage_for_openai)
+    cost_cb.on_llm_end(openai_llm_result)
+    with pytest.raises(ValueError, match="No cost table or cost per token provided"):
+        cost_cb.total_cost()
+
+
+def test_total_cost_with_llm_prices_package():
+    llm_prices = pytest.importorskip("llm_prices")
+
+    price = llm_prices.lookup("gpt-4o")
+    cost_cb = CostCallbackHandler(token_usage_parser=get_token_usage_for_openai)
+    cost_cb.on_llm_end(openai_llm_result)
+    assert cost_cb.total_cost() == pytest.approx(
+        10 * price.input_per_token + 10 * price.output_per_token
+    )
