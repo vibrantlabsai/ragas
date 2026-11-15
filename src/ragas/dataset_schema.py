@@ -228,7 +228,11 @@ class RagasDataset(ABC, t.Generic[Sample]):
                 "datasets is not installed. Please install it to use this function."
             )
 
-        return HFDataset.from_list(self.to_list())
+        rows = self.to_list()
+        columns = list(dict.fromkeys(key for row in rows for key in row))
+        return HFDataset.from_list(
+            [{col: row.get(col) for col in columns} for row in rows]
+        )
 
     @classmethod
     def from_hf_dataset(cls: t.Type[T], dataset: HFDataset) -> T:
@@ -277,7 +281,7 @@ class RagasDataset(ABC, t.Generic[Sample]):
         if not data:
             return
 
-        fieldnames = data[0].keys()
+        fieldnames = list(dict.fromkeys(key for row in data for key in row))
 
         with open(path, "w", newline="") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)

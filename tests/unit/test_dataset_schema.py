@@ -1,3 +1,4 @@
+import csv
 import typing as t
 
 import pytest
@@ -113,6 +114,36 @@ def test_evaluation_dataset_load_from_hf(eval_sample):
     hf_dataset = dataset.to_hf_dataset()
     loaded_dataset = EvaluationDataset.from_hf_dataset(hf_dataset)
     assert loaded_dataset == dataset
+
+
+def test_evaluation_dataset_hf_keeps_fields_missing_from_first_sample():
+    dataset = EvaluationDataset(
+        samples=[
+            SingleTurnSample(user_input="Q1", response="A1"),
+            SingleTurnSample(user_input="Q2", response="A2", reference="R2"),
+        ]
+    )
+
+    hf_dataset = dataset.to_hf_dataset()
+
+    assert hf_dataset["reference"] == [None, "R2"]
+    assert EvaluationDataset.from_hf_dataset(hf_dataset) == dataset
+
+
+def test_evaluation_dataset_csv_keeps_fields_missing_from_first_sample(tmpdir):
+    dataset = EvaluationDataset(
+        samples=[
+            SingleTurnSample(user_input="Q1", response="A1"),
+            SingleTurnSample(user_input="Q2", response="A2", reference="R2"),
+        ]
+    )
+
+    csv_path = tmpdir / "csvfile.csv"
+    dataset.to_csv(csv_path)
+
+    with open(csv_path, newline="") as csvfile:
+        rows = list(csv.DictReader(csvfile))
+    assert [row["reference"] for row in rows] == ["", "R2"]
 
 
 def test_single_turn_sample_metadata_roundtrip_hf_and_jsonl(tmpdir):
