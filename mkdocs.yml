@@ -67,6 +67,8 @@ nav:
                   - Instance Specific Rubrics Scoring: concepts/metrics/available_metrics/general_purpose/#instance-specific-rubrics-criteria-scoring
               - Other Tasks:
                   - Summarization: concepts/metrics/available_metrics/summarization_score.md
+              - Safety:
+                  - PII Leakage: concepts/metrics/available_metrics/pii_leakage.md
       - Test Data Generation:
           - concepts/test_data_generation/index.md
           - RAG:

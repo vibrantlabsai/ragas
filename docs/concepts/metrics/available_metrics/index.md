@@ -53,3 +53,7 @@ Each metric are essentially paradigms that are designed to evaluate a particular
 ## Other tasks
 
 - [Summarization](summarization_score.md)
+
+## Safety
+
+- [PII Leakage](pii_leakage.md)
