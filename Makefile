@@ -98,7 +98,7 @@ run-ci: ## Run complete CI pipeline (mirrors GitHub CI exactly)
 	@echo "Type check..."
 	$(Q)$(MAKE) type
 	@echo "Unit tests..."
-	$(Q)__RAGAS_DEBUG_TRACKING=true RAGAS_DO_NOT_TRACK=true uv run --active pytest --nbmake tests/unit --dist loadfile -n auto
+	$(Q)__RAGAS_DEBUG_TRACKING=true DO_NOT_TRACK=true uv run --active pytest --nbmake tests/unit --dist loadfile -n auto
 	@echo "All CI checks passed!"
 
 run-ci-format-check: ## Run format check in dry-run mode (like GitHub CI)
@@ -113,7 +113,7 @@ run-ci-type: ## Run type checking (matches GitHub CI)
 
 run-ci-tests: ## Run all tests with CI options
 	@echo "Running all tests with CI options..."
-	$(Q)__RAGAS_DEBUG_TRACKING=true RAGAS_DO_NOT_TRACK=true pytest --nbmake tests/unit --dist loadfile -n auto
+	$(Q)__RAGAS_DEBUG_TRACKING=true DO_NOT_TRACK=true pytest --nbmake tests/unit --dist loadfile -n auto
 
 run-ci-fast: ## Fast CI check for quick local validation (2-3 minutes)
 	@echo "Running fast CI check for quick feedback..."

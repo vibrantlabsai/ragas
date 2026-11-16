@@ -38,15 +38,16 @@ USAGE_TRACKING_URL = "https://t.explodinggradients.com"
 USAGE_REQUESTS_TIMEOUT_SEC = 1
 USER_DATA_DIR_NAME = "ragas"
 # Any chance you chance this also change the variable in our ci.yaml file
-RAGAS_DO_NOT_TRACK = "RAGAS_DO_NOT_TRACK"
+_DO_NOT_TRACK_VARS = ("RAGAS_DO_NOT_TRACK", "DO_NOT_TRACK", "DISABLE_TELEMETRY")
 RAGAS_DEBUG_TRACKING = "__RAGAS_DEBUG_TRACKING"
 
 
 @lru_cache(maxsize=1)
 def do_not_track() -> bool:  # pragma: no cover
-    # Returns True if and only if the environment variable is defined and has value True
-    # The function is cached for better performance.
-    return os.environ.get(RAGAS_DO_NOT_TRACK, str(False)).lower() == "true"
+    return any(
+        os.environ.get(var, "").strip().lower() in ("1", "true")
+        for var in _DO_NOT_TRACK_VARS
+    )
 
 
 @lru_cache(maxsize=1)
@@ -269,7 +270,7 @@ def track_was_completed(
     func: t.Callable[P, T],
 ) -> t.Callable[P, T]:  # pragma: no cover
     """
-    Track if the function was completed. This helps us understand failure cases and improve the user experience. Disable tracking by setting the environment variable RAGAS_DO_NOT_TRACK to True as usual.
+    Track if the function was completed. Disable tracking via RAGAS_DO_NOT_TRACK, DO_NOT_TRACK, or DISABLE_TELEMETRY env vars.
     """
 
     @wraps(func)

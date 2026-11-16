@@ -135,7 +135,7 @@ jobs:
           fi
         env:
           __RAGAS_DEBUG_TRACKING: true
-          RAGAS_DO_NOT_TRACK: true
+          DO_NOT_TRACK: true
 
   code_quality_check:
     runs-on: ubuntu-latest

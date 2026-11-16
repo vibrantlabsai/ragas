@@ -180,7 +180,7 @@ At Ragas, we believe in transparency. We collect minimal, anonymized usage data 
 
 ✅ Publicly available aggregated [data](https://github.com/vibrantlabsai/ragas/issues/49)
 
-To opt-out, set the `RAGAS_DO_NOT_TRACK` environment variable to `true`.
+To opt-out, set the `RAGAS_DO_NOT_TRACK`, `DO_NOT_TRACK`, or `DISABLE_TELEMETRY` environment variable to `true` or `1`.
 
 ### Cite Us
 
