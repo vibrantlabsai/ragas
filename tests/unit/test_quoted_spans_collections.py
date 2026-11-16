@@ -43,6 +43,20 @@ class TestQuotedSpansUtilities:
         spans = extract_quoted_spans(text, min_len=3)
         assert spans == ["deep learning outperforms baselines"]
 
+    @pytest.mark.parametrize(
+        "text",
+        [
+            'It\'s what the paper calls "deep learning outperforms baselines" here.',
+            "The paper’s authors say “deep learning outperforms baselines” here.",
+            '"the paper\'s claim that deep learning outperforms baselines"',
+        ],
+    )
+    def test_extract_quoted_spans_ignores_apostrophes(self, text):
+        """Apostrophes inside words do not open or close a quoted span."""
+        spans = extract_quoted_spans(text, min_len=3)
+        assert len(spans) == 1
+        assert spans[0].endswith("deep learning outperforms baselines")
+
     def test_extract_quoted_spans_min_len_filter(self):
         """Test that short spans are filtered out."""
         text = '"short" and "this is a longer quoted span"'
