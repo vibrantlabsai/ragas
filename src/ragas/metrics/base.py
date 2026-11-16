@@ -1426,9 +1426,14 @@ class SimpleLLMMetric(SimpleBaseMetric):
             score = self.score(llm=llm, **values)
             pred_scores.append(score.value)
 
-        # Convert to strings for correlation calculation, filtering out None values
-        gold_scores = [str(score) for score in gold_scores_raw if score is not None]
-        pred_scores_str = [str(score) for score in pred_scores if score is not None]
+        # Keep labels and predictions aligned when either score is missing.
+        score_pairs = [
+            (str(gold_score), str(pred_score))
+            for gold_score, pred_score in zip(gold_scores_raw, pred_scores)
+            if gold_score is not None and pred_score is not None
+        ]
+        gold_scores = [gold_score for gold_score, _ in score_pairs]
+        pred_scores_str = [pred_score for _, pred_score in score_pairs]
 
         df = test_dataset.to_pandas()
         df[f"{self.name}_pred"] = pred_scores
