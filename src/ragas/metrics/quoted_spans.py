@@ -21,7 +21,7 @@ from typing import Dict, Sequence
 
 # Regular expression to extract both straight and curly quoted spans.  Matches
 # pairs of quotes and captures the inner text.
-_QUOTE_RE = re.compile(r"[\"" "''`´](.*?)[\"" "''`´]")
+_QUOTE_RE = re.compile(r"(?<!\w)[\"" "''`´](.*?)[\"" r"''`´](?!\w)")
 
 
 def _normalize(text: str) -> str:
