@@ -3,6 +3,46 @@
 from __future__ import annotations
 
 import random
+from pathlib import Path
+
+
+def validate_local_name(name: str) -> str:
+    """Validate a dataset/experiment name used to build a local file path.
+
+    A name is a single storage *identifier*, not a path. File-backed backends
+    join it into a path (e.g. ``root/datasets/<name>.csv``), so a value with
+    path semantics such as ``../../escape`` would resolve outside the intended
+    storage directory. Reject names that are empty, refer to the current or
+    parent directory, or contain path separators; ordinary identifiers such as
+    ``dataset-1_v1.0`` pass through unchanged.
+
+    Args:
+        name: The dataset or experiment name to validate.
+
+    Returns:
+        The validated name, unchanged.
+
+    Raises:
+        ValueError: If the name is empty or contains path components.
+    """
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("Dataset/experiment name must be a non-empty string.")
+    if name in (".", ".."):
+        raise ValueError(
+            f"Invalid dataset/experiment name {name!r}: refers to a directory."
+        )
+    if "/" in name or "\\" in name:
+        raise ValueError(
+            f"Invalid dataset/experiment name {name!r}: must not contain path "
+            "separators."
+        )
+    # Defense in depth: the name must be a single, self-contained path component.
+    if Path(name).name != name:
+        raise ValueError(
+            f"Invalid dataset/experiment name {name!r}: must be a simple "
+            "identifier without path components."
+        )
+    return name
 
 
 class MemorableNames:
