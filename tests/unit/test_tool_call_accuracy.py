@@ -118,15 +118,20 @@ class TestToolCallAccuracy:
         assert score == 0.0
 
     @pytest.mark.asyncio
-    async def test_length_mismatch_more_predicted(
+    async def test_length_mismatch_more_predicted_same_name(
         self, tool_call_accuracy, mock_callbacks
     ):
-        """Test case with more predicted tool calls than reference."""
+        """Test case with more predicted tool calls than reference (retries).
+
+        When predicted calls contain the reference calls as a subsequence,
+        the metric should score based on best matches, not return 0.
+        Fixes: https://github.com/vibrantlabsai/ragas/issues/2079
+        """
         ref_tool_calls = [ToolCall(name="search", args={"query": "python"})]
 
         pred_tool_calls = [
             ToolCall(name="search", args={"query": "python"}),
-            ToolCall(name="filter", args={"type": "recent"}),
+            ToolCall(name="search", args={"query": "python"}),  # retry
         ]
 
         sample = MultiTurnSample(
@@ -141,8 +146,35 @@ class TestToolCallAccuracy:
         with pytest.warns(UserWarning, match="Length mismatch"):
             score = await tool_call_accuracy._multi_turn_ascore(sample, mock_callbacks)
 
-        # Should be 0 because sequences don't align (different lengths)
-        assert score == 0.0
+        # Reference "search" is a subsequence of predicted - should score well
+        assert score == 1.0
+
+    @pytest.mark.asyncio
+    async def test_length_mismatch_more_predicted_different_names(
+        self, tool_call_accuracy, mock_callbacks
+    ):
+        """Test case with more predicted tool calls with different names."""
+        ref_tool_calls = [ToolCall(name="search", args={"query": "python"})]
+
+        pred_tool_calls = [
+            ToolCall(name="search", args={"query": "python"}),
+            ToolCall(name="filter", args={"type": "recent"}),  # extra, different name
+        ]
+
+        sample = MultiTurnSample(
+            user_input=[AIMessage(content="Searching...", tool_calls=pred_tool_calls)],
+            reference_tool_calls=ref_tool_calls,
+        )
+
+        tool_call_accuracy.arg_comparison_metric.single_turn_ascore = AsyncMock(
+            return_value=1.0
+        )
+
+        with pytest.warns(UserWarning, match="Length mismatch"):
+            score = await tool_call_accuracy._multi_turn_ascore(sample, mock_callbacks)
+
+        # "search" is a subsequence of ["search", "filter"] - should match
+        assert score == 1.0
 
     @pytest.mark.asyncio
     async def test_length_mismatch_fewer_predicted(
@@ -168,8 +200,40 @@ class TestToolCallAccuracy:
         with pytest.warns(UserWarning, match="Length mismatch"):
             score = await tool_call_accuracy._multi_turn_ascore(sample, mock_callbacks)
 
-        # Should be 0 because sequences don't align (different lengths)
+        # Should be 0 because reference ["search", "filter"] is NOT a
+        # subsequence of predicted ["search"] - missing "filter"
         assert score == 0.0
+
+    @pytest.mark.asyncio
+    async def test_score_never_exceeds_one(self, tool_call_accuracy, mock_callbacks):
+        """Test that score never exceeds 1.0 even with many duplicate predictions.
+
+        Regression test for: https://github.com/vibrantlabsai/ragas/issues/2079
+        """
+        ref_tool_calls = [
+            ToolCall(name="weather_check", args={"location": "Shanghai"})
+        ]
+
+        # Agent made 3 calls (e.g., checking weather at different times)
+        pred_tool_calls = [
+            ToolCall(name="weather_check", args={"location": "Shanghai", "time": "9:00"}),
+            ToolCall(name="weather_check", args={"location": "Shanghai", "time": "13:00"}),
+            ToolCall(name="weather_check", args={"location": "Shanghai", "time": "21:00"}),
+        ]
+
+        sample = MultiTurnSample(
+            user_input=[AIMessage(content="Checking...", tool_calls=pred_tool_calls)],
+            reference_tool_calls=ref_tool_calls,
+        )
+
+        tool_call_accuracy.arg_comparison_metric.single_turn_ascore = AsyncMock(
+            return_value=1.0
+        )
+
+        with pytest.warns(UserWarning, match="Length mismatch"):
+            score = await tool_call_accuracy._multi_turn_ascore(sample, mock_callbacks)
+
+        assert 0.0 <= score <= 1.0, f"Score {score} is out of valid range [0, 1]"
 
     @pytest.mark.asyncio
     async def test_partial_argument_match(self, tool_call_accuracy, mock_callbacks):
@@ -315,6 +379,39 @@ class TestToolCallAccuracy:
         # Strict mode should return False for different order
         strict_metric = ToolCallAccuracy(strict_order=True)
         assert strict_metric.is_sequence_aligned(pred_seq, ref_seq) is False
+
+    def test_is_sequence_aligned_strict_subsequence(self):
+        """Test strict mode treats reference as subsequence of predicted."""
+        metric = ToolCallAccuracy(strict_order=True)
+
+        # Reference is a subsequence of predicted (extra retries)
+        assert metric.is_sequence_aligned(
+            ["search", "search", "filter"], ["search", "filter"]
+        ) is True
+
+        # Reference is NOT a subsequence (wrong order)
+        assert metric.is_sequence_aligned(
+            ["filter", "search"], ["search", "filter"]
+        ) is False
+
+        # Reference has item not in predicted
+        assert metric.is_sequence_aligned(
+            ["search"], ["search", "filter"]
+        ) is False
+
+    def test_is_sequence_aligned_flexible_extra_predictions(self):
+        """Test flexible mode with extra predicted calls."""
+        flexible = ToolCallAccuracy(strict_order=False)
+
+        # More predicted than reference - all ref names present
+        assert flexible.is_sequence_aligned(
+            ["search", "search", "filter"], ["search", "filter"]
+        ) is True
+
+        # Reference needs 2 search but predicted only has 1
+        assert flexible.is_sequence_aligned(
+            ["search", "filter"], ["search", "search"]
+        ) is False
 
     def test_flexible_order_sorting_behavior(self):
         """Test that flexible mode sorts tool calls before evaluation."""
