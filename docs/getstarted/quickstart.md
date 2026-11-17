@@ -7,7 +7,7 @@ Get started with Ragas in minutes. Create a complete evaluation project with jus
 
 - **Python:** Ragas is tested on Python 3.9 to 3.12. Newer versions may fail to install some optional dependencies used by the example project.
 - **uv:** The recommended path uses [`uv`](https://docs.astral.sh/uv/). If you don't have it, install it with `pip install uv` (see the [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/) for other options).
-- - **OpenAI account:** The default example calls the OpenAI API, so you need an API key on an account with billing set up or credits available.
+- **OpenAI account:** The default example calls the OpenAI API, so you need an API key on an account with billing set up or credits available.
 - **Windows (PowerShell):** `export` does not work in PowerShell. Use `$env:OPENAI_API_KEY="your-openai-key"` instead.
 
 
