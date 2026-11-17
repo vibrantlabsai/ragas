@@ -159,14 +159,24 @@ def parse_run_traces(
             )
             # get all the prompt IO from the metric trace
             prompt_traces = {}
+            prompt_names = [
+                traces[prompt_uuid].name for prompt_uuid in metric_trace.children
+            ]
+            has_duplicate_prompt_names = len(prompt_names) != len(set(prompt_names))
+
             for i, prompt_uuid in enumerate(metric_trace.children):
                 prompt_trace = traces[prompt_uuid]
                 output = prompt_trace.outputs.get("output", {})
                 output = output[0] if isinstance(output, list) else output
-                prompt_traces[f"{prompt_trace.name}"] = {
+                prompt_data = {
                     "input": prompt_trace.inputs.get("data", {}),
                     "output": output,
                 }
+                if has_duplicate_prompt_names:
+                    prompt_data["name"] = prompt_trace.name
+                    prompt_traces[f"prompt_{i + 1}"] = prompt_data
+                else:
+                    prompt_traces[prompt_trace.name] = prompt_data
             metric_traces[f"{metric_trace.name}"] = prompt_traces
         parased_traces.append(metric_traces)
 

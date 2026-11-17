@@ -487,6 +487,26 @@ class GeneticOptimizer(Optimizer):
 
         return improved_candidate
 
+    @staticmethod
+    def _get_prompt_trace(
+        prompt_traces: t.Dict[str, t.Any], prompt_name: str
+    ) -> t.Dict[str, t.Any]:
+        # Support the legacy trace shape where prompt names were dictionary keys.
+        if prompt_name in prompt_traces:
+            return prompt_traces[prompt_name]
+
+        # The ordered trace shape uses prompt_1, prompt_2, ... keys and stores the
+        # actual prompt name in each trace. Iterate in reverse to preserve the
+        # legacy behavior of using the last invocation when a prompt repeats.
+        for prompt_trace in reversed(prompt_traces.values()):
+            if (
+                isinstance(prompt_trace, dict)
+                and prompt_trace.get("name") == prompt_name
+            ):
+                return prompt_trace
+
+        raise KeyError(f"Prompt trace '{prompt_name}' not found")
+
     async def _get_feedbacks(
         self,
         candidate: t.Dict[str, str],
@@ -510,23 +530,21 @@ class GeneticOptimizer(Optimizer):
         if indices:
             feedback_candidates = {}
             for prompt_name in candidate.keys():
-                feedback_data = [
-                    FeedbackExample(
-                        input=dict_to_str(
-                            traces[idx][prompt_name]["input"].model_dump(
-                                exclude_none=True
-                            )
-                        ),
-                        output=traces[idx][prompt_name]["output"].model_dump(
-                            exclude_none=True
-                        ),
-                        expected_output=dataset[idx]["prompts"][prompt_name][
-                            "edited_output"
-                        ]
-                        or dataset[idx]["prompts"][prompt_name]["prompt_output"],
+                feedback_data = []
+                for idx in indices:
+                    prompt_trace = self._get_prompt_trace(traces[idx], prompt_name)
+                    feedback_data.append(
+                        FeedbackExample(
+                            input=dict_to_str(
+                                prompt_trace["input"].model_dump(exclude_none=True)
+                            ),
+                            output=prompt_trace["output"].model_dump(exclude_none=True),
+                            expected_output=dataset[idx]["prompts"][prompt_name][
+                                "edited_output"
+                            ]
+                            or dataset[idx]["prompts"][prompt_name]["prompt_output"],
+                        )
                     )
-                    for idx in indices
-                ]
                 prompt_input = FeedbackMutationInput(
                     instruction=candidate[prompt_name], examples=feedback_data
                 )
