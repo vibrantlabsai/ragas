@@ -240,4 +240,4 @@ my_metric = DiscreteMetric(
 
 - 📚 [Full Documentation](https://docs.ragas.io/)
 - 💬 [Join our Discord Community](https://discord.gg/5djav8GGNZ)
-- 🐛 [Report Issues](https://github.com/vibrantlabsai/ragas/issues)
+- 🐛 [Report Issues](https://github.com/vibrantlabsai/ragas/issues) 
