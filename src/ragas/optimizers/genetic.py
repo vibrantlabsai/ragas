@@ -242,7 +242,8 @@ class GeneticOptimizer(Optimizer):
                 raise_exceptions=raise_exceptions,
                 parent_pbar=parent_pbar,
             )
-        best_candidate = improved_prompts[np.argmax(fitness_scores)]
+        pick_best = np.argmax if loss.higher_is_better else np.argmin
+        best_candidate = improved_prompts[pick_best(fitness_scores)]
 
         optimization_generation_rm.on_chain_end(
             outputs={"best_candidate": best_candidate}

@@ -201,6 +201,19 @@ loss = HuberLoss(delta=1.0)
 config = InstructionConfig(llm=llm, optimizer=optimizer, loss=loss)
 ```
 
+Each loss declares its direction with the `higher_is_better` class attribute. `MSELoss` returns an error, so lower is better (`higher_is_better = False`, the default). `BinaryMetricLoss` returns accuracy or F1, so it sets `higher_is_better = True`. Both optimizers read this flag to pick the better prompt, so a custom `Loss` that returns a score should set `higher_is_better = True`:
+
+```python
+from ragas.losses import Loss
+
+
+class ExactMatchRate(Loss):
+    higher_is_better = True
+
+    def __call__(self, predicted, actual):
+        return sum(p == a for p, a in zip(predicted, actual)) / len(actual)
+```
+
 ## Comparison
 
 | Feature | GeneticOptimizer | DSPyOptimizer |

@@ -8,7 +8,7 @@ from ragas.dataset_schema import (
     SampleAnnotation,
     SingleMetricAnnotation,
 )
-from ragas.losses import MSELoss
+from ragas.losses import BinaryMetricLoss, MSELoss
 from ragas.prompt.pydantic_prompt import PydanticPrompt
 
 try:
@@ -300,6 +300,37 @@ class TestCreateDSPyMetric:
         result = metric_fn(mock_example, mock_prediction)
 
         assert result >= 0
+
+    def test_binary_loss_scores_correct_prediction_higher(self):
+        """BinaryMetricLoss returns accuracy (higher is better), so it is not negated."""
+        from ragas.optimizers.dspy_adapter import create_dspy_metric
+
+        metric_fn = create_dspy_metric(BinaryMetricLoss(), "verdict")
+
+        example = Mock()
+        example.verdict = 1
+        correct = Mock()
+        correct.verdict = 1
+        wrong = Mock()
+        wrong.verdict = 0
+
+        assert metric_fn(example, correct) == 1.0
+        assert metric_fn(example, wrong) == 0.0
+
+    def test_mse_loss_scores_closer_prediction_higher(self):
+        """MSELoss is an error (lower is better), so DSPy gets its negation."""
+        from ragas.optimizers.dspy_adapter import create_dspy_metric
+
+        metric_fn = create_dspy_metric(MSELoss(), "score")
+
+        example = Mock()
+        example.score = 1.0
+        close = Mock()
+        close.score = 0.9
+        far = Mock()
+        far.score = 0.0
+
+        assert metric_fn(example, close) > metric_fn(example, far)
 
 
 class TestSetupDSPyLLM:
