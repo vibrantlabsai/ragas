@@ -153,7 +153,7 @@ class OverlapScoreBuilder(RelationshipBuilder):
                     if x not in noisy_items:
                         for y in node_y_items:
                             if y not in noisy_items:
-                                similarity = 1 - distance_measure.distance(
+                                similarity = 1 - distance_measure.normalized_distance(
                                     x.lower(), y.lower()
                                 )
                                 verdict = similarity >= self.distance_threshold

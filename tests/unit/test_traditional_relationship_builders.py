@@ -8,9 +8,11 @@ from uuid import UUID
 import numpy as np
 import pytest
 
+from ragas.metrics._string import DistanceMeasure
 from ragas.testset.graph import KnowledgeGraph, Node, NodeType, Relationship
 from ragas.testset.transforms.relationship_builders.traditional import (
     JaccardSimilarityBuilder,
+    OverlapScoreBuilder,
 )
 
 
@@ -393,3 +395,45 @@ class TestJaccardSimilarityBuilder:
             and str(r.target.id) == "437c8c08-cef6-4ebf-a35f-93d6168b61a4"
             for r in kg.relationships
         )
+
+
+def overlap_kg(entity_x: str, entity_y: str) -> KnowledgeGraph:
+    """Build a two-node graph that compares `entity_x` with `entity_y`.
+
+    OverlapScoreBuilder ignores the most frequent entities in the graph as noise,
+    so both nodes also share a "noise" entity that gets filtered out instead.
+    """
+    return KnowledgeGraph(
+        nodes=[
+            Node(type=NodeType.CHUNK, properties={"entities": [entity_x, "noise"]}),
+            Node(type=NodeType.CHUNK, properties={"entities": [entity_y, "noise"]}),
+        ]
+    )
+
+
+class TestOverlapScoreBuilder:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("distance_measure", list(DistanceMeasure))
+    async def test_near_identical_entities_overlap(self, distance_measure):
+        kg = overlap_kg(
+            "Retrieval Augmented Generation", "Retrieval-Augmented Generation"
+        )
+        builder = OverlapScoreBuilder(
+            distance_measure=distance_measure, distance_threshold=0.9
+        )
+        relationships = await builder.transform(kg)
+        assert len(relationships) == 1
+        assert relationships[0].properties["entities_overlap_score"] == 1.0
+        assert relationships[0].properties["overlapped_items"] == [
+            ("Retrieval Augmented Generation", "Retrieval-Augmented Generation")
+        ]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("distance_measure", list(DistanceMeasure))
+    async def test_different_entities_do_not_overlap(self, distance_measure):
+        kg = overlap_kg("Retrieval Augmented Generation", "Knowledge Graph")
+        builder = OverlapScoreBuilder(
+            distance_measure=distance_measure, distance_threshold=0.9
+        )
+        relationships = await builder.transform(kg)
+        assert relationships == []
