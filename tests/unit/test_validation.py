@@ -5,7 +5,11 @@ import pytest
 from datasets import Dataset
 
 from ragas.metrics.base import MetricType
-from ragas.validation import remap_column_names, validate_supported_metrics
+from ragas.validation import (
+    remap_column_names,
+    validate_required_columns,
+    validate_supported_metrics,
+)
 
 column_maps = [
     {
@@ -21,13 +25,16 @@ column_maps = [
 ]
 
 
-def test_validate_required_columns():
+@pytest.mark.parametrize(
+    "response", [None, "An answer"], ids=["missing-response", "complete-columns"]
+)
+def test_validate_required_columns(response: t.Optional[str]):
     from ragas.dataset_schema import EvaluationDataset, SingleTurnSample
-    from ragas.metrics.base import Metric
+    from ragas.metrics.base import SingleTurnMetric
 
     @dataclass
-    class MockMetric(Metric):
-        name = "mock_metric"  # type: ignore
+    class MockMetric(SingleTurnMetric):
+        name: str = "mock_metric"
         _required_columns: t.Dict[MetricType, t.Set[str]] = field(
             default_factory=lambda: {MetricType.SINGLE_TURN: {"user_input", "response"}}
         )
@@ -35,15 +42,20 @@ def test_validate_required_columns():
         def init(self, run_config):
             pass
 
-        async def _ascore(self, row, callbacks):
+        async def _single_turn_ascore(self, sample, callbacks):
             return 0.0
 
     m = MockMetric()
-    sample1 = SingleTurnSample(user_input="What is X")
-    sample2 = SingleTurnSample(user_input="What is Z")
+    sample1 = SingleTurnSample(user_input="What is X", response=response)
+    sample2 = SingleTurnSample(user_input="What is Z", response=response)
     ds = EvaluationDataset(samples=[sample1, sample2])
-    with pytest.raises(ValueError):
-        validate_supported_metrics(ds, [m])
+    if response is None:
+        with pytest.raises(
+            ValueError, match=r"\[mock_metric\].*additional columns.*response"
+        ):
+            validate_required_columns(ds, [m])
+    else:
+        validate_required_columns(ds, [m])
 
 
 def test_valid_data_type():
