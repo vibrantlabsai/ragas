@@ -8,7 +8,13 @@ from pydantic_core import CoreSchema, core_schema
 class Loss(ABC):
     """
     Abstract base class for all loss functions.
+
+    Optimizers read ``higher_is_better`` to tell which value belongs to the
+    better prompt. It is ``False`` for errors such as MSE, where lower is better.
+    Subclasses that return a score such as accuracy should set it to ``True``.
     """
+
+    higher_is_better: t.ClassVar[bool] = False
 
     @abstractmethod
     def __call__(self, predicted: t.List, actual: t.List) -> float:
@@ -51,6 +57,7 @@ class BinaryMetricLoss(Loss):
     """
 
     metric: t.Literal["accuracy", "f1_score"] = "accuracy"
+    higher_is_better: t.ClassVar[bool] = True
 
     def __call__(self, predicted: t.List[int], actual: t.List[int]) -> float:
         """

@@ -133,7 +133,9 @@ def create_dspy_metric(
     Convert Ragas Loss function to DSPy metric.
 
     DSPy expects a metric function with signature: metric(example, prediction) -> float
-    where higher is better.
+    where higher is better. Losses where lower is better (such as MSELoss) are
+    negated; losses with ``higher_is_better = True`` (such as BinaryMetricLoss)
+    are returned unchanged.
 
     Parameters
     ----------
@@ -155,8 +157,8 @@ def create_dspy_metric(
         if ground_truth is None or predicted is None:
             return 0.0
 
-        loss_value = loss([predicted], [ground_truth])
+        loss_value = float(loss([predicted], [ground_truth]))
 
-        return -float(loss_value)
+        return loss_value if loss.higher_is_better else -loss_value
 
     return dspy_metric
