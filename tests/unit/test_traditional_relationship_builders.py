@@ -393,3 +393,37 @@ class TestJaccardSimilarityBuilder:
             and str(r.target.id) == "437c8c08-cef6-4ebf-a35f-93d6168b61a4"
             for r in kg.relationships
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "measure_name",
+    ["LEVENSHTEIN", "HAMMING", "JARO", "JARO_WINKLER"],
+)
+async def test_overlap_score_builder_uses_normalized_distance(measure_name: str) -> None:
+    from ragas.metrics._string import DistanceMeasure
+    from ragas.testset.transforms.relationship_builders.traditional import (
+        OverlapScoreBuilder,
+    )
+
+    kg = KnowledgeGraph(
+        nodes=[
+            Node(
+                type=NodeType.CHUNK,
+                properties={"entities": ["Retrieval Augmented Generation", "noise"]},
+            ),
+            Node(
+                type=NodeType.CHUNK,
+                properties={"entities": ["Retrieval-Augmented Generation", "noise"]},
+            ),
+        ]
+    )
+    builder = OverlapScoreBuilder(
+        distance_measure=DistanceMeasure[measure_name],
+        distance_threshold=0.9,
+    )
+    relationships = await builder.transform(kg)
+    assert len(relationships) == 1
+    assert relationships[0].properties["overlapped_items"] == [
+        ("Retrieval Augmented Generation", "Retrieval-Augmented Generation")
+    ]
