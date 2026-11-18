@@ -189,13 +189,16 @@ dataset = SingleMetricAnnotation(
 Optimizers use loss functions to evaluate prompt quality:
 
 ```python
-from ragas.losses import MSELoss, HuberLoss
+from ragas.losses import BinaryMetricLoss, MSELoss
 
 # Mean Squared Error (default)
 loss = MSELoss()
 
-# Huber Loss (robust to outliers)
-loss = HuberLoss(delta=1.0)
+# Sum the squared errors instead of averaging them
+loss = MSELoss(reduction="sum")
+
+# Accuracy or F1 score for binary metrics
+loss = BinaryMetricLoss(metric="f1_score")
 
 # Use with config
 config = InstructionConfig(llm=llm, optimizer=optimizer, loss=loss)

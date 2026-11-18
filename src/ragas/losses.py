@@ -1,5 +1,6 @@
 import typing as t
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
@@ -21,12 +22,10 @@ class Loss(ABC):
         """
         Define how Pydantic generates a schema for BaseRagasEmbeddings.
         """
-        return core_schema.no_info_after_validator_function(
-            cls,
-            core_schema.is_instance_schema(cls),  # The validator function
-        )
+        return core_schema.is_instance_schema(cls)
 
 
+@dataclass(eq=False)
 class MSELoss(Loss):
     """
     Mean Squared Error loss function.
@@ -44,6 +43,7 @@ class MSELoss(Loss):
             raise ValueError(f"Invalid reduction method: {self.reduction}")
 
 
+@dataclass(eq=False)
 class BinaryMetricLoss(Loss):
     """
     Computes the loss for binary metrics.
