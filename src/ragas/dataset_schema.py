@@ -376,6 +376,8 @@ class EvaluationDataset(RagasDataset[SingleTurnSampleOrMultiTurnSample]):
 
     def to_list(self) -> t.List[t.Dict]:
         rows = [sample.to_dict() for sample in self.samples]
+        if not rows:
+            return rows
 
         if self.get_sample_type() == MultiTurnSample:
             for sample in rows:

@@ -85,6 +85,48 @@ def test_evaluation_dataset(eval_sample):
     assert dataset_from_hf == dataset
 
 
+@pytest.fixture(params=["constructor", "from_list", "slice"])
+def empty_evaluation_dataset(request):
+    if request.param == "constructor":
+        return EvaluationDataset(samples=[])
+    if request.param == "from_list":
+        return EvaluationDataset.from_list([])
+    return EvaluationDataset(samples=[samples[0]])[:0]
+
+
+def test_empty_evaluation_dataset_to_list(empty_evaluation_dataset):
+    assert empty_evaluation_dataset.to_list() == []
+
+
+def test_empty_evaluation_dataset_to_pandas(empty_evaluation_dataset):
+    dataframe = empty_evaluation_dataset.to_pandas()
+    assert dataframe.empty
+    assert EvaluationDataset.from_pandas(dataframe).to_list() == []
+
+
+def test_empty_evaluation_dataset_to_hf(empty_evaluation_dataset):
+    hf_dataset = empty_evaluation_dataset.to_hf_dataset()
+    assert hf_dataset.num_rows == 0
+    assert EvaluationDataset.from_hf_dataset(hf_dataset).to_list() == []
+
+
+def test_empty_evaluation_dataset_jsonl_roundtrip(tmp_path, empty_evaluation_dataset):
+    path = tmp_path / "empty.jsonl"
+    empty_evaluation_dataset.to_jsonl(path)
+    assert path.read_text() == ""
+    assert EvaluationDataset.from_jsonl(path).to_list() == []
+
+
+def test_empty_evaluation_dataset_to_csv(tmp_path, empty_evaluation_dataset):
+    path = tmp_path / "empty.csv"
+    empty_evaluation_dataset.to_csv(path)
+    assert not path.exists()
+
+    path.write_text("existing contents")
+    empty_evaluation_dataset.to_csv(path)
+    assert path.read_text() == "existing contents"
+
+
 @pytest.mark.parametrize("eval_sample", samples)
 def test_evaluation_dataset_save_load_csv(tmpdir, eval_sample):
     dataset = EvaluationDataset(samples=[eval_sample, eval_sample])
