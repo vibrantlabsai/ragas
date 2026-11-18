@@ -34,6 +34,10 @@ from ragas.metrics.collections.domain_specific_rubrics import (
     RubricsScoreWithoutReference,
     RubricsScoreWithReference,
 )
+from ragas.metrics.collections.evidence_triplet_score import (
+    EvidenceTripletScore,
+    NeutrosophicEvidenceTriplet,
+)
 from ragas.metrics.collections.factual_correctness import FactualCorrectness
 from ragas.metrics.collections.faithfulness import Faithfulness
 from ragas.metrics.collections.instance_specific_rubrics import InstanceSpecificRubrics
@@ -86,7 +90,9 @@ __all__ = [
     "TopicAdherence",
     # Rubric metrics
     "DomainSpecificRubrics",
+    "EvidenceTripletScore",
     "InstanceSpecificRubrics",
+    "NeutrosophicEvidenceTriplet",
     "RubricsScoreWithoutReference",
     "RubricsScoreWithReference",
     # SQL & Data metrics
