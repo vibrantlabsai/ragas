@@ -64,6 +64,8 @@ Respond with JSON containing:
         response_format={"type": "json_object"},
     )
     
+    if not response.choices:
+        return {"error_codes": ["OTHER"], "error_analysis": "No response from model"}
     content = response.choices[0].message.content
     if content is None:
         return {"error_codes": ["OTHER"], "error_analysis": "No response from model"}

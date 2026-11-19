@@ -302,6 +302,8 @@ class MathToolsAgent:
                     # temperature=0
                 )
 
+                if not response.choices:
+                    raise ValueError("LLM API returned no choices")
                 message = response.choices[0].message
                 messages.append(message.model_dump())
 

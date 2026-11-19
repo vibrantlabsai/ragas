@@ -307,6 +307,8 @@ class ExampleRAG:
                 ],
             )
 
+            if not response.choices:
+                raise ValueError("LLM API returned no choices")
             response_text = response.choices[0].message.content.strip()
 
             self.traces.append(

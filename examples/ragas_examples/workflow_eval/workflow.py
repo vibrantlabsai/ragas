@@ -174,7 +174,7 @@ class LLMExtractor(BaseExtractor):
             # Parse JSON response
             result = json.loads(
                 response.choices[0].message.content.strip()
-                if response.choices[0].message.content
+                if response.choices and response.choices[0].message.content
                 else "{}"
             )
             return result
@@ -341,7 +341,7 @@ class ConfigurableSupportTriageAgent:
 
             category = (
                 response.choices[0].message.content.strip()
-                if response.choices[0].message.content
+                if response.choices and response.choices[0].message.content
                 else "unknown"
             )
             print(f"   ➜ Classified as: {category}")
@@ -470,7 +470,7 @@ class ConfigurableSupportTriageAgent:
 
             response_text = (
                 response.choices[0].message.content.strip()
-                if response.choices[0].message.content
+                if response.choices and response.choices[0].message.content
                 else ""
             )
             print("   ➜ Response template generated")

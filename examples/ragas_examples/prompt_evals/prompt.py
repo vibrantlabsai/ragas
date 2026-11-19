@@ -21,7 +21,7 @@ def run_prompt(prompt: str):
     )
     response = (
         response.choices[0].message.content.strip()
-        if response.choices[0].message.content
+        if response.choices and response.choices[0].message.content
         else ""
     )
     return response
