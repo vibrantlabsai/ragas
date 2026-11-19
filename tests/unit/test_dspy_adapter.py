@@ -316,3 +316,19 @@ class TestSetupDSPyLLM:
 
         mock_wrapper_class.assert_called_once_with(fake_llm)
         mock_dspy.settings.configure.assert_called_once_with(lm=mock_wrapper)
+
+
+class TestRagasDSPyLM:
+    def test_inspect_history_zero_or_negative(self):
+        """Test that inspect_history(n=0) or n<0 returns empty list instead of full history."""
+        from ragas.optimizers.dspy_llm_wrapper import RagasDSPyLM
+
+        mock_ragas_llm = Mock()
+        wrapper = RagasDSPyLM(ragas_llm=mock_ragas_llm)
+        wrapper.history = [{"call": 1}, {"call": 2}, {"call": 3}]
+
+        assert wrapper.inspect_history(n=0) == []
+        assert wrapper.inspect_history(n=-1) == []
+        assert len(wrapper.inspect_history(n=1)) == 1
+        assert len(wrapper.inspect_history(n=3)) == 3
+

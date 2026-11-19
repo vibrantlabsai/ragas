@@ -80,11 +80,21 @@ class RagasDSPyLM:
         if hasattr(result, "generations") and result.generations:
             generation = result.generations[0][0]
             if hasattr(generation, "text"):
-                return generation.text
+                response_text = generation.text
             else:
-                return str(generation)
+                response_text = str(generation)
         else:
-            return str(result)
+            response_text = str(result)
+
+        self.history.append(
+            {
+                "prompt": prompt_value,
+                "messages": messages,
+                "response": response_text,
+                "kwargs": kwargs,
+            }
+        )
+        return response_text
 
     def inspect_history(self, n: int = 1) -> t.List[t.Dict[str, t.Any]]:
         """
@@ -100,4 +110,7 @@ class RagasDSPyLM:
         List[Dict[str, Any]]
             Recent call history.
         """
+        if n <= 0:
+            return []
         return self.history[-n:]
+
