@@ -236,6 +236,47 @@ def test_snapshot_with_metadata():
     assert messages[0].metadata["message_id"] == "msg-1"
 
 
+def test_snapshot_with_none_content_is_empty():
+    """Assistant messages with content=None must not become the string 'None'."""
+    from ragas.integrations.ag_ui import convert_messages_snapshot
+
+    snapshot = MessagesSnapshotEvent(
+        messages=[
+            UserMessage(id="msg-1", content="What's the weather?"),
+            AssistantMessage(id="msg-2"),
+        ]
+    )
+
+    messages = convert_messages_snapshot(snapshot)
+
+    assert messages[1].content == ""
+
+
+def test_snapshot_with_multimodal_content_keeps_text():
+    """User messages with multimodal content must keep their text parts."""
+    try:
+        from ag_ui.core import TextInputContent
+    except ImportError:
+        pytest.skip("TextInputContent not available in installed ag-ui-protocol")
+
+    from ragas.integrations.ag_ui import convert_messages_snapshot
+
+    snapshot = MessagesSnapshotEvent(
+        messages=[
+            UserMessage(
+                id="msg-1",
+                content=[
+                    TextInputContent(type="text", text="What is in this screenshot?")
+                ],
+            )
+        ]
+    )
+
+    messages = convert_messages_snapshot(snapshot)
+
+    assert messages[0].content == "What is in this screenshot?"
+
+
 def test_non_message_events_filtered():
     """Test that non-message events are silently filtered."""
     from ragas.integrations.ag_ui import convert_to_ragas_messages
