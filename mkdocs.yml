@@ -141,6 +141,7 @@ nav:
               - AG-UI: howtos/integrations/ag_ui.md
               - Griptape: howtos/integrations/griptape.md
               - Haystack: howtos/integrations/haystack.md
+              - hieevas: howtos/integrations/hieevas.md
               - LangChain: howtos/integrations/langchain.md
               - LangGraph: howtos/integrations/_langgraph_agent_evaluation.md
               - LlamaIndex: howtos/integrations/_llamaindex.md
