@@ -1,3 +1,6 @@
+import subprocess
+import sys
+import textwrap
 import typing as t
 
 import pytest
@@ -68,6 +71,105 @@ def test_loader_batch():
 
     batches = dataset.stratified_batches(batch_size=2, stratify_key="metric_output")
     assert all(sum([item["metric_output"] for item in batch]) == 1 for batch in batches)
+
+
+def test_stratified_batches_without_drop_last_batch_uses_all_samples():
+    annotated_samples = [create_sample_annotation(1) for _ in range(11)] + [
+        create_sample_annotation(0) for _ in range(9)
+    ]
+    dataset = SingleMetricAnnotation(name="metric", samples=annotated_samples)
+
+    batches = dataset.stratified_batches(
+        batch_size=2, stratify_key="metric_output", drop_last_batch=False
+    )
+
+    batched_samples = [sample for batch in batches for sample in batch]
+    assert len(batched_samples) == len(annotated_samples)
+    assert len({id(sample) for sample in batched_samples}) == len(annotated_samples)
+    assert len(batches) == 10
+    assert all(len(batch) <= 2 for batch in batches)
+
+
+def test_stratified_batches_with_drop_last_batch_terminates():
+    """Regression test: with drop_last_batch=True, stratified_batches used to
+    loop forever when the remaining samples could not fill another complete
+    batch (num_batches was computed with ceil() instead of floor())."""
+    script = textwrap.dedent(
+        """
+        from ragas.dataset_schema import SampleAnnotation, SingleMetricAnnotation
+
+        def make_sample(metric_output):
+            return SampleAnnotation(
+                metric_input={"user_input": ""},
+                metric_output=metric_output,
+                prompts={},
+                is_accepted=True,
+            )
+
+        samples = [make_sample(1) for _ in range(11)]
+        samples += [make_sample(0) for _ in range(9)]
+        dataset = SingleMetricAnnotation(name="metric", samples=samples)
+
+        # 20 samples with batch_size=2 -> ten complete batches
+        batches = dataset.stratified_batches(
+            batch_size=2, stratify_key="metric_output", drop_last_batch=True
+        )
+        assert len(batches) == 10, [len(batch) for batch in batches]
+        assert all(len(batch) == 2 for batch in batches)
+
+        # 20 samples with batch_size=3 -> the partial last batch is dropped
+        batches = dataset.stratified_batches(
+            batch_size=3, stratify_key="metric_output", drop_last_batch=True
+        )
+        assert len(batches) == 6, [len(batch) for batch in batches]
+        assert all(len(batch) == 3 for batch in batches)
+
+        # no complete batch fits -> nothing to return
+        batches = dataset.stratified_batches(
+            batch_size=25, stratify_key="metric_output", drop_last_batch=True
+        )
+        assert batches == [], [len(batch) for batch in batches]
+        """
+    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        pytest.fail("stratified_batches(drop_last_batch=True) did not terminate")
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_stratified_batches_with_fewer_samples_than_batch_size():
+    annotated_samples = [create_sample_annotation(1) for _ in range(11)] + [
+        create_sample_annotation(0) for _ in range(9)
+    ]
+    dataset = SingleMetricAnnotation(name="metric", samples=annotated_samples)
+
+    batches = dataset.stratified_batches(
+        batch_size=25, stratify_key="metric_output", drop_last_batch=False
+    )
+
+    assert len(batches) == 1
+    assert len(batches[0]) == len(annotated_samples)
+
+
+def test_stratified_batches_with_replace_fills_batches():
+    annotated_samples = [create_sample_annotation(1) for _ in range(11)] + [
+        create_sample_annotation(0) for _ in range(9)
+    ]
+    dataset = SingleMetricAnnotation(name="metric", samples=annotated_samples)
+
+    batches = dataset.stratified_batches(
+        batch_size=3, stratify_key="metric_output", replace=True
+    )
+
+    assert len(batches) == 7
+    assert all(len(batch) == 3 for batch in batches)
 
 
 @pytest.mark.parametrize("eval_sample", samples)

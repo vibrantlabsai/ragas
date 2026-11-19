@@ -772,7 +772,7 @@ class SingleMetricAnnotation(BaseModel):
             batch_size (int): Number of samples per batch.
             stratify_key (str): Key in `metric_input` used for stratification (e.g., class labels).
             drop_last_batch (bool): If True, drops the last batch if it has fewer samples than `batch_size`.
-            replace (bool): If True, allows reusing samples from the same class to fill a batch if necessary.
+            replace (bool): If True, tops up batches that end up with fewer samples than `batch_size` by resampling from the samples already in the batch.
 
         Returns:
             List[List[SampleAnnotation]]: A list of stratified batches, each batch being a list of SampleAnnotation objects.
@@ -790,38 +790,39 @@ class SingleMetricAnnotation(BaseModel):
         # Determine the number of batches required
         total_samples = len(self.samples)
         num_batches = (
-            np.ceil(total_samples / batch_size).astype(int)
+            np.floor(total_samples / batch_size).astype(int)
             if drop_last_batch
-            else np.floor(total_samples / batch_size).astype(int)
+            else np.ceil(total_samples / batch_size).astype(int)
         )
-        samples_per_class_per_batch = {
-            cls: max(1, len(samples) // num_batches)
-            for cls, samples in class_groups.items()
-        }
+        if num_batches == 0:
+            return []
 
-        # Create stratified batches
-        all_batches = []
-        while len(all_batches) < num_batches:
-            batch = []
-            for cls, samples in list(class_groups.items()):
-                # Determine the number of samples to take from this class
-                count = min(
-                    samples_per_class_per_batch[cls],
-                    len(samples),
-                    batch_size - len(batch),
-                )
-                if count > 0:
-                    # Add samples from the current class
-                    batch.extend(samples[:count])
-                    class_groups[cls] = samples[count:]  # Remove used samples
-                elif replace and len(batch) < batch_size:
-                    # Reuse samples if `replace` is True
-                    batch.extend(random.choices(samples, k=batch_size - len(batch)))
+        # Create stratified batches by dealing the samples of each class
+        # round-robin across the batches so that every batch gets its
+        # proportional share of every class
+        all_batches: t.List[t.List[SampleAnnotation]] = [[] for _ in range(num_batches)]
+        for samples in class_groups.values():
+            batch_idx = 0
+            for sample in samples:
+                for _ in range(num_batches):
+                    if len(all_batches[batch_idx]) < batch_size:
+                        break
+                    batch_idx = (batch_idx + 1) % num_batches
+                else:
+                    # every batch is full, so the rest of this class would
+                    # only make up the dropped last batch
+                    break
+                all_batches[batch_idx].append(sample)
+                batch_idx = (batch_idx + 1) % num_batches
 
-            # Shuffle the batch to mix classes
+        if replace:
+            for batch in all_batches:
+                if len(batch) < batch_size:
+                    batch.extend(random.choices(batch, k=batch_size - len(batch)))
+
+        # Shuffle each batch to mix classes
+        for batch in all_batches:
             random.shuffle(batch)
-            if len(batch) == batch_size or not drop_last_batch:
-                all_batches.append(batch)
 
         return all_batches
 
