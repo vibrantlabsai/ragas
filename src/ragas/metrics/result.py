@@ -159,6 +159,11 @@ class MetricResult:
         This allows calling string methods on discrete results,
         numeric methods on numeric results, and list methods on ranking results.
         """
+        # copy and pickle create the object without calling ``__init__``, so
+        # ``_value`` may not exist yet. Reading ``self._value`` would then call
+        # ``__getattr__`` again and recurse forever.
+        if name == "_value":
+            raise AttributeError(f"{type(self).__name__} has no attribute '{name}'")
         if hasattr(self._value, name):
             attr = getattr(self._value, name)
             if callable(attr):
