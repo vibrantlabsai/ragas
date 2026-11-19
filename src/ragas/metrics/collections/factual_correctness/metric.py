@@ -154,6 +154,12 @@ class FactualCorrectness(BaseMetric):
         else:
             fn = 0
 
+        # No claims could be decomposed from either text (e.g. abstentions
+        # like "I don't know"): nothing was measured, so return NaN like
+        # Faithfulness does, instead of scoring a correct abstention 0.0.
+        if tp == 0 and fp == 0 and fn == 0:
+            return MetricResult(value=float("nan"))
+
         # Step 3: Compute final score based on mode
         if self.mode == "precision":
             score = tp / (tp + fp + 1e-8)
