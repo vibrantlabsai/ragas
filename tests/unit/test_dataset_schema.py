@@ -58,6 +58,16 @@ def test_loader_sample():
     assert sum(item["metric_output"] for item in sample) == 1
 
 
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 7, 9, 11, 15, 19])
+def test_loader_sample_stratified_returns_exactly_n(n):
+    annotated_samples = [create_sample_annotation(1) for _ in range(10)] + [
+        create_sample_annotation(0) for _ in range(10)
+    ]
+    test_dataset = SingleMetricAnnotation(name="metric", samples=annotated_samples)
+    sample = test_dataset.sample(n, stratify_key="metric_output")
+    assert len(sample) == n
+
+
 def test_loader_batch():
     annotated_samples = [create_sample_annotation(1) for _ in range(10)] + [
         create_sample_annotation(0) for _ in range(10)

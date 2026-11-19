@@ -728,6 +728,8 @@ class SingleMetricAnnotation(BaseModel):
                 if not remaining_indices:
                     break
                 sampled_indices.append(random.choice(list(remaining_indices)))
+            while len(sampled_indices) > n:
+                sampled_indices.pop()
 
             sampled_samples = [self.samples[i] for i in sampled_indices]
 
