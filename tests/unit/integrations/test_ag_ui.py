@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from unittest.mock import patch
 
 import pytest
@@ -13,6 +14,7 @@ try:
     from ag_ui.core import (
         AssistantMessage,
         EventType,
+        FunctionCall,
         MessagesSnapshotEvent,
         RunFinishedEvent,
         RunStartedEvent,
@@ -22,11 +24,13 @@ try:
         TextMessageContentEvent,
         TextMessageEndEvent,
         TextMessageStartEvent,
+        ToolCall as AGUIToolCall,
         ToolCallArgsEvent,
         ToolCallChunkEvent,
         ToolCallEndEvent,
         ToolCallResultEvent,
         ToolCallStartEvent,
+        ToolMessage as AGUIToolMessage,
         UserMessage,
     )
 
@@ -221,6 +225,33 @@ def test_messages_snapshot_conversion():
     assert messages[2].content == "Thanks!"
 
 
+def test_messages_snapshot_preserves_tool_call_name_and_args():
+    """Test that snapshot tool calls keep the real tool name and arguments."""
+    from ragas.integrations.ag_ui import convert_messages_snapshot
+    from ragas.messages import ToolCall
+
+    snapshot = MessagesSnapshotEvent(
+        messages=[
+            AssistantMessage(
+                id="msg-1",
+                content="Let me check the weather.",
+                tool_calls=[
+                    AGUIToolCall(
+                        id="tc-1",
+                        function=FunctionCall(
+                            name="get_weather", arguments='{"city": "SF"}'
+                        ),
+                    )
+                ],
+            )
+        ]
+    )
+
+    messages = convert_messages_snapshot(snapshot)
+
+    assert messages[0].tool_calls == [ToolCall(name="get_weather", args={"city": "SF"})]
+
+
 def test_snapshot_with_metadata():
     """Test that snapshot conversion includes metadata when requested."""
     from ragas.integrations.ag_ui import convert_messages_snapshot
@@ -234,6 +265,230 @@ def test_snapshot_with_metadata():
     assert messages[0].metadata is not None
     assert "message_id" in messages[0].metadata
     assert messages[0].metadata["message_id"] == "msg-1"
+
+
+# ---------------------------------------------------------------------------
+# Snapshot tool-call round-trip and argument edge cases
+# ---------------------------------------------------------------------------
+
+
+def test_snapshot_tool_call_round_trip():
+    """Tool calls encoded by the writer read back identically from a snapshot."""
+    from ragas.integrations.ag_ui import (
+        convert_messages_snapshot,
+        convert_messages_to_ag_ui,
+    )
+    from ragas.messages import ToolCall
+
+    ragas_messages = [
+        HumanMessage(content="What's the weather in SF?"),
+        AIMessage(
+            content="Let me check.",
+            tool_calls=[
+                ToolCall(name="get_weather", args={"city": "SF", "units": "fahrenheit"})
+            ],
+        ),
+    ]
+
+    ag_ui_messages = convert_messages_to_ag_ui(ragas_messages)
+
+    # The writer emits the nested AG-UI schema: function.name + JSON arguments
+    written = ag_ui_messages[1].tool_calls[0]
+    assert written.function.name == "get_weather"
+    assert json.loads(written.function.arguments) == {
+        "city": "SF",
+        "units": "fahrenheit",
+    }
+
+    messages = convert_messages_snapshot(MessagesSnapshotEvent(messages=ag_ui_messages))
+
+    assert messages[0].content == "What's the weather in SF?"
+    assert messages[1].tool_calls == [
+        ToolCall(name="get_weather", args={"city": "SF", "units": "fahrenheit"})
+    ]
+
+
+def test_snapshot_multiple_tool_calls_round_trip():
+    """Multiple tool calls on one message keep name, args, and order."""
+    from ragas.integrations.ag_ui import (
+        convert_messages_snapshot,
+        convert_messages_to_ag_ui,
+    )
+    from ragas.messages import ToolCall
+
+    ragas_messages = [
+        AIMessage(
+            content="Checking the weather and the time.",
+            tool_calls=[
+                ToolCall(name="get_weather", args={"city": "SF"}),
+                ToolCall(name="get_time", args={"timezone": "PST"}),
+            ],
+        )
+    ]
+
+    ag_ui_messages = convert_messages_to_ag_ui(ragas_messages)
+    messages = convert_messages_snapshot(MessagesSnapshotEvent(messages=ag_ui_messages))
+
+    assert messages[0].tool_calls == [
+        ToolCall(name="get_weather", args={"city": "SF"}),
+        ToolCall(name="get_time", args={"timezone": "PST"}),
+    ]
+
+
+def test_snapshot_tool_result_and_metadata():
+    """Tool results in a snapshot convert to ToolMessage and keep metadata."""
+    from ragas.integrations.ag_ui import convert_messages_snapshot
+    from ragas.messages import ToolCall
+
+    # AG-UI ToolMessage is emitted by the agent (the writer skips it by
+    # design), so the snapshot is built directly as an agent would send it.
+    snapshot = MessagesSnapshotEvent(
+        messages=[
+            AssistantMessage(
+                id="msg-1",
+                content="Let me check the weather.",
+                tool_calls=[
+                    AGUIToolCall(
+                        id="tc-1",
+                        function=FunctionCall(
+                            name="get_weather", arguments='{"city": "SF"}'
+                        ),
+                    )
+                ],
+            ),
+            AGUIToolMessage(id="msg-2", content="Sunny, 72F", tool_call_id="tc-1"),
+        ]
+    )
+
+    messages = convert_messages_snapshot(snapshot, metadata=True)
+
+    assert len(messages) == 2
+    assert isinstance(messages[0], AIMessage)
+    assert messages[0].tool_calls == [ToolCall(name="get_weather", args={"city": "SF"})]
+    assert isinstance(messages[1], ToolMessage)
+    assert messages[1].content == "Sunny, 72F"
+
+    assert messages[0].metadata["source"] == "messages_snapshot"
+    assert messages[0].metadata["message_id"] == "msg-1"
+    assert messages[1].metadata["source"] == "messages_snapshot"
+    assert messages[1].metadata["message_id"] == "msg-2"
+
+
+def test_snapshot_nested_and_unicode_arguments_round_trip():
+    """Nested values, Unicode text, and empty string values round trip."""
+    from ragas.integrations.ag_ui import (
+        convert_messages_snapshot,
+        convert_messages_to_ag_ui,
+    )
+    from ragas.messages import ToolCall
+
+    args = {
+        "city": "Zürich",
+        "emoji": "🌡️",
+        "filters": {"units": ["celsius", "fahrenheit"], "limit": 10},
+        "query": "",
+    }
+    ragas_messages = [
+        AIMessage(content="Searching.", tool_calls=[ToolCall(name="search", args=args)])
+    ]
+
+    ag_ui_messages = convert_messages_to_ag_ui(ragas_messages)
+    messages = convert_messages_snapshot(MessagesSnapshotEvent(messages=ag_ui_messages))
+
+    assert messages[0].tool_calls == [ToolCall(name="search", args=args)]
+
+
+def test_snapshot_empty_arguments():
+    """Empty arguments decode to an empty dict, like the streaming handler."""
+    from ragas.integrations.ag_ui import convert_messages_snapshot
+    from ragas.messages import ToolCall
+
+    snapshot = MessagesSnapshotEvent(
+        messages=[
+            AssistantMessage(
+                id="msg-1",
+                content="Listing files.",
+                tool_calls=[
+                    AGUIToolCall(
+                        id="tc-1",
+                        function=FunctionCall(name="list_files", arguments=""),
+                    )
+                ],
+            )
+        ]
+    )
+
+    messages = convert_messages_snapshot(snapshot)
+
+    assert messages[0].tool_calls == [ToolCall(name="list_files", args={})]
+
+
+def test_snapshot_malformed_json_arguments():
+    """Malformed JSON arguments fall back to raw_args."""
+    from ragas.integrations.ag_ui import convert_messages_snapshot
+    from ragas.messages import ToolCall
+
+    snapshot = MessagesSnapshotEvent(
+        messages=[
+            AssistantMessage(
+                id="msg-1",
+                content="Calling a broken tool.",
+                tool_calls=[
+                    AGUIToolCall(
+                        id="tc-1",
+                        function=FunctionCall(
+                            name="broken_tool", arguments="{invalid json"
+                        ),
+                    )
+                ],
+            )
+        ]
+    )
+
+    messages = convert_messages_snapshot(snapshot)
+
+    assert messages[0].tool_calls == [
+        ToolCall(name="broken_tool", args={"raw_args": "{invalid json"})
+    ]
+
+
+def test_snapshot_non_object_json_arguments():
+    """Valid non-object JSON arguments are preserved via raw_args."""
+    from ragas.integrations.ag_ui import convert_messages_snapshot
+    from ragas.messages import ToolCall
+
+    snapshot = MessagesSnapshotEvent(
+        messages=[
+            AssistantMessage(
+                id="msg-1",
+                content="Calling tools with non-object arguments.",
+                tool_calls=[
+                    AGUIToolCall(
+                        id="tc-1",
+                        function=FunctionCall(name="list_tool", arguments="[1, 2, 3]"),
+                    ),
+                    AGUIToolCall(
+                        id="tc-2",
+                        function=FunctionCall(
+                            name="text_tool", arguments='"just a string"'
+                        ),
+                    ),
+                    AGUIToolCall(
+                        id="tc-3",
+                        function=FunctionCall(name="number_tool", arguments="42"),
+                    ),
+                ],
+            )
+        ]
+    )
+
+    messages = convert_messages_snapshot(snapshot)
+
+    assert messages[0].tool_calls == [
+        ToolCall(name="list_tool", args={"raw_args": [1, 2, 3]}),
+        ToolCall(name="text_tool", args={"raw_args": "just a string"}),
+        ToolCall(name="number_tool", args={"raw_args": 42}),
+    ]
 
 
 def test_non_message_events_filtered():

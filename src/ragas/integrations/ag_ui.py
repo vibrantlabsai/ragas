@@ -633,8 +633,14 @@ class AGUIEventCollector:
                     tool_calls = []
                     for tc in msg.tool_calls:
                         tc_obj = t.cast(Any, tc)
-                        name = t.cast(str, getattr(tc_obj, "name", "unknown_tool"))
-                        raw_args = getattr(tc_obj, "args", {})
+                        function = getattr(tc_obj, "function", None)
+                        name = t.cast(str, getattr(function, "name", "unknown_tool"))
+                        raw_args = getattr(function, "arguments", {})
+                        if isinstance(raw_args, str):
+                            try:
+                                raw_args = json.loads(raw_args) if raw_args else {}
+                            except json.JSONDecodeError:
+                                raw_args = {"raw_args": raw_args}
                         if not isinstance(raw_args, dict):
                             raw_args = {"raw_args": raw_args}
                         tool_calls.append(
