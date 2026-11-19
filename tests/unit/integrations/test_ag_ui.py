@@ -520,6 +520,143 @@ def test_text_message_chunk():
     assert messages[0].content == "Complete message"
 
 
+def test_text_message_chunk_continuation_is_merged_into_open_message():
+    """Test TEXT_MESSAGE_CHUNK continuations that repeat message_id."""
+    from ragas.integrations.ag_ui import (
+        convert_to_ragas_messages,
+        extract_response,
+    )
+
+    events = [
+        TextMessageChunkEvent(
+            message_id="msg-1", role="assistant", delta="The weather "
+        ),
+        TextMessageChunkEvent(message_id="msg-1", delta="in SF is "),
+        TextMessageChunkEvent(message_id="msg-1", delta="sunny, 72F."),
+    ]
+
+    messages = convert_to_ragas_messages(events)
+
+    assert len(messages) == 1
+    assert isinstance(messages[0], AIMessage)
+    assert messages[0].content == "The weather in SF is sunny, 72F."
+    assert extract_response(messages) == "The weather in SF is sunny, 72F."
+
+
+def test_text_message_chunk_without_message_id_continues_open_message():
+    """Test TEXT_MESSAGE_CHUNK continuations that omit message_id."""
+    from ragas.integrations.ag_ui import convert_to_ragas_messages
+
+    events = [
+        TextMessageChunkEvent(role="assistant", delta="Hello"),
+        TextMessageChunkEvent(delta=" world"),
+    ]
+
+    messages = convert_to_ragas_messages(events)
+
+    assert len(messages) == 1
+    assert isinstance(messages[0], AIMessage)
+    assert messages[0].content == "Hello world"
+
+
+def test_text_message_chunk_continuation_keeps_opening_role():
+    """Test that continuation chunks inherit the role of the open message."""
+    from ragas.integrations.ag_ui import convert_to_ragas_messages
+
+    events = [
+        TextMessageChunkEvent(message_id="msg-1", role="user", delta="What is "),
+        TextMessageChunkEvent(message_id="msg-1", delta="the weather?"),
+    ]
+
+    messages = convert_to_ragas_messages(events)
+
+    assert len(messages) == 1
+    assert isinstance(messages[0], HumanMessage)
+    assert messages[0].content == "What is the weather?"
+
+
+def test_text_message_chunk_closed_at_tool_call_boundary():
+    """Test that tool events close the open chunk message (spec: stream boundaries).
+
+    A follow-on chunk without message_id arriving after tool events must not
+    attach to the already-closed message.
+    """
+    from ragas.integrations.ag_ui import convert_to_ragas_messages
+
+    events = [
+        TextMessageChunkEvent(message_id="m1", role="assistant", delta="Checking."),
+        ToolCallStartEvent(
+            tool_call_id="tc-1", tool_call_name="get_weather", parent_message_id="m1"
+        ),
+        ToolCallArgsEvent(tool_call_id="tc-1", delta='{"city": "SF"}'),
+        ToolCallEndEvent(tool_call_id="tc-1"),
+        ToolCallResultEvent(
+            tool_call_id="tc-1",
+            message_id="result-1",
+            content="Sunny, 72F",
+        ),
+        # Stray continuation chunk without message_id: the tool events closed
+        # m1, so this must not append to it
+        TextMessageChunkEvent(delta="It is sunny."),
+    ]
+
+    messages = convert_to_ragas_messages(events)
+
+    # m1 must keep exactly the content it was opened with
+    assert isinstance(messages[0], AIMessage)
+    assert messages[0].content == "Checking."
+    assert isinstance(messages[1], ToolMessage)
+    assert messages[1].content == "Sunny, 72F"
+    # The stray chunk opens its own message after the tool boundary
+    assert len(messages) == 3
+    assert isinstance(messages[2], AIMessage)
+    assert messages[2].content == "It is sunny."
+
+
+def test_text_message_chunk_closed_at_run_boundary():
+    """Test that run-level events close the open chunk message (spec: stream boundaries).
+
+    A follow-on chunk without message_id must not merge into the previous
+    run's message across RUN_FINISHED/RUN_STARTED.
+    """
+    from ragas.integrations.ag_ui import convert_to_ragas_messages
+
+    events = [
+        RunStartedEvent(run_id="run-1", thread_id="thread-1"),
+        TextMessageChunkEvent(message_id="m1", role="assistant", delta="Run one."),
+        RunFinishedEvent(run_id="run-1", thread_id="thread-1"),
+        RunStartedEvent(run_id="run-2", thread_id="thread-1"),
+        TextMessageChunkEvent(delta="Run two."),
+    ]
+
+    messages = convert_to_ragas_messages(events)
+
+    # The run 1 message must not absorb the run 2 chunk
+    assert isinstance(messages[0], AIMessage)
+    assert messages[0].content == "Run one."
+    assert len(messages) == 2
+    assert isinstance(messages[1], AIMessage)
+    assert messages[1].content == "Run two."
+
+
+def test_noop_event_does_not_close_open_chunk_message():
+    """Test that spec no-op events (e.g. RAW) do not close the open chunk message."""
+    from ragas.integrations.ag_ui import convert_to_ragas_messages
+
+    events = [
+        TextMessageChunkEvent(message_id="m1", role="assistant", delta="Hello"),
+        MockEvent(EventType.RAW, event="{}"),
+        TextMessageChunkEvent(delta=" world"),
+    ]
+
+    messages = convert_to_ragas_messages(events)
+
+    # RAW is a no-op, so the follow-on chunk still appends to the open message
+    assert len(messages) == 1
+    assert isinstance(messages[0], AIMessage)
+    assert messages[0].content == "Hello world"
+
+
 def test_tool_call_chunk():
     """Test TOOL_CALL_CHUNK event handling."""
     from ragas.integrations.ag_ui import convert_to_ragas_messages
