@@ -104,7 +104,7 @@ class HaystackLLMWrapper(BaseRagasLLM):
         callbacks: t.Optional[Callbacks] = None,
     ) -> LLMResult:
         component_output: t.Dict[str, t.Any] = self.generator.run(prompt.to_string())  # type: ignore[reportAttributeAccessIssue]
-        replies = component_output.get("llm", {}).get("replies", [])
+        replies = component_output.get("replies", [])
         output_text = replies[0] if replies else ""
 
         return LLMResult(generations=[[Generation(text=output_text)]])

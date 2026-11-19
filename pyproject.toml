@@ -61,7 +61,7 @@ gdrive = [
     "google-auth>=2.40.3",
     "google-auth-oauthlib>=1.2.2"
 ]
-ai-frameworks = ["haystack-ai"]
+ai-frameworks = ["haystack-ai<3"]
 oci = ["oci>=2.160.1"]
 ag-ui = ["ag-ui-protocol>=0.1.9", "httpx>=0.27.0"]
 dspy = ["dspy-ai>=2.4.0"]
