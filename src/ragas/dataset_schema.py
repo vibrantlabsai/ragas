@@ -249,8 +249,22 @@ class RagasDataset(ABC, t.Generic[Sample]):
 
     @classmethod
     def from_pandas(cls, dataframe: PandasDataframe):
-        """Creates an EvaluationDataset from a pandas DataFrame."""
-        return cls.from_list(dataframe.to_dict(orient="records"))
+        """Creates an EvaluationDataset from a pandas DataFrame.
+
+        Missing cells (NaN, None or pd.NA) are skipped, so a sample simply has no
+        value for that field instead of failing validation.
+        """
+        import pandas as pd
+
+        records = [
+            {
+                key: value
+                for key, value in record.items()
+                if not (pd.api.types.is_scalar(value) and pd.isna(value))
+            }
+            for record in dataframe.to_dict(orient="records")
+        ]
+        return cls.from_list(records)
 
     def features(self):
         """Returns the features of the samples."""
