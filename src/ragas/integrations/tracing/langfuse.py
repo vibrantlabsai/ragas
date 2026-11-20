@@ -8,6 +8,8 @@ import typing as t
 from datetime import datetime
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
+LANGFUSE_AVAILABLE = False
+
 if t.TYPE_CHECKING:
     from langfuse import Langfuse, observe
     from langfuse.api import Observation, TraceWithFullDetails
@@ -83,15 +85,17 @@ logger = logging.getLogger(__name__)
 class LangfuseTrace:
     def __init__(self, trace: "TraceWithFullDetails"):
         self.trace = trace
-        self._langfuse_client = Langfuse()
+        self._langfuse_client = Langfuse()  # pyright: ignore[reportCallIssue]
 
     def get_url(self) -> t.Optional[str]:
         return self._langfuse_client.get_trace_url()
 
     def filter(self, span_name: str) -> t.List["Observation"]:
-        # Note: In modern Langfuse, filtering would need to be done differently
-        # This is a placeholder implementation for backward compatibility
-        return []
+        return [
+            observation
+            for observation in self.trace.observations
+            if observation.name == span_name
+        ]
 
 
 async def sync_trace(
@@ -102,12 +106,12 @@ async def sync_trace(
     Args:
         trace_id: The ID of the trace to wait for
         max_retries: Maximum number of retry attempts (default: 10)
-        delay: Delay between retries in seconds (default: 0.5)
+        delay: Delay between retries in seconds (default: 2)
 
     Returns:
-        Trace object if found, None if not found after retries
+        The trace fetched from Langfuse
     """
-    langfuse_client = Langfuse()
+    langfuse_client = Langfuse()  # pyright: ignore[reportCallIssue]
 
     if trace_id is None:
         # if no trace id is provided, get the current trace id
@@ -118,29 +122,29 @@ async def sync_trace(
             "No trace id found. Please ensure you are running this function within a function decorated with @observe()."
         )
 
-    for _ in range(max_retries):
+    if not LANGFUSE_AVAILABLE:
+        raise ImportError(
+            "Langfuse is not installed. Install it with `pip install langfuse` to fetch traces."
+        )
+
+    last_error: t.Optional[Exception] = None
+    for attempt in range(max_retries):
         try:
-            # In modern Langfuse, we would use a different method to fetch traces
-            # This is a placeholder that creates a mock trace for backward compatibility
-            trace = TraceWithFullDetails(
-                id=trace_id,
-                timestamp=datetime.now(),
-                htmlPath="",
-                latency=0,
-                totalCost=0.0,
-                observations=[],
-                scores=[],
-                tags=[],
-                public=False,
-                environment="",
+            trace = await asyncio.to_thread(
+                langfuse_client.api.trace.get,
+                trace_id,
             )
             return LangfuseTrace(trace=trace)
         except Exception as e:
-            logger.debug(f"Trace {trace_id} not yet synced: {str(e)}")
+            last_error = e
+            logger.debug("Trace %s not yet synced: %s", trace_id, e)
 
-        await asyncio.sleep(delay)
+        if attempt < max_retries - 1:
+            await asyncio.sleep(delay)
 
-    raise ValueError(f"Trace {trace_id} not found after {max_retries} attempts")
+    raise ValueError(
+        f"Trace {trace_id} not found after {max_retries} attempts"
+    ) from last_error
 
 
 def add_query_param(url: str, param_name: str, param_value: str) -> str:

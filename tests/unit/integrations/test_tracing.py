@@ -7,7 +7,7 @@ to avoid external dependencies in tests.
 
 import os
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -70,6 +70,21 @@ class TestLangfuseIntegration:
         langfuse_trace = LangfuseTrace(mock_trace)
         assert langfuse_trace.trace == mock_trace
 
+    def test_langfuse_trace_filters_observations_by_name(self):
+        """Test that filtering returns only observations with the requested name."""
+        from ragas.integrations.tracing.langfuse import LangfuseTrace
+
+        matching_observation = MagicMock()
+        matching_observation.name = "retrieval"
+        other_observation = MagicMock()
+        other_observation.name = "generation"
+        mock_trace = MagicMock()
+        mock_trace.observations = [matching_observation, other_observation]
+
+        langfuse_trace = LangfuseTrace(mock_trace)
+
+        assert langfuse_trace.filter("retrieval") == [matching_observation]
+
     @pytest.mark.asyncio
     async def test_sync_trace_with_trace_id(self):
         """Test sync_trace function with explicit trace ID."""
@@ -80,14 +95,16 @@ class TestLangfuseIntegration:
             "ragas.integrations.tracing.langfuse.Langfuse"
         ) as mock_langfuse_class:
             mock_client = MagicMock()
+            mock_trace = MagicMock()
+            mock_client.api.trace.get.return_value = mock_trace
             mock_langfuse_class.return_value = mock_client
 
             result = await sync_trace(
                 trace_id="test-trace-id", max_retries=1, delay=0.1
             )
 
-            assert result is not None
-            assert hasattr(result, "trace")
+            assert result.trace is mock_trace
+            mock_client.api.trace.get.assert_called_once_with("test-trace-id")
 
     @pytest.mark.asyncio
     async def test_sync_trace_without_trace_id(self):
@@ -99,12 +116,73 @@ class TestLangfuseIntegration:
         ) as mock_langfuse_class:
             mock_client = MagicMock()
             mock_client.get_current_trace_id.return_value = "current-trace-id"
+            mock_trace = MagicMock()
+            mock_client.api.trace.get.return_value = mock_trace
             mock_langfuse_class.return_value = mock_client
 
             result = await sync_trace(max_retries=1, delay=0.1)
 
-            assert result is not None
+            assert result.trace is mock_trace
             mock_client.get_current_trace_id.assert_called_once()
+            mock_client.api.trace.get.assert_called_once_with("current-trace-id")
+
+    @pytest.mark.asyncio
+    async def test_sync_trace_retries_transient_failures(self):
+        """Test that sync_trace retries when a trace is not available yet."""
+        from ragas.integrations.tracing.langfuse import sync_trace
+
+        with (
+            patch(
+                "ragas.integrations.tracing.langfuse.Langfuse"
+            ) as mock_langfuse_class,
+            patch(
+                "ragas.integrations.tracing.langfuse.asyncio.sleep",
+                new_callable=AsyncMock,
+            ) as mock_sleep,
+        ):
+            mock_client = MagicMock()
+            mock_trace = MagicMock()
+            mock_client.api.trace.get.side_effect = [
+                RuntimeError("trace is still syncing"),
+                mock_trace,
+            ]
+            mock_langfuse_class.return_value = mock_client
+
+            result = await sync_trace(
+                trace_id="test-trace-id", max_retries=2, delay=0.25
+            )
+
+            assert result.trace is mock_trace
+            assert mock_client.api.trace.get.call_count == 2
+            mock_sleep.assert_awaited_once_with(0.25)
+
+    @pytest.mark.asyncio
+    async def test_sync_trace_raises_after_retries_are_exhausted(self):
+        """Test that sync_trace reports when the trace never becomes available."""
+        from ragas.integrations.tracing.langfuse import sync_trace
+
+        with (
+            patch(
+                "ragas.integrations.tracing.langfuse.Langfuse"
+            ) as mock_langfuse_class,
+            patch(
+                "ragas.integrations.tracing.langfuse.asyncio.sleep",
+                new_callable=AsyncMock,
+            ) as mock_sleep,
+        ):
+            mock_client = MagicMock()
+            mock_client.api.trace.get.side_effect = RuntimeError(
+                "trace is still syncing"
+            )
+            mock_langfuse_class.return_value = mock_client
+
+            with pytest.raises(
+                ValueError, match="Trace test-trace-id not found after 2 attempts"
+            ):
+                await sync_trace(trace_id="test-trace-id", max_retries=2, delay=0.25)
+
+            assert mock_client.api.trace.get.call_count == 2
+            mock_sleep.assert_awaited_once_with(0.25)
 
     @pytest.mark.asyncio
     async def test_sync_trace_no_trace_found(self):
@@ -120,6 +198,15 @@ class TestLangfuseIntegration:
 
             with pytest.raises(ValueError, match="No trace id found"):
                 await sync_trace(max_retries=1, delay=0.1)
+
+    @pytest.mark.asyncio
+    async def test_sync_trace_without_langfuse(self):
+        """Test sync_trace reports the missing dependency for an explicit trace ID."""
+        from ragas.integrations.tracing.langfuse import sync_trace
+
+        with patch("ragas.integrations.tracing.langfuse.LANGFUSE_AVAILABLE", False):
+            with pytest.raises(ImportError, match="pip install langfuse"):
+                await sync_trace(trace_id="test-trace-id", max_retries=1)
 
     def test_add_query_param(self):
         """Test URL query parameter addition utility."""
