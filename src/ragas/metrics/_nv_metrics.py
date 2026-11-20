@@ -92,8 +92,10 @@ class AnswerAccuracy(MetricWithLLM, SingleTurnMetric):
         score = np.nan
         if score0 >= 0 and score1 >= 0:
             score = (score0 + score1) / 2
-        else:
-            score = max(score0, score1)
+        elif score0 >= 0:
+            score = score0
+        elif score1 >= 0:
+            score = score1
         return score
 
     async def _single_turn_ascore(
@@ -227,8 +229,10 @@ class ContextRelevance(MetricWithLLM, SingleTurnMetric):
         score = np.nan
         if score0 >= 0 and score1 >= 0:
             score = (score0 + score1) / 2
-        else:
-            score = max(score0, score1)
+        elif score0 >= 0:
+            score = score0
+        elif score1 >= 0:
+            score = score1
         return score
 
     async def _single_turn_ascore(
@@ -361,8 +365,10 @@ class ResponseGroundedness(MetricWithLLM, SingleTurnMetric):
         score = np.nan
         if score0 >= 0 and score1 >= 0:
             score = (score0 + score1) / 2
-        else:
-            score = max(score0, score1)
+        elif score0 >= 0:
+            score = score0
+        elif score1 >= 0:
+            score = score1
         return score
 
     async def _single_turn_ascore(
