@@ -100,6 +100,8 @@ class BaseSynthesizer(ABC, t.Generic[Scenario], PromptMixin):
         persona_list: t.List[Persona],
         callbacks: t.Optional[Callbacks] = None,
     ) -> t.List[Scenario]:
+        if n <= 0:
+            return []
         callbacks = callbacks or []
         scenario_generation_rm, scenario_generation_group = new_group(
             name=self.name,
@@ -109,6 +111,8 @@ class BaseSynthesizer(ABC, t.Generic[Scenario], PromptMixin):
         scenarios = await self._generate_scenarios(
             n, knowledge_graph, persona_list, scenario_generation_group
         )
+        # synthesizers sample per node/cluster and can overshoot n
+        scenarios = scenarios[:n]
         scenario_generation_rm.on_chain_end(outputs={"scenarios": scenarios})
         return scenarios
 
