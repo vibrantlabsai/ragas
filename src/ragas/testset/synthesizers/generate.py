@@ -12,12 +12,18 @@ from ragas._analytics import TestsetGenerationEvent, track
 from ragas.callbacks import new_group
 from ragas.cost import TokenUsageParser
 from ragas.embeddings.base import (
+    BaseRagasEmbedding,
     BaseRagasEmbeddings,
     LangchainEmbeddingsWrapper,
     LlamaIndexEmbeddingsWrapper,
 )
 from ragas.executor import Executor
-from ragas.llms import BaseRagasLLM, LangchainLLMWrapper, LlamaIndexLLMWrapper
+from ragas.llms import (
+    BaseRagasLLM,
+    InstructorBaseRagasLLM,
+    LangchainLLMWrapper,
+    LlamaIndexLLMWrapper,
+)
 from ragas.run_config import RunConfig
 from ragas.testset.graph import KnowledgeGraph, Node, NodeType
 from ragas.testset.persona import Persona, generate_personas_from_kg
@@ -58,8 +64,10 @@ class TestsetGenerator:
 
     Attributes
     ----------
-    llm : BaseRagasLLM
+    llm : Union[BaseRagasLLM, InstructorBaseRagasLLM]
         The language model to use for the generation process.
+    embedding_model : Union[BaseRagasEmbeddings, BaseRagasEmbedding]
+        The embedding model to use for the generation process.
     knowledge_graph : KnowledgeGraph, default empty
         The knowledge graph to use for the generation process.
     llm_context : Optional[str], default None
@@ -67,8 +75,8 @@ class TestsetGenerator:
         This context will be used to guide how the LLM generates queries and answers.
     """
 
-    llm: BaseRagasLLM
-    embedding_model: BaseRagasEmbeddings
+    llm: t.Union[BaseRagasLLM, InstructorBaseRagasLLM]
+    embedding_model: t.Union[BaseRagasEmbeddings, BaseRagasEmbedding]
     knowledge_graph: KnowledgeGraph = field(default_factory=KnowledgeGraph)
     persona_list: t.Optional[t.List[Persona]] = None
     llm_context: t.Optional[str] = None

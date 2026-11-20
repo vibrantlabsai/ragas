@@ -6,7 +6,7 @@ from langchain_core.callbacks import Callbacks
 from pydantic import BaseModel
 
 from ragas.executor import run_async_batch
-from ragas.llms.base import BaseRagasLLM
+from ragas.llms.base import BaseRagasLLM, InstructorBaseRagasLLM
 from ragas.prompt import PydanticPrompt, StringIO
 from ragas.testset.graph import KnowledgeGraph, Node
 
@@ -60,7 +60,7 @@ class PersonaList(BaseModel):
 
 def generate_personas_from_kg(
     kg: KnowledgeGraph,
-    llm: BaseRagasLLM,
+    llm: t.Union[BaseRagasLLM, InstructorBaseRagasLLM],
     persona_generation_prompt: PersonaGenerationPrompt = PersonaGenerationPrompt(),
     num_personas: int = 3,
     filter_fn: t.Callable[[Node], bool] = default_filter,
@@ -72,7 +72,7 @@ def generate_personas_from_kg(
     parameters:
         kg: KnowledgeGraph
             The knowledge graph to generate personas from.
-        llm: BaseRagasLLM
+        llm: Union[BaseRagasLLM, InstructorBaseRagasLLM]
             The LLM to use for generating the persona.
         persona_generation_prompt: PersonaGenerationPrompt
             The prompt to use for generating the persona.
