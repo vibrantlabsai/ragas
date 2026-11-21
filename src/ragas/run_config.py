@@ -78,7 +78,7 @@ def add_retry(fn: WrappedFn, run_config: RunConfig) -> WrappedFn:
       based on the RunConfig.
     """
     # configure tenacity's after section wtih logger
-    if run_config.log_tenacity is not None:
+    if run_config.log_tenacity:
         logger = logging.getLogger(f"ragas.retry.{fn.__name__}")
         tenacity_logger = after_log(logger, logging.DEBUG)
     else:
@@ -99,7 +99,7 @@ def add_async_retry(fn: WrappedFn, run_config: RunConfig) -> WrappedFn:
     Decorator for retrying a function if it fails.
     """
     # configure tenacity's after section wtih logger
-    if run_config.log_tenacity is not None:
+    if run_config.log_tenacity:
         logger = logging.getLogger(f"TENACITYRetry[{fn.__name__}]")
         tenacity_logger = after_log(logger, logging.DEBUG)
     else:
