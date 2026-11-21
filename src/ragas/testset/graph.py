@@ -81,7 +81,8 @@ class Node(BaseModel):
         return self.properties.get(key.lower(), None)
 
     def __hash__(self) -> int:
-        return hash(self.id)
+        node_id = self.id
+        return hash(node_id.int) if type(node_id) is uuid.UUID else hash(node_id)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Node):
@@ -531,40 +532,49 @@ class KnowledgeGraph:
             )
 
         # Build adjacency list for faster neighbor lookup - optimized for large datasets
-        adjacency_list: dict[Node, set[Node]] = {}
-        unique_edges: set[frozenset[Node]] = set()
+        adjacency_list: defaultdict[Node, set[Node]] = defaultdict(set)
         for rel in filtered_relationships:
-            # Lazy initialization since we only care about nodes with relationships
-            if rel.source not in adjacency_list:
-                adjacency_list[rel.source] = set()
-            adjacency_list[rel.source].add(rel.target)
-            unique_edges.add(frozenset({rel.source, rel.target}))
+            source, target = rel.source, rel.target
+            adjacency_list[source].add(target)
             if rel.bidirectional:
-                if rel.target not in adjacency_list:
-                    adjacency_list[rel.target] = set()
-                adjacency_list[rel.target].add(rel.source)
+                adjacency_list[target].add(source)
 
-        # Aggregate clusters for each start node
-        start_node_clusters: dict[Node, set[frozenset[Node]]] = {}
+        neighbor_sets = adjacency_list.values()
+        connected_nodes = set(adjacency_list).union(*neighbor_sets)
+        edge_count = sum(map(len, neighbor_sets))
+        node_count = len(connected_nodes)
+
+        # Each undirected edge contributes one or two adjacency entries.
+        # Only count reciprocal pairs when those bounds straddle the cutoff.
+        if node_count <= edge_count < 2 * node_count - 1:
+            remaining = adjacency_list.copy()
+            for source, neighbors in adjacency_list.items():
+                del remaining[source]
+                for target in neighbors:
+                    reverse_neighbors = remaining.get(target)
+                    if reverse_neighbors is not None and source in reverse_neighbors:
+                        edge_count -= 1
+                if edge_count < node_count:
+                    break
+
         # sample enough starting nodes to handle worst case grouping scenario where nodes are grouped
         # in independent clusters of size equal to depth_limit. This only surfaces when there are less
         # unique edges than nodes.
-        connected_nodes: set[Node] = set().union(*unique_edges)
         sample_size: int = (
             (n - 1) * depth_limit + 1
-            if len(unique_edges) < len(connected_nodes)
+            if edge_count < node_count
             else max(n, depth_limit, 10)
         )
 
-        def dfs(node: Node, start_node: Node, current_path: t.Set[Node]):
+        def dfs(node: Node, clusters: set[frozenset[Node]], current_path: set[Node]):
             # Terminate exploration when max usable clusters is reached so complexity doesn't spiral
-            if len(start_node_clusters.get(start_node, [])) > sample_size:
+            if len(clusters) > sample_size:
                 return
 
             current_path.add(node)
             path_length = len(current_path)
             at_max_depth = path_length >= depth_limit
-            neighbors = adjacency_list.get(node, None)
+            neighbors = None if at_max_depth else adjacency_list.get(node)
 
             # If this is a leaf node or we've reached depth limit
             # and we have a valid path of at least 2 nodes, add it as a cluster
@@ -573,15 +583,12 @@ class KnowledgeGraph:
                 or not neighbors
                 or all(n in current_path for n in neighbors)
             ):
-                # Lazy initialization of the set for this start node
-                if start_node not in start_node_clusters:
-                    start_node_clusters[start_node] = set()
-                start_node_clusters[start_node].add(frozenset(current_path))
+                clusters.add(frozenset(current_path))
             elif neighbors:
                 for neighbor in neighbors:
                     # Block cycles
                     if neighbor not in current_path:
-                        dfs(neighbor, start_node, current_path)
+                        dfs(neighbor, clusters, current_path)
 
             # Backtrack by removing the current node from path
             current_path.remove(node)
@@ -596,12 +603,12 @@ class KnowledgeGraph:
         rng = random.Random(int(node_hash[:8], 16))  # Use first 8 hex chars as seed
         rng.shuffle(start_nodes)
         samples: list[Node] = start_nodes[:sample_size]
+        start_node_clusters_list: list[set[frozenset[Node]]] = []
         for start_node in samples:
-            dfs(start_node, start_node, set())
-
-        start_node_clusters_list: list[set[frozenset[Node]]] = list(
-            start_node_clusters.values()
-        )
+            clusters: set[frozenset[Node]] = set()
+            dfs(start_node, clusters, set())
+            if clusters:
+                start_node_clusters_list.append(clusters)
 
         # Iteratively pop from each start_node_clusters until we have n unique clusters
         # Avoid adding duplicates and subset/superset pairs so we have diversity. We
