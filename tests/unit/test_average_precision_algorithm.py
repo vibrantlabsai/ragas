@@ -19,8 +19,8 @@ def calculate_average_precision_original(verdict_list: List[int]) -> float:
             for i in range(len(verdict_list))
         ]
     )
-    denominator = sum(verdict_list) + 1e-10
-    return numerator / denominator
+    denominator = sum(verdict_list)
+    return numerator / denominator if denominator else 0.0
 
 
 def calculate_average_precision_optimized(verdict_list: List[int]) -> float:
@@ -32,8 +32,7 @@ def calculate_average_precision_optimized(verdict_list: List[int]) -> float:
         if v:
             numerator += cumsum / (i + 1)
 
-    denominator = cumsum + 1e-10
-    return numerator / denominator
+    return numerator / cumsum if cumsum else 0.0
 
 
 class TestAveragePrecisionAlgorithm:
@@ -86,3 +85,101 @@ class TestAveragePrecisionAlgorithm:
             original = calculate_average_precision_original(verdict_list)
             optimized = calculate_average_precision_optimized(verdict_list)
             assert np.isclose(original, optimized, rtol=1e-10, atol=1e-10)
+
+    # --- Exact-equality regression tests (issue #2909) ---
+
+    def test_perfect_ranking_returns_exactly_1(self):
+        """A perfectly ranked retrieval must return exactly 1.0, not 0.9999999999."""
+        assert calculate_average_precision_optimized([1]) == 1.0
+        assert calculate_average_precision_optimized([1, 1, 1]) == 1.0
+        assert calculate_average_precision_optimized([1] * 20) == 1.0
+
+    def test_no_relevant_returns_exactly_0(self):
+        """No relevant items must return exactly 0.0."""
+        assert calculate_average_precision_optimized([0]) == 0.0
+        assert calculate_average_precision_optimized([0, 0, 0]) == 0.0
+
+    def test_empty_returns_exactly_0(self):
+        """Empty verdict list must return exactly 0.0."""
+        assert calculate_average_precision_optimized([]) == 0.0
+
+    def test_mixed_ranking_exact_values(self):
+        """Verify exact scores for known mixed rankings (using approx for float division)."""
+        assert calculate_average_precision_optimized([1, 0, 1]) == pytest.approx(5 / 6)
+        assert calculate_average_precision_optimized([0, 1, 1]) == pytest.approx(7 / 12)
+
+
+class TestMetricAveragePrecisionExact:
+    """Exact-equality tests calling the real metric classes (issue #2909)."""
+
+    def test_llm_context_precision_perfect_ranking(self):
+        """LLMContextPrecisionWithReference._calculate_average_precision returns exactly 1.0."""
+        from ragas.metrics._context_precision import (
+            LLMContextPrecisionWithReference,
+            Verification,
+        )
+
+        metric = LLMContextPrecisionWithReference()
+        verdicts = [Verification(reason="ok", verdict=1) for _ in range(5)]
+        assert metric._calculate_average_precision(verdicts) == 1.0
+
+    def test_llm_context_precision_no_relevant(self):
+        """LLMContextPrecisionWithReference._calculate_average_precision returns exactly 0.0."""
+        from ragas.metrics._context_precision import (
+            LLMContextPrecisionWithReference,
+            Verification,
+        )
+
+        metric = LLMContextPrecisionWithReference()
+        verdicts = [Verification(reason="no", verdict=0) for _ in range(3)]
+        assert metric._calculate_average_precision(verdicts) == 0.0
+
+    def test_llm_context_precision_empty(self):
+        """LLMContextPrecisionWithReference._calculate_average_precision on empty returns 0.0."""
+        from ragas.metrics._context_precision import LLMContextPrecisionWithReference
+
+        metric = LLMContextPrecisionWithReference()
+        assert metric._calculate_average_precision([]) == 0.0
+
+    def test_llm_context_precision_mixed(self):
+        """LLMContextPrecisionWithReference._calculate_average_precision on [1,0,1] == 5/6."""
+        from ragas.metrics._context_precision import (
+            LLMContextPrecisionWithReference,
+            Verification,
+        )
+
+        metric = LLMContextPrecisionWithReference()
+        verdicts = [
+            Verification(reason="yes", verdict=1),
+            Verification(reason="no", verdict=0),
+            Verification(reason="yes", verdict=1),
+        ]
+        assert metric._calculate_average_precision(verdicts) == pytest.approx(5 / 6)
+
+    def test_non_llm_context_precision_perfect_ranking(self):
+        """NonLLMContextPrecisionWithReference._calculate_average_precision returns exactly 1.0."""
+        from ragas.metrics._context_precision import NonLLMContextPrecisionWithReference
+
+        metric = NonLLMContextPrecisionWithReference()
+        assert metric._calculate_average_precision([1, 1, 1]) == 1.0
+
+    def test_non_llm_context_precision_no_relevant(self):
+        """NonLLMContextPrecisionWithReference._calculate_average_precision returns exactly 0.0."""
+        from ragas.metrics._context_precision import NonLLMContextPrecisionWithReference
+
+        metric = NonLLMContextPrecisionWithReference()
+        assert metric._calculate_average_precision([0, 0, 0]) == 0.0
+
+    def test_non_llm_context_precision_empty(self):
+        """NonLLMContextPrecisionWithReference._calculate_average_precision on empty returns 0.0."""
+        from ragas.metrics._context_precision import NonLLMContextPrecisionWithReference
+
+        metric = NonLLMContextPrecisionWithReference()
+        assert metric._calculate_average_precision([]) == 0.0
+
+    def test_non_llm_context_precision_mixed(self):
+        """NonLLMContextPrecisionWithReference._calculate_average_precision on [0,1,1] == 7/12."""
+        from ragas.metrics._context_precision import NonLLMContextPrecisionWithReference
+
+        metric = NonLLMContextPrecisionWithReference()
+        assert metric._calculate_average_precision([0, 1, 1]) == pytest.approx(7 / 12)

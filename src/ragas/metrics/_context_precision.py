@@ -113,8 +113,6 @@ class LLMContextPrecisionWithReference(MetricWithLLM, SingleTurnMetric):
     def _calculate_average_precision(
         self, verifications: t.List[Verification]
     ) -> float:
-        score = np.nan
-
         cumsum = 0
         numerator = 0.0
         for i, ver in enumerate(verifications):
@@ -123,12 +121,7 @@ class LLMContextPrecisionWithReference(MetricWithLLM, SingleTurnMetric):
             if v:
                 numerator += cumsum / (i + 1)
 
-        denominator = cumsum + 1e-10
-        score = numerator / denominator
-        if np.isnan(score):
-            logger.warning(
-                "Invalid response format. Expected a list of dictionaries with keys 'verdict'"
-            )
+        score = numerator / cumsum if cumsum else 0.0
         return score
 
     async def _single_turn_ascore(
@@ -242,8 +235,7 @@ class NonLLMContextPrecisionWithReference(SingleTurnMetric):
             if v:
                 numerator += cumsum / (i + 1)
 
-        denominator = cumsum + 1e-10
-        score = numerator / denominator
+        score = numerator / cumsum if cumsum else 0.0
         return score
 
 
