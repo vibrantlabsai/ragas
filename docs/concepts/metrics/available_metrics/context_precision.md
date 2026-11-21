@@ -119,28 +119,6 @@ The following examples use the legacy metrics API pattern. For new projects, we 
 !!! warning "Deprecation Timeline"
     This API will be deprecated in version 0.4 and removed in version 1.0. Please migrate to the collections-based API shown above.
 
-### Example with SingleTurnSample
-
-```python
-from ragas import SingleTurnSample
-from ragas.metrics import LLMContextPrecisionWithoutReference
-
-context_precision = LLMContextPrecisionWithoutReference(llm=evaluator_llm)
-
-sample = SingleTurnSample(
-    user_input="Where is the Eiffel Tower located?",
-    response="The Eiffel Tower is located in Paris.",
-    retrieved_contexts=["The Eiffel Tower is located in Paris."],
-)
-
-await context_precision.single_turn_ascore(sample)
-```
-
-Output:
-```
-0.9999999999
-```
-
 ### Context Precision without reference
 
 The `LLMContextPrecisionWithoutReference` metric can be used without the availability of a reference answer. To estimate if the retrieved contexts are relevant, this method uses the LLM to compare each chunk in `retrieved_contexts` with the `response`.

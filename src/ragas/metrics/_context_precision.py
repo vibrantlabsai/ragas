@@ -172,6 +172,18 @@ class LLMContextPrecisionWithReference(MetricWithLLM, SingleTurnMetric):
 
 @dataclass
 class LLMContextPrecisionWithoutReference(LLMContextPrecisionWithReference):
+    """
+    Context precision without a reference answer. Each chunk in
+    `retrieved_contexts` is judged useful or not by comparing it against
+    the generated `response` (instead of a `reference`).
+
+    Attributes
+    ----------
+    name : str
+    evaluation_mode: EvaluationMode
+    context_precision_prompt: Prompt
+    """
+
     name: str = "llm_context_precision_without_reference"
     _required_columns: t.Dict[MetricType, t.Set[str]] = field(
         default_factory=lambda: {
@@ -309,6 +321,18 @@ class IDBasedContextPrecision(SingleTurnMetric):
 
 @dataclass
 class ContextPrecision(LLMContextPrecisionWithReference):
+    """
+    Context precision with a reference answer. Requires `user_input`,
+    `retrieved_contexts` and `reference`; each chunk is judged against
+    the `reference`.
+
+    Attributes
+    ----------
+    name : str
+    evaluation_mode: EvaluationMode
+    context_precision_prompt: Prompt
+    """
+
     name: str = "context_precision"
 
     async def _single_turn_ascore(
@@ -319,6 +343,18 @@ class ContextPrecision(LLMContextPrecisionWithReference):
 
 @dataclass
 class ContextUtilization(LLMContextPrecisionWithoutReference):
+    """
+    Context precision without a reference answer. Requires `user_input`,
+    `response` and `retrieved_contexts`; each chunk is judged against
+    the generated `response`.
+
+    Attributes
+    ----------
+    name : str
+    evaluation_mode: EvaluationMode
+    context_precision_prompt: Prompt
+    """
+
     name: str = "context_utilization"
 
     async def _single_turn_ascore(
