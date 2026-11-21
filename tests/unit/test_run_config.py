@@ -1,11 +1,13 @@
+import asyncio
 import importlib
+import logging
 import sys
-from typing import Callable
+from typing import Callable, List
 
 import pytest
 from numpy.random import Generator, default_rng
 
-from ragas.run_config import RunConfig
+from ragas.run_config import RunConfig, add_async_retry, add_retry
 
 # Use a simple type alias that works across Python versions
 RandomComparison = Callable[[Generator, Generator], bool]
@@ -73,3 +75,68 @@ def test_random_num_generator(
                 )
             )
         )
+
+
+class _RecordingHandler(logging.Handler):
+    """Collect the messages tenacity writes to a logger."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.DEBUG)
+        self.messages: List[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.messages.append(record.getMessage())
+
+
+def _flaky_step() -> None:
+    raise ValueError("boom")
+
+
+async def _flaky_step_async() -> None:
+    raise ValueError("boom")
+
+
+def _collect_sync_retry_logs(run_config: RunConfig) -> List[str]:
+    logger = logging.getLogger(f"ragas.retry.{_flaky_step.__name__}")
+    handler = _RecordingHandler()
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+    propagate = logger.propagate
+    logger.propagate = False
+    try:
+        with pytest.raises(ValueError):
+            add_retry(_flaky_step, run_config)()
+    finally:
+        logger.removeHandler(handler)
+        logger.propagate = propagate
+    return handler.messages
+
+
+def _collect_async_retry_logs(run_config: RunConfig) -> List[str]:
+    logger = logging.getLogger(f"TENACITYRetry[{_flaky_step_async.__name__}]")
+    handler = _RecordingHandler()
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+    propagate = logger.propagate
+    logger.propagate = False
+    try:
+        with pytest.raises(ValueError):
+            asyncio.run(add_async_retry(_flaky_step_async, run_config)())
+    finally:
+        logger.removeHandler(handler)
+        logger.propagate = propagate
+    return handler.messages
+
+
+@pytest.mark.parametrize("log_tenacity", [False, True])
+def test_log_tenacity_controls_retry_logging(log_tenacity: bool):
+    """log_tenacity decides whether retry attempts are logged at all.
+
+    ``log_tenacity=False`` is the documented default and must keep the retry
+    loggers silent; ``log_tenacity=True`` opts into one record per attempt.
+    """
+    run_config = RunConfig(max_retries=3, max_wait=0, log_tenacity=log_tenacity)
+    expected = run_config.max_retries if log_tenacity else 0
+
+    assert len(_collect_sync_retry_logs(run_config)) == expected
+    assert len(_collect_async_retry_logs(run_config)) == expected
