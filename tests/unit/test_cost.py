@@ -175,6 +175,41 @@ def test_parse_llm_results():
     )
 
 
+def test_anthropic_token_usage_sums_every_prompt_in_a_batch():
+    # a batched call yields one generation group per prompt
+    batched_result = LLMResult(
+        generations=anthropic_llm_result.generations * 3,
+        llm_output={},
+    )
+    token_usage = get_token_usage_for_anthropic(batched_result)
+    assert token_usage == TokenUsage(
+        input_tokens=27, output_tokens=36, model="claude-3-opus-20240229"
+    )
+
+
+def test_bedrock_token_usage_sums_every_prompt_in_a_batch():
+    batched_result = LLMResult(
+        generations=bedrock_claude_result.generations * 3,
+        llm_output={},
+    )
+    token_usage = get_token_usage_for_bedrock(batched_result)
+    assert token_usage == TokenUsage(
+        input_tokens=30,
+        output_tokens=30,
+        model="us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+    )
+
+
+def test_token_usage_parsers_return_zero_without_generations():
+    empty_result = LLMResult(generations=[], llm_output={})
+    assert get_token_usage_for_anthropic(empty_result) == TokenUsage(
+        input_tokens=0, output_tokens=0
+    )
+    assert get_token_usage_for_bedrock(empty_result) == TokenUsage(
+        input_tokens=0, output_tokens=0
+    )
+
+
 def test_azure_ai_edge_cases():
     # Test with None llm_output
     empty_result = LLMResult(
