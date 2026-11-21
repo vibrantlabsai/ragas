@@ -143,7 +143,7 @@ Output:
 
 ### Context Precision without reference
 
-The `LLMContextPrecisionWithoutReference` metric can be used without the availability of a reference answer. To estimate if the retrieved contexts are relevant, this method uses the LLM to compare each chunk in `retrieved_contexts` with the `response`.
+LLMContextPrecisionWithoutReference metric can be used when you have retrieved contexts (retrieved_contexts) associated with a user_input — no reference context is required.
 
 #### Example
 
