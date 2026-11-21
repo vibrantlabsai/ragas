@@ -1,3 +1,5 @@
+from typing import Optional
+
 import pytest
 
 from ragas.dataset_schema import (
@@ -28,6 +30,32 @@ def test_testset_to_evaluation_dataset(eval_sample):
     testset = RagasTestset(samples=[testset_sample, testset_sample])
     evaluation_dataset = testset.to_evaluation_dataset()
     assert evaluation_dataset == EvaluationDataset(samples=[eval_sample, eval_sample])
+
+
+@pytest.mark.parametrize("user_input", ["What is X?", None])
+def test_testset_from_dict_preserves_synthesizer_name(
+    user_input: Optional[str],
+) -> None:
+    class CustomTestset(RagasTestset):
+        pass
+
+    row = {
+        "reference": "Y",
+        "synthesizer_name": "example",
+    }
+    if user_input is not None:
+        row["user_input"] = user_input
+    columns = {name: [value] for name, value in row.items()}
+    testset = CustomTestset.from_dict(columns)
+    assert isinstance(testset, CustomTestset)
+    assert testset.samples == [
+        RagasTestsetSample(
+            eval_sample=SingleTurnSample(user_input=user_input, reference="Y"),
+            synthesizer_name="example",
+        )
+    ]
+    assert CustomTestset.from_dict([row]).samples == testset.samples
+    assert row["synthesizer_name"] == "example"
 
 
 @pytest.mark.parametrize("eval_sample", samples)

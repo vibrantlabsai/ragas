@@ -91,13 +91,10 @@ class Testset(RagasDataset[TestsetSample]):
             # the remaining sample is the eval_sample
             eval_sample = sample
 
-            # if user_input is a list it is MultiTurnSample
-            if "user_input" in eval_sample and not isinstance(
-                eval_sample.get("user_input"), list
-            ):
-                eval_sample = SingleTurnSample(**eval_sample)
-            else:
+            if isinstance(eval_sample.get("user_input"), list):
                 eval_sample = MultiTurnSample(**eval_sample)
+            else:
+                eval_sample = SingleTurnSample(**eval_sample)
 
             samples.append(
                 TestsetSample(
@@ -105,7 +102,7 @@ class Testset(RagasDataset[TestsetSample]):
                 )
             )
         # then create the testset
-        return Testset(samples=samples)
+        return cls(samples=samples)
 
     def total_tokens(self) -> t.Union[t.List[TokenUsage], TokenUsage]:
         """

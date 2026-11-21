@@ -5,6 +5,7 @@ import random
 import typing as t
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
 
@@ -257,17 +258,27 @@ class RagasDataset(ABC, t.Generic[Sample]):
         return self.samples[0].get_features()
 
     @classmethod
-    def from_dict(cls: t.Type[T], mapping: t.Dict) -> T:
-        """Creates an EvaluationDataset from a dictionary."""
-        samples = []
-        if all(
-            "user_input" in item and isinstance(mapping[0]["user_input"], list)
-            for item in mapping
+    def from_dict(
+        cls: t.Type[T],
+        mapping: t.Union[
+            Mapping[str, Sequence[object]], Sequence[Mapping[str, object]]
+        ],
+    ) -> T:
+        """Build a dataset from equal-length columns or legacy row mappings."""
+        if not isinstance(mapping, Mapping):
+            return cls.from_list([{**row} for row in mapping])
+
+        columns = list(mapping.values())
+        if any(
+            not isinstance(column, Sequence) or isinstance(column, (str, bytes))
+            for column in columns
         ):
-            samples.extend(MultiTurnSample(**sample) for sample in mapping)
-        else:
-            samples.extend(SingleTurnSample(**sample) for sample in mapping)
-        return cls(samples=samples)
+            raise TypeError("Dataset columns must be sequences of values")
+        if len({len(column) for column in columns}) > 1:
+            raise ValueError("Dataset columns must have the same length")
+
+        rows = [dict(zip(mapping, values)) for values in zip(*columns)]
+        return cls.from_list(rows)
 
     def to_csv(self, path: t.Union[str, Path]):
         """Converts the dataset to a CSV file."""
@@ -343,7 +354,7 @@ class EvaluationDataset(RagasDataset[SingleTurnSampleOrMultiTurnSample]):
     from_list(mapping)
         Creates an EvaluationDataset from a list of dictionaries.
     from_dict(mapping)
-        Creates an EvaluationDataset from a dictionary.
+        Creates an EvaluationDataset from a dictionary of column sequences.
     to_csv(path)
         Converts the dataset to a CSV file.
     to_jsonl(path)
