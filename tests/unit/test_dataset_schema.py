@@ -86,6 +86,49 @@ def test_evaluation_dataset(eval_sample):
 
 
 @pytest.mark.parametrize("eval_sample", samples)
+def test_evaluation_dataset_from_dict_accepts_columns_and_rows(
+    eval_sample: t.Union[SingleTurnSample, MultiTurnSample],
+) -> None:
+    first = eval_sample.model_copy(update={"reference": "first"})
+    next_input = (
+        [HumanMessage(content="Another question")]
+        if isinstance(eval_sample, MultiTurnSample)
+        else "Another question"
+    )
+    second = eval_sample.model_copy(
+        update={"user_input": next_input, "reference": "second"}
+    )
+    rows = [first.model_dump(exclude_none=True), second.model_dump(exclude_none=True)]
+    columns = {column: (rows[0][column], rows[1][column]) for column in rows[0]}
+    expected = EvaluationDataset(samples=[first, second])
+
+    assert EvaluationDataset.from_dict(columns) == expected
+    assert EvaluationDataset.from_dict(rows) == expected
+
+
+def test_evaluation_dataset_from_dict_rejects_different_column_lengths() -> None:
+    with pytest.raises(ValueError, match="same length"):
+        EvaluationDataset.from_dict({"user_input": ["a", "b"], "response": ["x"]})
+
+
+def test_evaluation_dataset_from_dict_rejects_scalar_text_columns() -> None:
+    with pytest.raises(TypeError, match="sequences"):
+        EvaluationDataset.from_dict({"user_input": "ab", "response": ["x", "y"]})
+
+
+def test_evaluation_dataset_from_dict_rejects_non_mapping_rows() -> None:
+    with pytest.raises(TypeError):
+        EvaluationDataset.from_dict([[]])
+
+
+@pytest.mark.parametrize("columns", [{}, {"user_input": [], "response": []}])
+def test_evaluation_dataset_from_dict_accepts_empty_columns(
+    columns: dict[str, list[str]],
+) -> None:
+    assert len(EvaluationDataset.from_dict(columns)) == 0
+
+
+@pytest.mark.parametrize("eval_sample", samples)
 def test_evaluation_dataset_save_load_csv(tmpdir, eval_sample):
     dataset = EvaluationDataset(samples=[eval_sample, eval_sample])
 
