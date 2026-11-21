@@ -114,7 +114,7 @@ class AIMessage(Message):
             if self.tool_calls is None
             else {
                 "text": self.content,
-                "tool_calls": [tc.dict() for tc in self.tool_calls],
+                "tool_calls": [tc.model_dump() for tc in self.tool_calls],
             }
         )
         return {"content": content, "type": self.type}
