@@ -472,13 +472,7 @@ def evaluate(
             return_executor=return_executor,
         )
 
-    if not allow_nest_asyncio:
-        # Run without nest_asyncio - creates a new event loop
-        import asyncio
+    # run the evaluation
+    from ragas.async_utils import run
 
-        return asyncio.run(_async_wrapper())
-    else:
-        # Default behavior: use nest_asyncio for backward compatibility (Jupyter notebooks)
-        from ragas.async_utils import run
-
-        return run(_async_wrapper())
+    return run(_async_wrapper)

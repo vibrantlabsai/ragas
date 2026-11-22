@@ -10,26 +10,8 @@ class TestUvloopCompatibility:
     """Test that ragas works with uvloop event loops."""
 
     @pytest.mark.skipif(sys.version_info < (3, 8), reason="uvloop requires Python 3.8+")
-    def test_apply_nest_asyncio_with_uvloop_returns_false(self):
-        """Test that apply_nest_asyncio returns False with uvloop."""
-        uvloop = pytest.importorskip("uvloop")
-
-        from ragas.async_utils import apply_nest_asyncio
-
-        async def test_func():
-            result = apply_nest_asyncio()
-            return result
-
-        uvloop.install()
-        try:
-            result = asyncio.run(test_func())
-            assert result is False
-        finally:
-            asyncio.set_event_loop_policy(None)
-
-    @pytest.mark.skipif(sys.version_info < (3, 8), reason="uvloop requires Python 3.8+")
     def test_run_with_uvloop_and_running_loop(self):
-        """Test that run() raises clear error with uvloop in running event loop (Jupyter scenario)."""
+        """Test that run() raises clear error with uvloop in running event loop."""
         uvloop = pytest.importorskip("uvloop")
 
         from ragas.async_utils import run
@@ -38,7 +20,8 @@ class TestUvloopCompatibility:
             return "success"
 
         async def outer_task():
-            with pytest.raises(RuntimeError, match="Cannot execute nested async code"):
+            # Should raise RuntimeError because loop is running
+            with pytest.raises(RuntimeError, match="Event loop is already running"):
                 run(inner_task)
 
         uvloop.install()
@@ -61,32 +44,26 @@ class TestUvloopCompatibility:
 
         uvloop.install()
         try:
+            # this works because we are calling run_async_tasks from outside a loop (via run which calls asyncio.run)
+            # Wait, run_async_tasks calls run() internally.
+            # If we call it here synchronously, it calls run().
+            # run() checks if loop is running.
+            # Here we are NOT in a loop (sync context).
             results = run_async_tasks(tasks, show_progress=False)
             assert sorted(results) == [0, 2, 4, 6, 8]
         finally:
             asyncio.set_event_loop_policy(None)
 
-    def test_apply_nest_asyncio_without_uvloop_returns_true(self):
-        """Test that apply_nest_asyncio returns True with standard asyncio."""
-        from ragas.async_utils import apply_nest_asyncio
-
-        async def test_func():
-            result = apply_nest_asyncio()
-            return result
-
-        result = asyncio.run(test_func())
-        assert result is True
-
     def test_run_with_standard_asyncio_and_running_loop(self):
-        """Test that run() works with standard asyncio in a running loop."""
+        """Test that run() raises RuntimeError with standard asyncio in a running loop."""
         from ragas.async_utils import run
 
         async def inner_task():
             return "nested_success"
 
         async def outer_task():
-            result = run(inner_task)
-            return result
+            # This used to work with nest_asyncio, now must fail
+            with pytest.raises(RuntimeError, match="Event loop is already running"):
+                run(inner_task)
 
-        result = asyncio.run(outer_task())
-        assert result == "nested_success"
+        asyncio.run(outer_task())

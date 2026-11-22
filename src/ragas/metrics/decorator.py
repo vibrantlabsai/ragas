@@ -117,15 +117,10 @@ def create_metric_decorator():
                 allowed_values = ["pass", "fail"]
             validator_class = get_validator_for_allowed_values(allowed_values)
 
-            # TODO: Move to dataclass type implementation
             @dataclass(repr=False)
             class CustomMetric(SimpleBaseMetric, validator_class):
-                _func: t.Optional[t.Callable[..., t.Any]] = field(
-                    default=None, init=False
-                )
-                _metric_params: t.Dict[str, t.Any] = field(
-                    default_factory=dict, init=False
-                )
+                _func: t.Callable[..., t.Any] = field(default=None)
+                _metric_params: t.Dict[str, t.Any] = field(default_factory=dict)
                 # Note: allowed_values is inherited from SimpleBaseMetric
 
                 def _validate_result_value(self, result_value):
@@ -153,6 +148,8 @@ def create_metric_decorator():
                     msg += "   💡 Tip: Always use parameter names for clarity and future compatibility."
 
                     return msg
+
+
 
                 def _create_pydantic_model(self):
                     """Create a Pydantic model dynamically from the function signature."""
@@ -257,17 +254,9 @@ def create_metric_decorator():
                     async def _async_wrapper():
                         return await self.ascore(*args, **kwargs)
 
-                    # Check if we're already in an event loop
-                    try:
-                        # If we're in a running event loop, we need nest_asyncio for compatibility
-                        _ = asyncio.get_running_loop()
-                        # Import nest_asyncio style runner from ragas
-                        from ragas.async_utils import run
-
-                        return run(_async_wrapper())
-                    except RuntimeError:
-                        # No running event loop, safe to use asyncio.run
-                        return asyncio.run(_async_wrapper())
+                    # Use updated run utility which handles event loop checking
+                    from ragas.async_utils import run
+                    return run(_async_wrapper)
 
                 async def ascore(self, *args, **kwargs):
                     """Asynchronous scoring method."""
@@ -336,22 +325,27 @@ def create_metric_decorator():
                         f"{self.name}({param_str}) -> {metric_type}{allowed_values_str}"
                     )
 
-            # Create the metric instance with all parameters
-            metric_instance = CustomMetric(name=metric_name)
+            # Prepare initialization arguments
+            init_kwargs = {
+                "name": metric_name,
+                "_func": func,
+                "_metric_params": metric_params,
+            }
 
-            # Store metric parameters and original function
-            metric_instance._metric_params = metric_params
-            metric_instance._func = func
-
-            # Set allowed_values if provided
+            # Use 'allowed_values' from metric_params if available, otherwise it uses default from SimpleBaseMetric
             if "allowed_values" in metric_params:
-                metric_instance.allowed_values = metric_params["allowed_values"]
+                init_kwargs["allowed_values"] = metric_params["allowed_values"]
+
+            # Create the metric instance with all parameters
+            metric_instance = CustomMetric(**init_kwargs)
 
             # Preserve metadata
             metric_instance.__name__ = metric_name
             metric_instance.__doc__ = func.__doc__
 
             return metric_instance
+
+
 
         return decorator
 
