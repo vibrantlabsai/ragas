@@ -22,7 +22,7 @@ class RougeScore(SingleTurnMetric):
             from rouge_score import rouge_scorer
         except ImportError as e:
             raise ImportError(
-                f"{e.name} is required for rouge score. Please install it using `pip install {e.name}"
+                f"{e.name} is required for rouge score. Please install it using `pip install {e.name}`"
             )
         self.rouge_scorer = rouge_scorer
 
