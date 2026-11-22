@@ -279,7 +279,7 @@ class RagasDataset(ABC, t.Generic[Sample]):
 
         fieldnames = data[0].keys()
 
-        with open(path, "w", newline="") as csvfile:
+        with open(path, "w", newline="", encoding="utf-8") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             for row in data:
@@ -287,14 +287,14 @@ class RagasDataset(ABC, t.Generic[Sample]):
 
     def to_jsonl(self, path: t.Union[str, Path]):
         """Converts the dataset to a JSONL file."""
-        with open(path, "w") as jsonlfile:
+        with open(path, "w", encoding="utf-8") as jsonlfile:
             for sample in self.to_list():
                 jsonlfile.write(json.dumps(sample, ensure_ascii=False) + "\n")
 
     @classmethod
     def from_jsonl(cls: t.Type[T], path: t.Union[str, Path]) -> T:
         """Creates an EvaluationDataset from a JSONL file."""
-        with open(path, "r") as jsonlfile:
+        with open(path, "r", encoding="utf-8") as jsonlfile:
             data = [json.loads(line) for line in jsonlfile]
         return cls.from_list(data)
 
