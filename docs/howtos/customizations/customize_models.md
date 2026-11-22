@@ -17,9 +17,12 @@ You can provide system prompts to customize LLM behavior across all evaluations:
 from ragas.llms import llm_factory
 from openai import OpenAI
 
-client = OpenAI(api_key="your-key")
+client = OpenAI(
+    api_key="your-deepseek-key",
+    base_url="https://api.deepseek.com"
+)
 llm = llm_factory(
-    "gpt-4o",
+    "deepseek-chat",
     client=client,
     system_prompt="You are a helpful assistant that evaluates RAG systems.",
 )
