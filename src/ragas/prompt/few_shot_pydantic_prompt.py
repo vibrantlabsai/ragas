@@ -25,7 +25,7 @@ OutputModel = t.TypeVar("OutputModel", bound=BaseModel)
 class ExampleStore(ABC):
     @abstractmethod
     def get_examples(
-        self, data: BaseModel, top_k: int = 5
+        self, data: BaseModel, top_k: int = 5, threshold: float = 0.7
     ) -> t.Sequence[t.Tuple[BaseModel, BaseModel]]:
         pass
 
@@ -117,7 +117,7 @@ class FewShotPydanticPrompt(PydanticPrompt, t.Generic[InputModel, OutputModel]):
         retries_left: int = 3,
     ) -> t.List[OutputModel]:
         # Ensure get_examples returns a sequence of tuples (InputModel, OutputModel)
-        self.examples = self.example_store.get_examples(data, self.top_k_for_examples)  # type: ignore
+        self.examples = self.example_store.get_examples(data, self.top_k_for_examples, self.threshold_for_examples)  # type: ignore
 
         # Track few-shot prompt usage
         track(
