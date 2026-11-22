@@ -253,6 +253,35 @@
     If you want more information on how to use other Azure services, please refer to the [langchain-azure](https://python.langchain.com/docs/integrations/chat/azure_chat_openai/) documentation.
 
 
+=== "DeepSeek"
+    DeepSeek's API is OpenAI-compatible, so you can use the `langchain-openai` package and point it at DeepSeek's base URL.
+
+    ```bash
+    pip install langchain-openai
+    ```
+
+    Ensure you have your DeepSeek key ready and available in your environment (get one at [platform.deepseek.com](https://platform.deepseek.com/)).
+
+    ```python
+    import os
+    os.environ["DEEPSEEK_API_KEY"] = "your-deepseek-key"
+    ```
+
+    Wrap the LLM in `LangchainLLMWrapper` so that it can be used with ragas.
+
+    ```python
+    from ragas.llms import LangchainLLMWrapper
+    from langchain_openai import ChatOpenAI
+
+    evaluator_llm = LangchainLLMWrapper(ChatOpenAI(
+        model="deepseek-chat",  # or "deepseek-reasoner"
+        base_url="https://api.deepseek.com",
+        api_key=os.environ["DEEPSEEK_API_KEY"],
+    ))
+    ```
+
+    DeepSeek does not currently offer an embeddings endpoint, so for embedding-based metrics (e.g. answer relevancy, semantic similarity) pair it with an embeddings provider of your choice — see the other tabs (e.g. OpenAI or Hugging Face).
+
 === "Others"
     If you are using a different LLM provider and using LangChain to interact with it, you can wrap your LLM in `LangchainLLMWrapper` so that it can be used with ragas.
 
