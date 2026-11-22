@@ -64,10 +64,11 @@ class CustomNodeFilter(LLMBasedNodeFilter):
     async def custom_filter(self, node: Node, kg: KnowledgeGraph) -> bool:
         if node.type.name == "CHUNK":
             parent_nodes = get_parent_nodes(node, kg)
+            summary = ""
             if len(parent_nodes) > 0:
                 summary = parent_nodes[0].properties.get("summary", "")
-            else:
-                summary = ""
+            if not summary:
+                summary = node.properties.get("summary", "")
         else:
             summary = node.properties.get("summary", "")
 
