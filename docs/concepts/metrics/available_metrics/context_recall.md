@@ -36,7 +36,7 @@ print(f"Context Recall Score: {result.value}")
 Output:
 
 ```
-Context Recall Score: 1.0
+Context Recall Score: 0.0
 ```
 
 !!! note "Synchronous Usage"
