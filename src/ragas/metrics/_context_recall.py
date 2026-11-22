@@ -200,16 +200,14 @@ class NonLLMContextRecall(SingleTurnMetric):
 
         scores = []
         for ref in reference_contexts:
-            scores.append(
-                max(
-                    [
-                        await self.distance_measure.single_turn_ascore(
-                            SingleTurnSample(reference=rc, response=ref), callbacks
-                        )
-                        for rc in retrieved_contexts
-                    ]
+            similarities = [
+                await self.distance_measure.single_turn_ascore(
+                    SingleTurnSample(reference=rc, response=ref), callbacks
                 )
-            )
+                for rc in retrieved_contexts
+            ]
+            # Nothing was retrieved, so the reference context cannot have been recalled.
+            scores.append(max(similarities) if similarities else 0.0)
         return self._compute_score(scores)
 
     async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> float:

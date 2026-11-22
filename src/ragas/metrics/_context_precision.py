@@ -221,16 +221,15 @@ class NonLLMContextPrecisionWithReference(SingleTurnMetric):
 
         scores = []
         for rc in retrieved_contexts:
-            scores.append(
-                max(
-                    [
-                        await self.distance_measure.single_turn_ascore(
-                            SingleTurnSample(reference=rc, response=ref), callbacks
-                        )
-                        for ref in reference_contexts
-                    ]
+            similarities = [
+                await self.distance_measure.single_turn_ascore(
+                    SingleTurnSample(reference=rc, response=ref), callbacks
                 )
-            )
+                for ref in reference_contexts
+            ]
+            # There are no reference contexts to compare against, so this retrieved context
+            # cannot be judged relevant.
+            scores.append(max(similarities) if similarities else 0.0)
         scores = [1 if score >= self.threshold else 0 for score in scores]
         return self._calculate_average_precision(scores)
 
