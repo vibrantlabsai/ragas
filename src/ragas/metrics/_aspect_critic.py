@@ -121,15 +121,12 @@ class AspectCritic(MetricWithLLM, SingleTurnMetric, MultiTurnMetric):
             output_type=output_type,
         )
 
-        self._definition = definition
         self.single_turn_prompt = single_turn_prompt or SingleTurnAspectCriticPrompt()
         self.multi_turn_prompt = multi_turn_prompt or MultiTurnAspectCriticPrompt()
         self.max_retries = max_retries
 
-        # update the instruction for the prompts with the definition
-        instruction = f"Evaluate the Input based on the criterial defined. Use only 'Yes' (1) and 'No' (0) as verdict.\nCriteria Definition: {self._definition}"
-        self.single_turn_prompt.instruction = instruction
-        self.multi_turn_prompt.instruction = instruction
+        # route through the setter so init and later mutations share one code path
+        self.definition = definition
 
         # ensure odd number of checks to avoid tie in majority vote.
         self.strictness = strictness

@@ -112,6 +112,31 @@ def test_metrics_with_definition(metric):
     assert "this is a new definition" in m.single_turn_prompt.instruction
 
 
+@pytest.mark.parametrize("metric", [AspectCritic, SimpleCriteriaScore])
+def test_metric_init_propagates_definition_to_prompts(metric):
+    """Regression test for #1944: definition passed to __init__ must reach
+    both single_turn_prompt.instruction and multi_turn_prompt.instruction,
+    not just the private ``_definition`` attribute."""
+
+    m = metric(name="metric", definition="Score 0 to 5 by similarity")
+
+    assert "Score 0 to 5 by similarity" in m.single_turn_prompt.instruction
+    assert "Score 0 to 5 by similarity" in m.multi_turn_prompt.instruction
+
+
+@pytest.mark.parametrize("metric", [AspectCritic, SimpleCriteriaScore])
+def test_metric_setter_updates_multi_turn_prompt(metric):
+    """The ``definition`` setter must update *both* prompt instructions."""
+
+    m = metric(name="metric", definition="original")
+    m.definition = "updated definition"
+
+    assert "updated definition" in m.single_turn_prompt.instruction
+    assert "updated definition" in m.multi_turn_prompt.instruction
+    assert "original" not in m.single_turn_prompt.instruction
+    assert "original" not in m.multi_turn_prompt.instruction
+
+
 def test_ignored_columns():
     """Test that :ignored suffixed columns are properly excluded from all column queries."""
     from ragas.metrics.base import MetricType, SingleTurnMetric
