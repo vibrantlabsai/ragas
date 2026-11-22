@@ -138,4 +138,5 @@ class SingleHopQuerySynthesizer(BaseSynthesizer[Scenario]):
             persona_name=getattr(scenario.persona, "name", None),
             query_style=getattr(scenario.style, "name", None),
             query_length=getattr(scenario.length, "name", None),
+            reference_context_ids=[scenario.nodes[0].properties.get("document_metadata",{}).get("id", "null")],
         )

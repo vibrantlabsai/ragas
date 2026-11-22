@@ -159,6 +159,7 @@ class MultiHopQuerySynthesizer(BaseSynthesizer[Scenario]):
         if not isinstance(scenario, MultiHopScenario):
             raise TypeError("scenario type should be MultiHopScenario")
         reference_context = self.make_contexts(scenario)
+        reference_context_ids = self.get_contexts_ids(scenario)
         prompt_input = QueryConditions(
             persona=scenario.persona,
             themes=scenario.combinations,
@@ -174,9 +175,7 @@ class MultiHopQuerySynthesizer(BaseSynthesizer[Scenario]):
             user_input=response.query,
             reference=response.answer,
             reference_contexts=reference_context,
-            persona_name=getattr(scenario.persona, "name", None),
-            query_style=getattr(scenario.style, "name", None),
-            query_length=getattr(scenario.length, "name", None),
+            reference_context_ids=reference_context_ids,
         )
 
     def make_contexts(self, scenario: MultiHopScenario) -> t.List[str]:
@@ -188,3 +187,10 @@ class MultiHopQuerySynthesizer(BaseSynthesizer[Scenario]):
             contexts.append(context)
 
         return contexts
+    def get_contexts_ids(self, scenario: MultiHopScenario) -> t.List[str]:
+        context_ids = []
+        for node in scenario.nodes:
+            context_id = node.properties.get("document_metadata", {}).get("id", "null")
+            context_ids.append(context_id)
+
+        return context_ids
