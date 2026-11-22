@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag-eval-ptbr"
+version = "0.1.0"
+description = "Exemplo de avaliação RAG em português (PT-BR) usando Ragas"
+requires-python = ">=3.9"
+dependencies = [
+    "ragas[all]>=0.3.0",
+    "openai>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[tool.setuptools]
+py-modules = []
+
+[tool.uv]
+managed = true
