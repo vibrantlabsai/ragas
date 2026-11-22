@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import typing as t
 
-from ragas.async_utils import apply_nest_asyncio, run_async_tasks
+from ragas.async_utils import run_async_tasks
 from ragas.run_config import RunConfig
 from ragas.testset.graph import KnowledgeGraph
 from ragas.testset.transforms.base import BaseGraphTransformation
@@ -60,9 +60,6 @@ def apply_transforms(
     """
     Recursively apply transformations to a knowledge graph in place.
     """
-    # apply nest_asyncio to fix the event loop issue in jupyter
-    apply_nest_asyncio()
-
     max_workers = getattr(run_config, "max_workers", -1)
 
     if isinstance(transforms, t.Sequence):
