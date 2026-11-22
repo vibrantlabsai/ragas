@@ -131,6 +131,18 @@ You can pass additional arguments to the underlying `sacrebleu.corpus_bleu` func
 scorer = BleuScore(kwargs={"smooth_method": "exp"})
 ```
 
+For languages that do not use spaces to separate words, configure an appropriate
+tokenizer. For example, use sacreBLEU's Chinese tokenizer for Chinese text:
+
+```python
+scorer = BleuScore(kwargs={"tokenize": "zh"})
+result = await scorer.ascore(
+    reference="今天天气很好，我们一起去公园散步。",
+    response="今天天气很好，我们一起去公园散步。"
+)
+print(result.value)  # 1.0
+```
+
 ### Legacy Metrics API
 
 The following examples use the legacy metrics API pattern. For new projects, we recommend using the collections-based API shown above.
