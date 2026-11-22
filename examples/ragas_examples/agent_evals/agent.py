@@ -9,7 +9,7 @@ import openai
 
 SYSTEM_MESSAGE = """You are a mathematical problem-solving agent. You can only use these four atomic tools to solve problems:
 - add(a, b): Add two numbers
-- sub(a, b): Subtract b from a  
+- sub(a, b): Subtract b from a
 - mul(a, b): Multiply two numbers
 - div(a, b): Divide a by b
 
