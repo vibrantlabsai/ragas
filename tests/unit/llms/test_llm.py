@@ -235,3 +235,57 @@ class TestLangchainLLMWrapperBypassN:
             assert mock_llm._n_passed is None
             # Result should still have 3 generations
             assert len(result.generations[0]) == 3
+
+
+class _LLMWithTemperature:
+    """Minimal LangChain-like LLM that records the temperature in effect"""
+
+    """when each generation call runs."""
+
+    def __init__(self, temperature):
+        self.temperature = temperature
+        self.observed = []
+
+    def generate_prompt(self, prompts, stop=None, callbacks=None, **kwargs):
+        self.observed.append(self.temperature)
+        return LLMResult(generations=[[Generation(text="r")] for _ in prompts])
+
+    async def agenerate_prompt(self, prompts, stop=None, callbacks=None, **kwargs):
+        self.observed.append(self.temperature)
+        return LLMResult(generations=[[Generation(text="r")] for _ in prompts])
+
+
+class TestLangchainLLMWrapperRespectsLLMTemperature:
+    """Regression tests for #1976: a temperature configured on the wrapped
+    LangChain LLM must be honoured when the caller does not specify one."""
+
+    @pytest.mark.asyncio
+    async def test_async_uses_underlying_temperature_when_caller_passes_none(self):
+        llm = _LLMWithTemperature(temperature=0.7)
+        with patch(
+            "ragas.llms.base.is_multiple_completion_supported", return_value=True
+        ):
+            wrapper = LangchainLLMWrapper(langchain_llm=llm)
+            await wrapper.agenerate_text(create_mock_prompt(), n=1, temperature=None)
+            await wrapper.agenerate_text(create_mock_prompt(), n=3, temperature=None)
+        assert llm.observed == [0.7, 0.7]
+
+    @pytest.mark.asyncio
+    async def test_async_caller_temperature_still_wins(self):
+        llm = _LLMWithTemperature(temperature=0.7)
+        with patch(
+            "ragas.llms.base.is_multiple_completion_supported", return_value=True
+        ):
+            wrapper = LangchainLLMWrapper(langchain_llm=llm)
+            await wrapper.agenerate_text(create_mock_prompt(), n=1, temperature=0.4)
+        assert llm.observed == [0.4]
+
+    def test_sync_uses_underlying_temperature_when_caller_passes_none(self):
+        llm = _LLMWithTemperature(temperature=0.7)
+        with patch(
+            "ragas.llms.base.is_multiple_completion_supported", return_value=True
+        ):
+            wrapper = LangchainLLMWrapper(langchain_llm=llm)
+            wrapper.generate_text(create_mock_prompt(), n=1, temperature=None)
+            wrapper.generate_text(create_mock_prompt(), n=3, temperature=None)
+        assert llm.observed == [0.7, 0.7]

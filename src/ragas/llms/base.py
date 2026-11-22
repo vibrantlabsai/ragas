@@ -247,7 +247,10 @@ class LangchainLLMWrapper(BaseRagasLLM):
         # figure out the temperature to set
         old_temperature: float | None = None
         if temperature is None:
-            temperature = self.get_temperature(n=n)
+            existing = getattr(self.langchain_llm, "temperature", None)
+            temperature = (
+                existing if existing is not None else self.get_temperature(n=n)
+            )
         if hasattr(self.langchain_llm, "temperature"):
             old_temperature = self.langchain_llm.temperature  # type: ignore
             self.langchain_llm.temperature = temperature  # type: ignore
@@ -299,7 +302,10 @@ class LangchainLLMWrapper(BaseRagasLLM):
         # handle temperature
         old_temperature: float | None = None
         if temperature is None:
-            temperature = self.get_temperature(n=n)
+            existing = getattr(self.langchain_llm, "temperature", None)
+            temperature = (
+                existing if existing is not None else self.get_temperature(n=n)
+            )
         if hasattr(self.langchain_llm, "temperature") and not self.bypass_temperature:
             old_temperature = self.langchain_llm.temperature  # type: ignore
             self.langchain_llm.temperature = temperature  # type: ignore
@@ -457,7 +463,8 @@ class LlamaIndexLLMWrapper(BaseRagasLLM):
         callbacks: Callbacks = None,
     ) -> LLMResult:
         if temperature is None:
-            temperature = self.get_temperature(n)
+            existing = getattr(self.llm, "temperature", None)
+            temperature = existing if existing is not None else self.get_temperature(n)
 
         kwargs = self.check_args(n, temperature, stop, callbacks)
 
