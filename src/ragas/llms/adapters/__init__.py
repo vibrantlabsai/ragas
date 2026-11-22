@@ -2,10 +2,12 @@ import typing as t
 
 from ragas.llms.adapters.instructor import InstructorAdapter
 from ragas.llms.adapters.litellm import LiteLLMAdapter
+from ragas.llms.adapters.typesafe import TypeSafeAdapter
 
 ADAPTERS = {
     "instructor": InstructorAdapter(),
     "litellm": LiteLLMAdapter(),
+    "typesafe": TypeSafeAdapter(),
 }
 
 
@@ -66,8 +68,14 @@ def auto_detect_adapter(client: t.Any, provider: str) -> str:
         provider: Provider name
 
     Returns:
-        Adapter name ("instructor" or "litellm")
+        Adapter name ("instructor", "litellm", or "typesafe")
     """
+    # Check if provider or client is TypeSafe
+    if provider.lower() in ("typesafe", "jev"):
+        return "typesafe"
+    if hasattr(client, "__class__") and "typesafe" in getattr(client.__class__, "__module__", ""):
+        return "typesafe"
+
     # Check if client is LiteLLM
     if hasattr(client, "__class__"):
         if "litellm" in client.__class__.__module__:

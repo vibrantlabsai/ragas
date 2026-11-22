@@ -639,19 +639,21 @@ def llm_factory(
 
     Auto-detects the best adapter for your provider:
     - Google Gemini → uses LiteLLM adapter
+    - TypeSafe AI (Jev) → uses TypeSafe adapter
     - Other providers → uses Instructor adapter (default)
     - Explicit control available via adapter parameter
 
     Args:
-        model: Model name (e.g., "gpt-4o", "claude-3-sonnet", "gemini-2.0-flash").
+        model: Model name (e.g., "gpt-4o", "claude-3-sonnet", "gemini-2.0-flash", "jev-latest").
         provider: LLM provider (default: "openai").
-                 Examples: openai, anthropic, google, groq, mistral, etc.
-        client: Pre-initialized client instance (required). For OpenAI, can be
-               OpenAI(...) or AsyncOpenAI(...).
+                 Examples: openai, anthropic, google, typesafe, groq, mistral, etc.
+        client: Pre-initialized client instance. Required for standard LLMs. For TypeSafe,
+               optional if api_key or TYPESAFE_API_KEY env var is provided.
         adapter: Structured output adapter to use (default: "auto").
                 - "auto": Auto-detect based on provider/client (recommended)
                 - "instructor": Use Instructor library
                 - "litellm": Use LiteLLM (supports 100+ providers)
+                - "typesafe": Use TypeSafe AI (Jev decision model)
         cache: Optional cache backend for caching LLM responses.
                Pass DiskCacheBackend() for persistent caching across runs.
                Saves costs and speeds up repeated evaluations by 60x.
@@ -677,6 +679,11 @@ def llm_factory(
         client = OpenAI(api_key="...")
         llm = llm_factory("gpt-4o-mini", client=client)
         response = llm.generate(prompt, ResponseModel)
+
+        # TypeSafe AI Jev (System One calibrated evaluation)
+        from typesafe_sdk import TypeSafeClient
+        client = TypeSafeClient(api_key="...")
+        llm = llm_factory("jev-latest", client=client)
 
         # With caching (recommended for experiments)
         from ragas.cache import DiskCacheBackend
@@ -707,7 +714,7 @@ def llm_factory(
         llm = llm_factory("gpt-4o-mini", client=client)
         response = await llm.agenerate(prompt, ResponseModel)
     """
-    if client is None:
+    if client is None and provider.lower() not in ("typesafe", "jev"):
         raise ValueError(
             "llm_factory() requires a client instance. "
             "Text-only mode has been removed.\n\n"

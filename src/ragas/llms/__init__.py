@@ -10,6 +10,7 @@ from ragas.llms.base import (
 from ragas.llms.haystack_wrapper import HaystackLLMWrapper
 from ragas.llms.litellm_llm import LiteLLMStructuredLLM
 from ragas.llms.oci_genai_wrapper import OCIGenAIWrapper, oci_genai_factory
+from ragas.llms.typesafe_llm import TypeSafeStructuredLLM
 from ragas.utils import DeprecationHelper
 
 # Create deprecation wrappers for legacy classes
@@ -40,6 +41,7 @@ __all__ = [
     "LlamaIndexLLMWrapper",
     "LiteLLMStructuredLLM",
     "OCIGenAIWrapper",
+    "TypeSafeStructuredLLM",
     "InstructorTypeVar",
     "llm_factory",
     "oci_genai_factory",
