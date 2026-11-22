@@ -85,7 +85,7 @@ class AspectCritic(MetricWithLLM, SingleTurnMetric, MultiTurnMetric):
         criteria to judge the submission, example "Is the submission spreading
         fake information?"
     strictness: int
-        The number of times self consistency checks is made. Final judgement is
+        The number of times self consistency checks is made. Final judgment is
         made using majority vote.
     """
 

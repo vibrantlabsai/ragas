@@ -83,7 +83,7 @@ class InferGoalOutcomePrompt(PydanticPrompt[WorkflowInput, WorkflowOutput]):
 
 
 class CompareOutcomePrompt(PydanticPrompt[CompareOutcomeInput, CompareOutcomeOutput]):
-    instruction = "Given user goal, desired outcome and acheived outcome compare them and identify if they are the same (1) or different(0)."
+    instruction = "Given user goal, desired outcome and achieved outcome compare them and identify if they are the same (1) or different(0)."
     input_model = CompareOutcomeInput
     output_model = CompareOutcomeOutput
     examples = [

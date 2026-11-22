@@ -83,7 +83,7 @@ class SimpleCriteriaScore(MetricWithLLM, SingleTurnMetric, MultiTurnMetric):
     definition: str
         criteria to score the submission
     strictness: int
-        The number of times self consistency checks is made. Final judgement is
+        The number of times self consistency checks is made. Final judgment is
         made using majority vote.
     """
 
