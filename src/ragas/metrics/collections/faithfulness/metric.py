@@ -15,6 +15,9 @@ from .util import (
     StatementGeneratorPrompt,
 )
 
+VERDICT_FAITHFUL = "Faithful"
+VERDICT_NOT_FAITHFUL = "Not Faithful"
+
 if t.TYPE_CHECKING:
     from ragas.llms.base import InstructorBaseRagasLLM
 
@@ -126,8 +129,9 @@ class Faithfulness(BaseMetric):
 
         # Step 3: Compute faithfulness score
         score = self._compute_score(verdicts)
+        reason = self._build_reason(verdicts, score)
 
-        return MetricResult(value=float(score))
+        return MetricResult(value=float(score), reason=reason)
 
     async def _create_statements(self, question: str, response: str) -> List[str]:
         """Break response into atomic statements using statement generator."""
@@ -161,3 +165,28 @@ class Faithfulness(BaseMetric):
             score = float("nan")
 
         return score
+
+    def _build_reason(self, verdicts: NLIStatementOutput, score: float) -> str:
+        """Build a human-readable reason string from NLI verdicts.
+
+        Formats each statement's verdict and reason into a structured
+        explanation of how the faithfulness score was computed.
+        """
+        if not verdicts.statements:
+            return "No statements were generated from the response."
+
+        faithful_count = sum(
+            1 for s in verdicts.statements if s.verdict
+        )
+        total = len(verdicts.statements)
+        lines = [
+            f"{faithful_count} out of {total} statements were faithful to the context."
+        ]
+
+        for i, stmt in enumerate(verdicts.statements, start=1):
+            verdict_label = VERDICT_FAITHFUL if stmt.verdict else VERDICT_NOT_FAITHFUL
+            lines.append(
+                f"{i}. [{verdict_label}] \"{stmt.statement}\"\n   Reason: {stmt.reason}"
+            )
+
+        return "\n".join(lines)
