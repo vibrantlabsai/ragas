@@ -71,16 +71,13 @@ class BleuScore(BaseMetric):
         assert isinstance(reference, str), "BleuScore expects a valid reference string"
         assert isinstance(response, str), "BleuScore expects a valid response string"
 
-        reference_sentences = reference.split(". ")
-        response_sentences = response.split(". ")
+        # sacrebleu expects references as a list of reference streams, each with one
+        # entry per hypothesis. Score the whole response against the whole reference
+        # as a single segment (the same way CHRFScore does), so every sentence counts.
+        references = [[reference]]
+        hypotheses = [response]
 
-        reference_formatted = [[ref] for ref in reference_sentences]
-        response_formatted = response_sentences
-
-        score = (
-            corpus_bleu(response_formatted, reference_formatted, **self.kwargs).score
-            / 100
-        )
+        score = corpus_bleu(hypotheses, references, **self.kwargs).score / 100
 
         assert isinstance(score, float), "Expecting a float"
         return MetricResult(value=float(score))
