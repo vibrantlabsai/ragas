@@ -114,6 +114,16 @@ Context Utilization Score: 0.49999999995
 
 ## Legacy Metrics API
 
+!!! note "Naming Mapping"
+    The metrics in this section were renamed as part of the collections-based API:
+
+    - `LLMContextPrecisionWithoutReference` → `ContextUtilization`
+    - `LLMContextPrecisionWithReference` → `ContextPrecision`
+
+    The underlying logic is unchanged — only the class names and API surface differ. See the [collections API examples](#context-precision) above.
+
+The following examples use the legacy metrics API pattern. For new projects, we recommend using the collections-based API shown above.
+
 The following examples use the legacy metrics API pattern. For new projects, we recommend using the collections-based API shown above.
 
 !!! warning "Deprecation Timeline"
