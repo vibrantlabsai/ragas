@@ -192,6 +192,42 @@ def test_azure_ai_edge_cases():
     token_usage = get_token_usage_for_azure_ai(empty_llm_output_result)
     assert token_usage == TokenUsage(input_tokens=0, output_tokens=0)
 
+
+def _anthropic_generation(input_tokens: int, output_tokens: int):
+    return [
+        ChatGeneration(
+            text="Hello, world!",
+            message=AIMessage(
+                content="Hello, world!",
+                response_metadata={
+                    "usage": {
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                    },
+                    "model": "claude-3-opus-20240229",
+                },
+            ),
+        )
+    ]
+
+
+def test_token_usage_sums_across_multiple_generations():
+    # An LLMResult can contain more than one generation group (e.g. a batched
+    # call with multiple prompts). Token usage from every generation must be
+    # counted, like the openai parser which reads the aggregate llm_output.
+    multi_generation_result = LLMResult(
+        generations=[
+            _anthropic_generation(5, 7),
+            _anthropic_generation(3, 4),
+        ],
+        llm_output={},
+    )
+
+    token_usage = get_token_usage_for_anthropic(multi_generation_result)
+    assert token_usage == TokenUsage(
+        input_tokens=8, output_tokens=11, model="claude-3-opus-20240229"
+    )
+
     # Test with missing token_usage field
     no_token_usage_result = LLMResult(
         generations=[[ChatGeneration(message=AIMessage(content="Hello, world!"))]],

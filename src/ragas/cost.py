@@ -101,12 +101,8 @@ def get_token_usage_for_anthropic(
                             ),
                         )
                     )
-        model = next((usage.model for usage in token_usages if usage.model), "")
-        return sum(
-            token_usages, TokenUsage(input_tokens=0, output_tokens=0, model=model)
-        )
-    else:
-        return TokenUsage(input_tokens=0, output_tokens=0)
+    model = next((usage.model for usage in token_usages if usage.model), "")
+    return sum(token_usages, TokenUsage(input_tokens=0, output_tokens=0, model=model))
 
 
 def get_token_usage_for_bedrock(
@@ -134,11 +130,8 @@ def get_token_usage_for_bedrock(
                             ),
                         )
                     )
-        model = next((usage.model for usage in token_usages if usage.model), "")
-        return sum(
-            token_usages, TokenUsage(input_tokens=0, output_tokens=0, model=model)
-        )
-    return TokenUsage(input_tokens=0, output_tokens=0)
+    model = next((usage.model for usage in token_usages if usage.model), "")
+    return sum(token_usages, TokenUsage(input_tokens=0, output_tokens=0, model=model))
 
 
 def get_token_usage_for_azure_ai(
