@@ -35,12 +35,7 @@ class BleuScore(SingleTurnMetric):
         assert isinstance(reference, str), "BleuScore expects a valid reference string"
         assert isinstance(response, str), "BleuScore expects a valid response string"
 
-        reference_sentences = reference.split(". ")
-        response_sentences = response.split(". ")
-
-        reference = [[reference] for reference in reference_sentences]
-        response = response_sentences
-        score = self.corpus_bleu(response, reference, **self.kwargs).score / 100
+        score = self.corpus_bleu([response], [[reference]], **self.kwargs).score / 100
         assert isinstance(score, float), "Expecting a float"
         return score
 
