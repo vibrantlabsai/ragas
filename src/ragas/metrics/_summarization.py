@@ -187,9 +187,14 @@ class SummarizationScore(MetricWithLLM, SingleTurnMetric):
         return self._compute_score(scores)
 
     def _compute_score(self, scores) -> float:
+        if "conciseness_score" not in scores:
+            # length_penalty disabled: the score is the QA score alone. Without
+            # this, qa_score is still multiplied by (1 - coeff) while the absent
+            # conciseness term defaults to 0, silently halving the score.
+            return scores["qa_score"]
         return (
             scores["qa_score"] * (1 - self.coeff)
-            + scores.get("conciseness_score", 0) * self.coeff
+            + scores["conciseness_score"] * self.coeff
         )
 
     def _compute_qa_score(self, answers: t.List[str]) -> float:
