@@ -267,3 +267,20 @@ def test_in_memory_example_store():
     assert store.get_examples(FakeInputModel(text="hello", embedding=[1, 2, 3])) == [
         FakeOutputModel(text="hello")
     ]
+
+
+@pytest.mark.asyncio
+async def test_pydantic_prompt_langchain_markdown_json():
+    from langchain_core.language_models import FakeListLLM
+    from ragas.prompt import PydanticPrompt, StringIO
+
+    class SimplePrompt(PydanticPrompt[StringIO, StringIO]):
+        instruction = "Return the same text"
+        input_model = StringIO
+        output_model = StringIO
+
+    fake_llm = FakeListLLM(responses=['```json\n{"text": "extracted text"}\n```'])
+    prompt = SimplePrompt()
+    result = await prompt.generate(llm=fake_llm, data=StringIO(text="test"))
+    assert result.text == "extracted text"
+
