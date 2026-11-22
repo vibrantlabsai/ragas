@@ -7,6 +7,7 @@ from ragas.llms.base import (
     LlamaIndexLLMWrapper as _LlamaIndexLLMWrapper,
     llm_factory,
 )
+from ragas.llms.groq_wrapper import GroqLLMWrapper
 from ragas.llms.haystack_wrapper import HaystackLLMWrapper
 from ragas.llms.litellm_llm import LiteLLMStructuredLLM
 from ragas.llms.oci_genai_wrapper import OCIGenAIWrapper, oci_genai_factory
@@ -33,6 +34,7 @@ LlamaIndexLLMWrapper = DeprecationHelper(
 
 __all__ = [
     "BaseRagasLLM",
+    "GroqLLMWrapper",
     "HaystackLLMWrapper",
     "InstructorBaseRagasLLM",
     "InstructorLLM",
