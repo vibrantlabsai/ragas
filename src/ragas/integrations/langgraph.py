@@ -106,5 +106,5 @@ def convert_to_ragas_messages(
     return [
         converted
         for message in messages
-        if (converted := _convert_message(message)) is not None
+        if (converted := _convert_message(message, metadata)) is not None
     ]

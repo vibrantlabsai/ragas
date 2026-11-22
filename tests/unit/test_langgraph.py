@@ -138,3 +138,18 @@ def test_invalid_tool_calls_json():
 
     with pytest.raises(json.JSONDecodeError):
         convert_to_ragas_messages(messages)
+
+
+def test_messages_metadata_conversion():
+    """Test metadata conversion for HumanMessage, AIMessage, and ToolMessage when metadata=True"""
+    messages = [
+        HumanMessage(content="Hello", id="msg_1"),
+        AIMessage(content="Hi", id="msg_2"),
+        ToolMessage(content="Result", tool_call_id="1", id="msg_3"),
+    ]
+    result = convert_to_ragas_messages(messages, metadata=True)
+
+    assert len(result) == 3
+    assert result[0].metadata is not None and result[0].metadata.get("id") == "msg_1"
+    assert result[1].metadata is not None and result[1].metadata.get("id") == "msg_2"
+    assert result[2].metadata is not None and result[2].metadata.get("id") == "msg_3"
