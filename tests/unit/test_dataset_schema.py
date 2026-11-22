@@ -105,6 +105,26 @@ def test_evaluation_dataset_save_load_jsonl(tmpdir, eval_sample):
     assert loaded_dataset == dataset
 
 
+def test_evaluation_dataset_jsonl_preserves_unicode_text(tmpdir):
+    unicode_answer = "Toshkent Oʻzbekiston poytaxti."
+    sample = SingleTurnSample(
+        user_input="Toshkent qayerda joylashgan?",
+        response=unicode_answer,
+        reference=unicode_answer,
+    )
+    dataset = EvaluationDataset(samples=[sample])
+    jsonl_path = tmpdir / "unicode.jsonl"
+
+    dataset.to_jsonl(jsonl_path)
+
+    with open(jsonl_path, "rb") as jsonlfile:
+        raw_jsonl = jsonlfile.read()
+    assert "Oʻzbekiston".encode("utf-8") in raw_jsonl
+
+    loaded_dataset = EvaluationDataset.from_jsonl(jsonl_path)
+    assert loaded_dataset == dataset
+
+
 @pytest.mark.parametrize("eval_sample", samples)
 def test_evaluation_dataset_load_from_hf(eval_sample):
     dataset = EvaluationDataset(samples=[eval_sample, eval_sample])
