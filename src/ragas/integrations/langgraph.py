@@ -70,7 +70,18 @@ def convert_to_ragas_messages(
         }
 
     def _extract_tool_calls(message: AIMessage) -> List[r.ToolCall]:
+        if message.tool_calls:
+            tool_calls = message.tool_calls
+            return [
+                r.ToolCall(
+                    name=tool_call["name"],
+                    args=tool_call["args"],
+                )
+                for tool_call in tool_calls
+            ]
+
         tool_calls = message.additional_kwargs.get("tool_calls", [])
+
         return [
             r.ToolCall(
                 name=tool_call["function"]["name"],
@@ -80,7 +91,7 @@ def convert_to_ragas_messages(
         ]
 
     def _convert_ai_message(message: AIMessage, metadata: bool) -> r.AIMessage:
-        tool_calls = _extract_tool_calls(message) if message.additional_kwargs else None
+        tool_calls = _extract_tool_calls(message) if message.additional_kwargs or message.tool_calls else None
         if metadata:
             return r.AIMessage(
                 content=_validate_string_content(message, "AIMessage"),
