@@ -5,6 +5,7 @@ Ragas provides a set of evaluation metrics that can be used to measure the perfo
 Each metric are essentially paradigms that are designed to evaluate a particular aspect of the application. LLM Based metrics might use one or more LLM calls to arrive at the score or result. One can also modify or write your own metrics using ragas.
 
 ## Retrieval Augmented Generation
+- [Answer Consistency](answer_consistency.md)
 - [Context Precision](context_precision.md)
 - [Context Recall](context_recall.md)
 - [Context Entities Recall](context_entities_recall.md)

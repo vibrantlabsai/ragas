@@ -9,10 +9,15 @@ from ragas.metrics._answer_relevance import (
     ResponseRelevancy as _ResponseRelevancy,
     answer_relevancy as _answer_relevancy,
 )
+
 from ragas.metrics._answer_similarity import (
     AnswerSimilarity as _AnswerSimilarity,
     SemanticSimilarity as _SemanticSimilarity,
     answer_similarity as _answer_similarity,
+)
+from ragas.metrics._answer_consistency import (
+    AnswerConsistency as _AnswerConsistency,
+    answer_consistency as _answer_consistency,
 )
 from ragas.metrics._aspect_critic import AspectCritic as _AspectCritic
 from ragas.metrics._bleu_score import BleuScore as _BleuScore
@@ -128,6 +133,8 @@ _DEPRECATED_METRICS = {
     "AnswerAccuracy": _AnswerAccuracy,
     "AnswerCorrectness": _AnswerCorrectness,
     "answer_correctness": _answer_correctness,
+    "AnswerConsistency": _AnswerConsistency,
+    "answer_consistency": _answer_consistency,
     "AnswerRelevancy": _AnswerRelevancy,
     "answer_relevancy": _answer_relevancy,
     "AnswerSimilarity": _AnswerSimilarity,
