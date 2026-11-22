@@ -123,8 +123,7 @@ def goal_accuracy_metric_without_llm(current_state: Dict, expected_state: Dict):
 
 goal_accuracy_metric_with_llm = DiscreteMetric(
     name="goal_accuracy(with llm)",
-    prompt="""
-You are evaluating whether the user’s action achieved the intended goal.
+    prompt="""You are evaluating whether the user’s action achieved the intended goal.
 
 - Initial State: {initial_state}
 - Final State: {final_state}
@@ -132,9 +131,8 @@ You are evaluating whether the user’s action achieved the intended goal.
 
 Determine if the change from Initial State to Final State correctly reflects the User Input.
 
-If yes, return 'pass'.  
-If no, return 'fail'.
-""",
+If yes, return 'pass'.
+If no, return 'fail'.""",
     allowed_values=["pass", "fail"],
 )
 
