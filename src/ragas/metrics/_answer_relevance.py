@@ -124,7 +124,12 @@ class ResponseRelevancy(MetricWithLLM, MetricWithEmbeddings, SingleTurnMetric):
             score = np.nan
         else:
             cosine_sim = self.calculate_similarity(question, gen_questions)
-            score = cosine_sim.mean() * int(not all_noncommittal)
+            # Cosine similarity is mathematically in [-1, 1]; clip to the
+            # documented [0, 1] range so near-orthogonal embeddings cannot
+            # produce slightly-negative scores.
+            score = float(
+                np.clip(cosine_sim.mean() * int(not all_noncommittal), 0.0, 1.0)
+            )
 
         return score
 
