@@ -116,22 +116,35 @@ def get_token_usage_for_bedrock(
     for gs in llm_result.generations:
         for g in gs:
             if isinstance(g, ChatGeneration):
-                if g.message.response_metadata != {}:
+                message = g.message
+                # langchain-aws ChatBedrock / ChatBedrockConverse expose token
+                # counts on the message-level `usage_metadata`
+                # ({"input_tokens", "output_tokens", ...}), not under
+                # `response_metadata`. ChatBedrock also mirrors them under
+                # `additional_kwargs["usage"]` ({"prompt_tokens",
+                # "completion_tokens"}), which we use as a fallback.
+                usage_metadata = getattr(message, "usage_metadata", None) or {}
+                input_tokens = get_from_dict(usage_metadata, "input_tokens", None)
+                output_tokens = get_from_dict(usage_metadata, "output_tokens", None)
+                if input_tokens is None:
+                    input_tokens = get_from_dict(
+                        message.additional_kwargs, "usage.prompt_tokens", 0
+                    )
+                if output_tokens is None:
+                    output_tokens = get_from_dict(
+                        message.additional_kwargs, "usage.completion_tokens", 0
+                    )
+
+                # The model id lives under `response_metadata["model_name"]` for
+                # both ChatBedrock and ChatBedrockConverse.
+                model = get_from_dict(message.response_metadata, "model_name", "")
+
+                if usage_metadata or message.response_metadata:
                     token_usages.append(
                         TokenUsage(
-                            input_tokens=get_from_dict(
-                                g.message.response_metadata,
-                                "usage.prompt_tokens",
-                                0,
-                            ),
-                            output_tokens=get_from_dict(
-                                g.message.response_metadata,
-                                "usage.completion_tokens",
-                                0,
-                            ),
-                            model=get_from_dict(
-                                g.message.response_metadata, "model_id", ""
-                            ),
+                            input_tokens=input_tokens or 0,
+                            output_tokens=output_tokens or 0,
+                            model=model,
                         )
                     )
         model = next((usage.model for usage in token_usages if usage.model), "")

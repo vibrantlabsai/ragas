@@ -84,6 +84,8 @@ anthropic_llm_result = LLMResult(
     llm_output={},
 )
 
+# ChatBedrock shape: counts on message-level `usage_metadata`, mirrored under
+# `additional_kwargs["usage"]`, with the model under `response_metadata["model_name"]`.
 bedrock_llama_result = LLMResult(
     generations=[
         [
@@ -91,14 +93,21 @@ bedrock_llama_result = LLMResult(
                 text="Hello, world!",
                 message=AIMessage(
                     content="Hello, world!",
-                    response_metadata={
+                    usage_metadata={
+                        "input_tokens": 10,
+                        "output_tokens": 10,
+                        "total_tokens": 20,
+                    },
+                    additional_kwargs={
                         "usage": {
                             "prompt_tokens": 10,
                             "completion_tokens": 10,
                             "total_tokens": 20,
                         },
-                        "stop_reason": "stop",
-                        "model_id": "us.meta.llama3-1-70b-instruct-v1:0",
+                    },
+                    response_metadata={
+                        "model_provider": "bedrock",
+                        "model_name": "us.meta.llama3-1-70b-instruct-v1:0",
                     },
                 ),
             )
@@ -107,6 +116,8 @@ bedrock_llama_result = LLMResult(
     llm_output={},
 )
 
+# ChatBedrockConverse shape: counts only on `usage_metadata` (no additional_kwargs),
+# model under `response_metadata["model_name"]`.
 bedrock_claude_result = LLMResult(
     generations=[
         [
@@ -114,14 +125,13 @@ bedrock_claude_result = LLMResult(
                 text="Hello, world!",
                 message=AIMessage(
                     content="Hello, world!",
+                    usage_metadata={
+                        "input_tokens": 10,
+                        "output_tokens": 10,
+                        "total_tokens": 20,
+                    },
                     response_metadata={
-                        "usage": {
-                            "prompt_tokens": 10,
-                            "completion_tokens": 10,
-                            "total_tokens": 20,
-                        },
-                        "stop_reason": "end_turn",
-                        "model_id": "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+                        "model_name": "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
                     },
                 ),
             )
