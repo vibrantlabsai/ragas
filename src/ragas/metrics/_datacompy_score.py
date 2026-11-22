@@ -28,7 +28,7 @@ class DataCompyScore(SingleTurnMetric):
             from datacompy import Compare  # type: ignore[attr-defined]
         except ImportError as e:
             raise ImportError(
-                f"{e.name} is required for bleu score. Please install it using `pip install {e.name}`"
+                f"{e.name} is required for DataCompy score. Please install it using `pip install {e.name}`"
             )
 
         self.Compare = Compare
