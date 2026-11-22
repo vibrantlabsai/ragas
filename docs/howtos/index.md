@@ -18,7 +18,7 @@ Each guide in this section provides a focused solution to real-world problems th
 
     How to use Ragas for various applications and use cases.
 
-    Includes applications such as [RAG evaluation](applications/index.md).
+    Includes applications such as [RAG Evaluation](applications/evaluate-and-improve-rag.md), [Agent Evaluation](applications/text2sql.md), [Benchmarking](applications/benchmark_llm.md) and [Prompt Evaluation](applications/iterate_prompt.md).
 
 -   :material-link-variant:{ .lg .middle } [__Integrations__](integrations/index.md)
 
