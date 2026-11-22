@@ -74,7 +74,7 @@ class BleuScore(BaseMetric):
         reference_sentences = reference.split(". ")
         response_sentences = response.split(". ")
 
-        reference_formatted = [[ref] for ref in reference_sentences]
+        reference_formatted = [reference_sentences]
         response_formatted = response_sentences
 
         score = (

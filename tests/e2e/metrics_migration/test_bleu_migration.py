@@ -201,3 +201,30 @@ class TestBleuE2EMigration:
         assert 0.0 <= result_custom.value <= 1.0
 
         print("   ✅ Custom kwargs work correctly!")
+
+
+    @pytest.mark.asyncio
+    async def test_bleu_score_multi_sentence_reference(self):
+        reference = "The cat sat. The dog ran. The bird exploded."
+        response = "The cat sat. The dog ran. The bird flew away."
+
+        legacy_score = await LegacyBleuScore()._single_turn_ascore(
+            SingleTurnSample(user_input="dummy", response=response, reference=reference), None
+        )
+        v2_result = await BleuScore().ascore(reference=reference, response=response)
+
+        assert legacy_score == pytest.approx(0.4755, abs=0.01)
+        assert v2_result.value == pytest.approx(0.4755, abs=0.01)
+
+    @pytest.mark.asyncio
+    async def test_bleu_score_single_sentence_reference(self):
+        reference = "The cat sat on the mat."
+        response = "The cat sat on the mat."
+
+        legacy_score = await LegacyBleuScore()._single_turn_ascore(
+            SingleTurnSample(user_input="dummy", response=response, reference=reference), None
+        )
+        v2_result = await BleuScore().ascore(reference=reference, response=response)
+
+        assert legacy_score == pytest.approx(1.0, abs=0.01)
+        assert v2_result.value == pytest.approx(1.0, abs=0.01)  

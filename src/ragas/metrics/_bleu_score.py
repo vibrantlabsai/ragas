@@ -38,7 +38,7 @@ class BleuScore(SingleTurnMetric):
         reference_sentences = reference.split(". ")
         response_sentences = response.split(". ")
 
-        reference = [[reference] for reference in reference_sentences]
+        reference = [reference_sentences]
         response = response_sentences
         score = self.corpus_bleu(response, reference, **self.kwargs).score / 100
         assert isinstance(score, float), "Expecting a float"
