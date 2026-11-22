@@ -1,10 +1,14 @@
+import asyncio
+
 from langchain_core.documents import Document
+from pydantic import BaseModel
 
 from ragas.embeddings import BaseRagasEmbeddings
 from ragas.llms import BaseRagasLLM
-from ragas.testset.graph import NodeType
+from ragas.testset.graph import KnowledgeGraph, Node, NodeType
 from ragas.testset.synthesizers.generate import TestsetGenerator
 from ragas.testset.transforms.default import default_transforms_for_prechunked
+from ragas.testset.transforms.filters import CustomNodeFilter
 from ragas.testset.transforms.splitters import HeadlineSplitter
 
 
@@ -34,6 +38,20 @@ class MockEmbeddings(BaseRagasEmbeddings):
 
     async def aembed_query(self, text):
         pass
+
+
+class RecordingPromptOutput(BaseModel):
+    score: int
+
+
+class RecordingScoringPrompt:
+    def __init__(self, score: int = 3):
+        self.score = score
+        self.calls = []
+
+    async def generate(self, data, llm):
+        self.calls.append(data)
+        return RecordingPromptOutput(score=self.score)
 
 
 def test_prechunked_transforms_has_no_splitter():
@@ -164,3 +182,26 @@ def test_generate_with_chunks_handles_empty_sequence():
 
     kg = generator.knowledge_graph
     assert len(kg.nodes) == 0
+
+
+def test_custom_node_filter_uses_chunk_summary_without_parent():
+    scoring_prompt = RecordingScoringPrompt(score=3)
+    node = Node(
+        type=NodeType.CHUNK,
+        properties={
+            "page_content": "This is the chunk content.",
+            "summary": "This is the chunk summary.",
+        },
+    )
+    kg = KnowledgeGraph(nodes=[node])
+
+    node_filter = CustomNodeFilter(
+        llm=MockLLM(),
+        scoring_prompt=scoring_prompt,
+    )
+
+    result = asyncio.run(node_filter.custom_filter(node, kg))
+
+    assert result is False
+    assert len(scoring_prompt.calls) == 1
+    assert scoring_prompt.calls[0].document_summary == "This is the chunk summary."

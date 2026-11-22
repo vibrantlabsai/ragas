@@ -68,6 +68,11 @@ class CustomNodeFilter(LLMBasedNodeFilter):
                 summary = parent_nodes[0].properties.get("summary", "")
             else:
                 summary = ""
+
+            # Pre-chunked generation stores summaries directly on CHUNK nodes,
+            # so fall back to the node summary when no parent summary exists.
+            if summary == "":
+                summary = node.properties.get("summary", "")
         else:
             summary = node.properties.get("summary", "")
 
