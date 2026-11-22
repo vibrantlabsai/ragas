@@ -3,8 +3,9 @@ import typing as t
 
 import numpy as np
 import pytest
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.outputs import Generation, LLMResult
-from langchain_core.prompt_values import StringPromptValue
+from langchain_core.prompt_values import PromptValue
 from pydantic import BaseModel
 
 from ragas.llms.base import BaseRagasLLM
@@ -15,7 +16,7 @@ from ragas.run_config import RunConfig
 class EchoLLM(BaseRagasLLM):
     def generate_text(  # type: ignore
         self,
-        prompt: StringPromptValue,
+        prompt: PromptValue,
         *args,
         **kwargs,
     ) -> LLMResult:
@@ -23,7 +24,7 @@ class EchoLLM(BaseRagasLLM):
 
     async def agenerate_text(  # type: ignore
         self,
-        prompt: StringPromptValue,
+        prompt: PromptValue,
         *args,
         **kwargs,
     ) -> LLMResult:
@@ -240,6 +241,58 @@ def cosine_similarity(v1: t.List[float], v2: t.List[float]) -> float:
     return np.dot(v1_array, v2_array) / (
         np.linalg.norm(v1_array) * np.linalg.norm(v2_array)
     )
+
+
+def test_to_messages_structure():
+    """to_messages() must split the prompt into a static SystemMessage and a
+    variable HumanMessage so that providers with automatic prefix caching
+    (OpenAI, Anthropic) can cache the unchanged system content across calls."""
+    from ragas.prompt import PydanticPrompt, StringIO
+
+    class Prompt(PydanticPrompt[StringIO, StringIO]):
+        instruction = "You are a helpful assistant."
+        input_model = StringIO
+        output_model = StringIO
+        examples = [
+            (StringIO(text="hello"), StringIO(text="hello")),
+        ]
+
+    p = Prompt()
+    messages = p.to_messages(StringIO(text="test input"))
+
+    assert len(messages) == 2
+    assert isinstance(messages[0], SystemMessage)
+    assert isinstance(messages[1], HumanMessage)
+
+    system_text = messages[0].content
+    assert isinstance(system_text, str)
+    # Static prefix must contain instruction and examples
+    assert "You are a helpful assistant." in system_text
+    assert "hello" in system_text
+
+    human_text = messages[1].content
+    assert isinstance(human_text, str)
+    # Variable suffix must contain the per-call input, not the instruction
+    assert "test input" in human_text
+    assert "You are a helpful assistant." not in human_text
+
+
+def test_to_messages_static_prefix_is_identical_across_calls():
+    """The SystemMessage content must be byte-identical for two calls with
+    different inputs — this is the property that enables prefix caching."""
+    from ragas.prompt import PydanticPrompt, StringIO
+
+    class Prompt(PydanticPrompt[StringIO, StringIO]):
+        instruction = "Evaluate faithfully."
+        input_model = StringIO
+        output_model = StringIO
+
+    p = Prompt()
+    msgs_a = p.to_messages(StringIO(text="input A"))
+    msgs_b = p.to_messages(StringIO(text="input B"))
+
+    assert msgs_a[0].content == msgs_b[0].content  # system message identical
+    assert msgs_a[1].content != msgs_b[1].content  # human message differs
 
 
 @pytest.mark.skip(reason="TODO: Implement embedding calculation")

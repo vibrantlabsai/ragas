@@ -9,8 +9,12 @@ import typing as t
 
 from langchain_core.exceptions import OutputParserException
 from langchain_core.language_models import BaseLanguageModel
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import PydanticOutputParser
-from langchain_core.prompt_values import StringPromptValue as PromptValue
+from langchain_core.prompt_values import (
+    ChatPromptValue,
+    StringPromptValue as PromptValue,
+)
 from pydantic import BaseModel
 
 from ragas._analytics import PromptUsageEvent, track
@@ -133,6 +137,40 @@ class PydanticPrompt(BasePrompt, t.Generic[InputModel, OutputModel]):
             + "Output: "
         )
 
+    def to_messages(
+        self, data: t.Optional[InputModel] = None
+    ) -> t.List[t.Union[SystemMessage, HumanMessage]]:
+        """Return the prompt as a [SystemMessage, HumanMessage] pair.
+
+        The system message contains the static prefix (instruction + output schema +
+        few-shot examples) which is identical across all calls to the same prompt
+        class. Keeping it in a dedicated system message lets providers that support
+        automatic prefix caching (OpenAI, Anthropic) reuse the KV-cache across
+        requests, cutting first-token latency and cost for repeated evaluations.
+
+        The human message contains only the per-call variable input.
+        """
+        static_prefix = (
+            f"{self.instruction}\n"
+            + self._generate_output_signature()
+            + "\n"
+            + self._generate_examples()
+        )
+        variable_input = (
+            "\n-----------------------------\n"
+            "\nNow perform the same with the following input\n"
+            + (
+                "input: " + data.model_dump_json(indent=4, exclude_none=True) + "\n"
+                if data is not None
+                else "Input: (None)\n"
+            )
+            + "Output: "
+        )
+        return [
+            SystemMessage(content=static_prefix),
+            HumanMessage(content=variable_input),
+        ]
+
     async def generate(
         self,
         llm: t.Union[BaseRagasLLM, InstructorBaseRagasLLM, BaseLanguageModel],
@@ -234,7 +272,15 @@ class PydanticPrompt(BasePrompt, t.Generic[InputModel, OutputModel]):
             callbacks=callbacks,
             metadata={"type": ChainType.RAGAS_PROMPT},
         )
-        prompt_value = PromptValue(text=self.to_string(processed_data))
+        # InstructorBaseRagasLLM accesses prompt_value.text directly, so it needs
+        # StringPromptValue. All other paths use ChatPromptValue so that the static
+        # prefix (instruction + schema + examples) lands in a SystemMessage that is
+        # identical across calls — enabling automatic prefix caching on providers
+        # that support it (OpenAI, Anthropic).
+        if isinstance(llm, InstructorBaseRagasLLM):
+            prompt_value = PromptValue(text=self.to_string(processed_data))
+        else:
+            prompt_value = ChatPromptValue(messages=self.to_messages(processed_data))
 
         # Handle different LLM types with different interfaces
         # 1. LangChain LLMs have agenerate_prompt() for async with specific signature
