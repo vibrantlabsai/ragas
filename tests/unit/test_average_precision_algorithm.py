@@ -19,7 +19,7 @@ def calculate_average_precision_original(verdict_list: List[int]) -> float:
             for i in range(len(verdict_list))
         ]
     )
-    denominator = sum(verdict_list) + 1e-10
+    denominator = sum(verdict_list) if sum(verdict_list) != 0 else 1e-10
     return numerator / denominator
 
 
@@ -32,7 +32,7 @@ def calculate_average_precision_optimized(verdict_list: List[int]) -> float:
         if v:
             numerator += cumsum / (i + 1)
 
-    denominator = cumsum + 1e-10
+    denominator = cumsum if cumsum != 0 else 1e-10
     return numerator / denominator
 
 
@@ -58,6 +58,18 @@ class TestAveragePrecisionAlgorithm:
         original = calculate_average_precision_original(verdict_list)
         optimized = calculate_average_precision_optimized(verdict_list)
         assert np.isclose(original, optimized, rtol=1e-10, atol=1e-10)
+
+    def test_perfect_retrieval_returns_exact_one(self):
+        """Test that perfect retrieval cases return exactly 1.0."""
+        for ones in [[1], [1, 1], [1, 1, 1], [1, 1, 1, 1, 1]]:
+            score = calculate_average_precision_optimized(ones)
+            assert score == 1.0
+
+    def test_zero_denominator_returns_zero(self):
+        """Test that zero-denominator cases (no relevant contexts) return 0.0."""
+        for zeros in [[], [0], [0, 0], [0, 0, 0]]:
+            score = calculate_average_precision_optimized(zeros)
+            assert score == 0.0
 
     def test_known_example_1_0_1(self):
         """Test [1,0,1]: score = (1 + 2/3) / 2 = 5/6."""
@@ -86,3 +98,51 @@ class TestAveragePrecisionAlgorithm:
             original = calculate_average_precision_original(verdict_list)
             optimized = calculate_average_precision_optimized(verdict_list)
             assert np.isclose(original, optimized, rtol=1e-10, atol=1e-10)
+
+
+def test_context_precision_metrics_exact_scores():
+    """Test _calculate_average_precision directly on ContextPrecision metric implementations."""
+    from ragas.metrics._context_precision import (
+        LLMContextPrecisionWithReference,
+        NonLLMContextPrecisionWithReference,
+        Verification,
+    )
+    from ragas.metrics.collections import (
+        ContextPrecisionWithoutReference,
+        ContextPrecisionWithReference,
+    )
+
+    # 1. LLMContextPrecisionWithReference
+    llm_metric = LLMContextPrecisionWithReference.__new__(
+        LLMContextPrecisionWithReference
+    )
+    perfect_verifications = [
+        Verification(verdict=1, reason="relevant"),
+        Verification(verdict=1, reason="relevant"),
+    ]
+    assert llm_metric._calculate_average_precision(perfect_verifications) == 1.0
+
+    zero_verifications = [
+        Verification(verdict=0, reason="not relevant"),
+        Verification(verdict=0, reason="not relevant"),
+    ]
+    assert llm_metric._calculate_average_precision(zero_verifications) == 0.0
+
+    # 2. NonLLMContextPrecisionWithReference
+    non_llm_metric = NonLLMContextPrecisionWithReference.__new__(
+        NonLLMContextPrecisionWithReference
+    )
+    assert non_llm_metric._calculate_average_precision([1, 1, 1]) == 1.0
+    assert non_llm_metric._calculate_average_precision([0, 0]) == 0.0
+
+    # 3. ContextPrecisionWithReference (collections)
+    v2_ref_metric = ContextPrecisionWithReference.__new__(ContextPrecisionWithReference)
+    assert v2_ref_metric._calculate_average_precision([1, 1]) == 1.0
+    assert v2_ref_metric._calculate_average_precision([0, 0]) == 0.0
+
+    # 4. ContextPrecisionWithoutReference (collections)
+    v2_no_ref_metric = ContextPrecisionWithoutReference.__new__(
+        ContextPrecisionWithoutReference
+    )
+    assert v2_no_ref_metric._calculate_average_precision([1, 1]) == 1.0
+    assert v2_no_ref_metric._calculate_average_precision([0, 0]) == 0.0

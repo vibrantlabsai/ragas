@@ -124,7 +124,7 @@ class ContextPrecisionWithReference(BaseMetric):
             if v:
                 numerator += cumsum / (i + 1)
 
-        denominator = cumsum + 1e-10
+        denominator = cumsum if cumsum != 0 else 1e-10
         score = numerator / denominator
 
         if np.isnan(score):
@@ -244,7 +244,7 @@ class ContextPrecisionWithoutReference(BaseMetric):
             if v:
                 numerator += cumsum / (i + 1)
 
-        denominator = cumsum + 1e-10
+        denominator = cumsum if cumsum != 0 else 1e-10
         score = numerator / denominator
 
         if np.isnan(score):
