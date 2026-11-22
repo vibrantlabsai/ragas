@@ -91,14 +91,14 @@ bedrock_llama_result = LLMResult(
                 text="Hello, world!",
                 message=AIMessage(
                     content="Hello, world!",
+                    usage_metadata={
+                        "input_tokens": 10,
+                        "output_tokens": 10,
+                        "total_tokens": 20,
+                    },
                     response_metadata={
-                        "usage": {
-                            "prompt_tokens": 10,
-                            "completion_tokens": 10,
-                            "total_tokens": 20,
-                        },
-                        "stop_reason": "stop",
-                        "model_id": "us.meta.llama3-1-70b-instruct-v1:0",
+                        "model_provider": "bedrock",
+                        "model_name": "us.meta.llama3-1-70b-instruct-v1:0",
                     },
                 ),
             )
@@ -114,16 +114,60 @@ bedrock_claude_result = LLMResult(
                 text="Hello, world!",
                 message=AIMessage(
                     content="Hello, world!",
+                    usage_metadata={
+                        "input_tokens": 10,
+                        "output_tokens": 10,
+                        "total_tokens": 20,
+                    },
                     response_metadata={
-                        "usage": {
-                            "prompt_tokens": 10,
-                            "completion_tokens": 10,
-                            "total_tokens": 20,
-                        },
-                        "stop_reason": "end_turn",
-                        "model_id": "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+                        "model_provider": "bedrock",
+                        "model_name": "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
                     },
                 ),
+            )
+        ]
+    ],
+    llm_output={},
+)
+
+# Bedrock legacy response format
+bedrock_legacy_result = LLMResult(
+    generations=[
+        [
+            ChatGeneration(
+                message=AIMessage(
+                    content="Hello",
+                    response_metadata={
+                        "usage": {
+                            "prompt_tokens": 12,
+                            "completion_tokens": 9,
+                        },
+                        "model_id": "legacy-bedrock-model",
+                    },
+                )
+            )
+        ]
+    ],
+    llm_output={},
+)
+
+# Bedrock additional_kwargs response format
+bedrock_additional_kwargs_result = LLMResult(
+    generations=[
+        [
+            ChatGeneration(
+                message=AIMessage(
+                    content="Hello, world!",
+                    additional_kwargs={
+                        "usage": {
+                            "prompt_tokens": 15,
+                            "completion_tokens": 7,
+                        }
+                    },
+                    response_metadata={
+                        "model_name": "test-bedrock-model",
+                    },
+                )
             )
         ]
     ],
@@ -172,6 +216,24 @@ def test_parse_llm_results():
     token_usage = get_token_usage_for_azure_ai(azure_ai_result)
     assert token_usage == TokenUsage(
         input_tokens=10, output_tokens=10, model="mistral-small-2503"
+    )
+
+    # Bedrock additional_kwargs usage format
+    token_usage = get_token_usage_for_bedrock(bedrock_additional_kwargs_result)
+
+    assert token_usage == TokenUsage(
+        input_tokens=15,
+        output_tokens=7,
+        model="test-bedrock-model",
+    )
+
+    # Bedrock legacy response format
+    token_usage = get_token_usage_for_bedrock(bedrock_legacy_result)
+
+    assert token_usage == TokenUsage(
+        input_tokens=12,
+        output_tokens=9,
+        model="legacy-bedrock-model",
     )
 
 

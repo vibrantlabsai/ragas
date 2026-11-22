@@ -116,27 +116,41 @@ def get_token_usage_for_bedrock(
     for gs in llm_result.generations:
         for g in gs:
             if isinstance(g, ChatGeneration):
-                if g.message.response_metadata != {}:
+                message = g.message
+                response_metadata = message.response_metadata
+
+                if response_metadata:
+                    usage_metadata = getattr(message, "usage_metadata", {}) or {}
+
+                    usage = (
+                        usage_metadata
+                        or get_from_dict(message.additional_kwargs, "usage", {})
+                        or get_from_dict(response_metadata, "usage", {})
+                    )
+
                     token_usages.append(
                         TokenUsage(
                             input_tokens=get_from_dict(
-                                g.message.response_metadata,
-                                "usage.prompt_tokens",
-                                0,
+                                usage,
+                                "input_tokens",
+                                get_from_dict(usage, "prompt_tokens", 0),
                             ),
                             output_tokens=get_from_dict(
-                                g.message.response_metadata,
-                                "usage.completion_tokens",
-                                0,
+                                usage,
+                                "output_tokens",
+                                get_from_dict(usage, "completion_tokens", 0),
                             ),
                             model=get_from_dict(
-                                g.message.response_metadata, "model_id", ""
+                                response_metadata,
+                                "model_name",
+                                get_from_dict(response_metadata, "model_id", ""),
                             ),
                         )
                     )
         model = next((usage.model for usage in token_usages if usage.model), "")
         return sum(
-            token_usages, TokenUsage(input_tokens=0, output_tokens=0, model=model)
+            token_usages,
+            TokenUsage(input_tokens=0, output_tokens=0, model=model),
         )
     return TokenUsage(input_tokens=0, output_tokens=0)
 
