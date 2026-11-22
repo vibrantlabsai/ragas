@@ -12,12 +12,14 @@ from ragas._analytics import TestsetGenerationEvent, track
 from ragas.callbacks import new_group
 from ragas.cost import TokenUsageParser
 from ragas.embeddings.base import (
+    BaseRagasEmbedding,
     BaseRagasEmbeddings,
     LangchainEmbeddingsWrapper,
     LlamaIndexEmbeddingsWrapper,
 )
 from ragas.executor import Executor
 from ragas.llms import BaseRagasLLM, LangchainLLMWrapper, LlamaIndexLLMWrapper
+from ragas.llms.base import InstructorBaseRagasLLM
 from ragas.run_config import RunConfig
 from ragas.testset.graph import KnowledgeGraph, Node, NodeType
 from ragas.testset.persona import Persona, generate_personas_from_kg
@@ -67,8 +69,8 @@ class TestsetGenerator:
         This context will be used to guide how the LLM generates queries and answers.
     """
 
-    llm: BaseRagasLLM
-    embedding_model: BaseRagasEmbeddings
+    llm: t.Union[BaseRagasLLM, InstructorBaseRagasLLM]
+    embedding_model: t.Union[BaseRagasEmbeddings, BaseRagasEmbedding]
     knowledge_graph: KnowledgeGraph = field(default_factory=KnowledgeGraph)
     persona_list: t.Optional[t.List[Persona]] = None
     llm_context: t.Optional[str] = None
@@ -116,8 +118,12 @@ class TestsetGenerator:
         documents: t.Sequence[LCDocument],
         testset_size: int,
         transforms: t.Optional[Transforms] = None,
-        transforms_llm: t.Optional[BaseRagasLLM] = None,
-        transforms_embedding_model: t.Optional[BaseRagasEmbeddings] = None,
+        transforms_llm: t.Optional[
+            t.Union[BaseRagasLLM, InstructorBaseRagasLLM]
+        ] = None,
+        transforms_embedding_model: t.Optional[
+            t.Union[BaseRagasEmbeddings, BaseRagasEmbedding]
+        ] = None,
         query_distribution: t.Optional[QueryDistribution] = None,
         run_config: t.Optional[RunConfig] = None,
         callbacks: t.Optional[Callbacks] = None,
@@ -304,8 +310,12 @@ class TestsetGenerator:
         chunks: t.Sequence[t.Union[LCDocument, str]],
         testset_size: int,
         transforms: t.Optional[Transforms] = None,
-        transforms_llm: t.Optional[BaseRagasLLM] = None,
-        transforms_embedding_model: t.Optional[BaseRagasEmbeddings] = None,
+        transforms_llm: t.Optional[
+            t.Union[BaseRagasLLM, InstructorBaseRagasLLM]
+        ] = None,
+        transforms_embedding_model: t.Optional[
+            t.Union[BaseRagasEmbeddings, BaseRagasEmbedding]
+        ] = None,
         query_distribution: t.Optional[QueryDistribution] = None,
         run_config: t.Optional[RunConfig] = None,
         callbacks: t.Optional[Callbacks] = None,

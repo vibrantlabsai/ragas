@@ -349,7 +349,7 @@ async def aevaluate(
 def evaluate(
     dataset: t.Union[Dataset, EvaluationDataset],
     metrics: t.Optional[t.Sequence[Metric]] = None,
-    llm: t.Optional[BaseRagasLLM | LangchainLLM] = None,
+    llm: t.Optional[BaseRagasLLM | InstructorBaseRagasLLM | LangchainLLM] = None,
     embeddings: t.Optional[
         BaseRagasEmbeddings | BaseRagasEmbedding | LangchainEmbeddings
     ] = None,
