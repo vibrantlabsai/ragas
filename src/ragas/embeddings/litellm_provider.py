@@ -41,6 +41,22 @@ class LiteLLMEmbeddings(BaseRagasEmbedding):
         self.batch_size = batch_size or get_optimal_batch_size("litellm", model)
         self.litellm_params = litellm_params
 
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Cache identity for LiteLLM embeddings.
+
+        ``api_key`` is excluded as a credential, and ``api_base``/``api_version``
+        as endpoint identity (deliberately out of scope, see issue #2983).
+        ``timeout``, ``max_retries`` and ``batch_size`` are excluded because they
+        do not change the returned vectors - in particular, including
+        ``batch_size`` would key the same text differently after a re-batch.
+        """
+        return {
+            "class": type(self).__name__,
+            "provider": self.PROVIDER_NAME,
+            "model": self.model,
+            "litellm_params": self.litellm_params,
+        }
+
     def _prepare_kwargs(self, **kwargs: t.Any) -> t.Dict[str, t.Any]:
         """Prepare kwargs for LiteLLM call."""
         call_kwargs = {

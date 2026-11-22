@@ -92,6 +92,21 @@ class HaystackLLMWrapper(BaseRagasLLM):
             run_config = RunConfig()
         self.set_run_config(run_config)
 
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Cache identity derived from the wrapped Haystack generator.
+
+        Azure generators identify their model by ``azure_deployment`` instead of
+        ``model``; deployment identity is deliberately out of scope (issue #2983),
+        so such wrappers still partition only by generator class.
+        """
+        return {
+            "class": type(self).__name__,
+            "provider": "haystack",
+            "inner_class": type(self.generator).__name__,
+            "model": getattr(self.generator, "model", None),
+            "generation_kwargs": getattr(self.generator, "generation_kwargs", None),
+        }
+
     def is_finished(self, response: LLMResult) -> bool:
         return True
 

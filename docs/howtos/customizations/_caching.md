@@ -161,12 +161,50 @@ Cache hits occur when:
 - ✅ Same prompt/text (exact match)
 - ✅ Same model parameters (temperature, max_tokens, etc.)
 - ✅ Same response model/structure (for LLMs)
+- ✅ Same wrapper configuration (same provider, model, model arguments and system prompt)
 
 Cache misses occur when:
 
 - ❌ Different prompt/text
 - ❌ Different parameters
 - ❌ Different response model
+- ❌ Different provider, model, model arguments or system prompt
+
+### What partitions the cache
+
+One cache backend can safely be shared between several LLMs and embeddings. Each
+wrapper contributes its own configuration to the cache key, so two models never
+read each other's responses:
+
+```python
+cache = DiskCacheBackend()
+
+small = llm_factory("gpt-4o-mini", client=client, cache=cache)
+large = llm_factory("gpt-4o", client=client, cache=cache)
+
+# Same prompt, but each model is called and cached separately
+small.generate("Evaluate this text", Response)
+large.generate("Evaluate this text", Response)
+```
+
+The configuration that takes part in the key is chosen deliberately: the wrapper
+class, provider, model, model arguments and system prompt. Two wrappers that
+point at the same model still share cached responses, so building a fresh
+wrapper - or a fresh process - reuses the work done earlier.
+
+Some things are deliberately *not* part of the key:
+
+- The **client object**, so that recreating a client does not throw away the cache.
+- **Endpoint, deployment and credentials**. Two wrappers naming the same model on
+  different endpoints or Azure deployments currently share a namespace. If you need
+  them kept apart, give each one its own cache backend, or override
+  `_cache_identity()` on your wrapper to add the distinguishing field:
+
+```python
+class MyLLM(InstructorLLM):
+    def _cache_identity(self):
+        return {**super()._cache_identity(), "deployment": self.deployment}
+```
 
 ### Anti-Patterns (When NOT to Cache)
 

@@ -98,6 +98,20 @@ class OCIGenAIWrapper(BaseRagasLLM):
             )
         )
 
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Cache identity for the OCI Gen AI wrapper.
+
+        ``compartment_id`` and ``endpoint_id`` are excluded as deployment identity,
+        and ``_oci_config`` because it carries credentials (key files, fingerprints).
+        Both exclusions are deliberate - see issue #2983.
+        """
+        return {
+            "class": type(self).__name__,
+            "provider": "oci_genai",
+            "model": self.model_id,
+            "system_prompt": self.default_system_prompt,
+        }
+
     def _convert_prompt_to_messages(self, prompt: PromptValue) -> List[Dict[str, str]]:
         """Convert PromptValue to a list of role-aware messages for OCI.
 

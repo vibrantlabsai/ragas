@@ -30,6 +30,52 @@ def test_embeddings_cache_hit(tmp_path):
     assert emb1 == emb2
 
 
+def test_embeddings_cache_miss_different_model(tmp_path):
+    """Different embedding models sharing a backend must not collide (#2983).
+
+    The cache decorator wraps a bound method, so the model name only reaches the
+    cache key via the explicit cache identity. Without it the second model reads
+    the first model's vector and its client is never called.
+    """
+    cache = DiskCacheBackend(cache_dir=str(tmp_path / "cache"))
+
+    small_client = MagicMock()
+    small_client.embeddings.create.return_value = MagicMock(
+        data=[MagicMock(embedding=[0.1, 0.2, 0.3])]
+    )
+    large_client = MagicMock()
+    large_client.embeddings.create.return_value = MagicMock(
+        data=[MagicMock(embedding=[0.9, 0.8, 0.7])]
+    )
+
+    small = embedding_factory(
+        "openai",
+        client=small_client,
+        model="text-embedding-3-small",
+        cache=cache,
+    )
+    large = embedding_factory(
+        "openai",
+        client=large_client,
+        model="text-embedding-3-large",
+        cache=cache,
+    )
+
+    emb_small = small.embed_text("shared text")
+    emb_large = large.embed_text("shared text")
+
+    assert small_client.embeddings.create.call_count == 1
+    assert large_client.embeddings.create.call_count == 1, (
+        "the second model must execute rather than reuse the first model's vector"
+    )
+    assert emb_small == [0.1, 0.2, 0.3]
+    assert emb_large == [0.9, 0.8, 0.7]
+
+    # the first model still gets a cache hit on a repeat call
+    assert small.embed_text("shared text") == emb_small
+    assert small_client.embeddings.create.call_count == 1
+
+
 def test_embeddings_cache_miss_different_text(tmp_path):
     """Test that different texts don't hit cache."""
     cache = DiskCacheBackend(cache_dir=str(tmp_path / "cache"))

@@ -74,8 +74,35 @@ class BaseRagasLLM(ABC):
     def __post_init__(self):
         # If a cache_backend is provided, wrap the implementation methods at construction time.
         if self.cache is not None:
-            self.generate_text = cacher(cache_backend=self.cache)(self.generate_text)
-            self.agenerate_text = cacher(cache_backend=self.cache)(self.agenerate_text)
+            self.generate_text = cacher(
+                cache_backend=self.cache, cache_identity=self._cache_identity
+            )(self.generate_text)
+            self.agenerate_text = cacher(
+                cache_backend=self.cache, cache_identity=self._cache_identity
+            )(self.agenerate_text)
+
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Configuration that must partition this wrapper's cache entries.
+
+        The cache decorator is applied to bound methods, so ``self`` never reaches
+        the cache key on its own. Without this, two wrappers of the same class that
+        differ only in which model they call would share cache entries.
+
+        Only the fields listed here take part in the key - the selection is
+        deliberate, not introspected. Subclasses should override this and extend it
+        with their own output-relevant configuration, e.g.::
+
+            def _cache_identity(self):
+                return {**super()._cache_identity(), "deployment": self.deployment}
+
+        Must not contain per-call or mutable state: a value that changes between
+        calls would prevent the cache from ever hitting.
+        """
+        return {
+            "class": type(self).__name__,
+            "provider": getattr(self, "provider", None),
+            "model": getattr(self, "model", None),
+        }
 
     def set_run_config(self, run_config: RunConfig):
         self.run_config = run_config
@@ -185,6 +212,29 @@ class LangchainLLMWrapper(BaseRagasLLM):
         self.bypass_temperature = bypass_temperature
         # Certain reasoning LLMs (e.g., OpenAI o1 series) do not support n parameter for
         self.bypass_n = bypass_n
+
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Cache identity derived from the wrapped langchain LLM.
+
+        This class holds no ``model``/``provider`` of its own, so the model name is
+        read off the wrapped LLM using the same attribute fallback that the usage
+        tracking in ``generate_text`` already relies on.
+
+        ``temperature`` and ``n`` are deliberately excluded: ``generate_text`` and
+        ``agenerate_text`` mutate them on ``self.langchain_llm`` per call (and ``n``
+        is never restored), so including either would change the key after every
+        call. Both already reach the key as explicit call arguments.
+        """
+        inner = self.langchain_llm
+        return {
+            "class": type(self).__name__,
+            "provider": "langchain",
+            "inner_class": type(inner).__name__,
+            "model": getattr(inner, "model_name", None)
+            or getattr(inner, "model", None),
+            "bypass_temperature": self.bypass_temperature,
+            "bypass_n": self.bypass_n,
+        }
 
     def is_finished(self, response: LLMResult) -> bool:
         """
@@ -405,6 +455,21 @@ class LlamaIndexLLMWrapper(BaseRagasLLM):
         if run_config is None:
             run_config = RunConfig()
         self.set_run_config(run_config)
+
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Cache identity derived from the wrapped LlamaIndex LLM.
+
+        Reads the plain ``model`` attribute rather than ``llm.metadata.model_name``:
+        ``metadata`` is a provider-defined property and is not guaranteed to be
+        side-effect free.
+        """
+        return {
+            "class": type(self).__name__,
+            "provider": "llamaindex",
+            "inner_class": type(self.llm).__name__,
+            "model": getattr(self.llm, "model", None),
+            "bypass_temperature": self.bypass_temperature,
+        }
 
     def check_args(
         self,
@@ -787,6 +852,29 @@ class InstructorModelArgs(BaseModel):
 class InstructorBaseRagasLLM(ABC):
     """Base class for LLMs using the Instructor library pattern."""
 
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Configuration that must partition this wrapper's cache entries.
+
+        The cache decorator is applied to bound methods, so ``self`` never reaches
+        the cache key on its own. Without this, two wrappers of the same class that
+        differ only in which model they call would share cache entries.
+
+        Only the fields listed here take part in the key - the selection is
+        deliberate, not introspected. ``client`` is excluded because its repr is
+        unstable across processes and it holds credentials; ``is_async`` is excluded
+        because the transport does not change the response.
+
+        Must not contain per-call or mutable state: a value that changes between
+        calls would prevent the cache from ever hitting.
+        """
+        return {
+            "class": type(self).__name__,
+            "provider": getattr(self, "provider", None),
+            "model": getattr(self, "model", None),
+            "model_args": getattr(self, "model_args", None),
+            "system_prompt": getattr(self, "system_prompt", None),
+        }
+
     @abstractmethod
     def generate(
         self, prompt: str, response_model: t.Type[InstructorTypeVar]
@@ -841,8 +929,12 @@ class InstructorLLM(InstructorBaseRagasLLM):
         self.is_async = self._check_client_async()
 
         if self.cache is not None:
-            self.generate = cacher(cache_backend=self.cache)(self.generate)  # type: ignore
-            self.agenerate = cacher(cache_backend=self.cache)(self.agenerate)  # type: ignore
+            self.generate = cacher(  # type: ignore
+                cache_backend=self.cache, cache_identity=self._cache_identity
+            )(self.generate)
+            self.agenerate = cacher(  # type: ignore
+                cache_backend=self.cache, cache_identity=self._cache_identity
+            )(self.agenerate)
 
     def _map_provider_params(self) -> t.Dict[str, t.Any]:
         """Route to provider-specific parameter mapping.

@@ -52,8 +52,12 @@ class LiteLLMStructuredLLM(InstructorBaseRagasLLM):
         self.is_async = self._check_client_async()
 
         if self.cache is not None:
-            self.generate = cacher(cache_backend=self.cache)(self.generate)  # type: ignore
-            self.agenerate = cacher(cache_backend=self.cache)(self.agenerate)  # type: ignore
+            self.generate = cacher(  # type: ignore
+                cache_backend=self.cache, cache_identity=self._cache_identity
+            )(self.generate)
+            self.agenerate = cacher(  # type: ignore
+                cache_backend=self.cache, cache_identity=self._cache_identity
+            )(self.agenerate)
 
     def _check_client_async(self) -> bool:
         """Determine if the client is async-capable.

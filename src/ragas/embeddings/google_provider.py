@@ -70,6 +70,21 @@ class GoogleEmbeddings(BaseRagasEmbedding):
         # Resolve the actual client to use
         self.client = self._resolve_client(client, use_vertex)
 
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Cache identity for Google embeddings.
+
+        ``project_id`` and ``location`` are excluded: they identify a deployment
+        rather than the model, and deployment partitioning is deliberately left
+        out of scope pending a maintainer decision (see issue #2983).
+        """
+        return {
+            "class": type(self).__name__,
+            "provider": self.PROVIDER_NAME,
+            "model": self.model,
+            "use_vertex": self.use_vertex,
+            "kwargs": self.kwargs,
+        }
+
     def _resolve_client(self, client: t.Optional[t.Any], use_vertex: bool) -> t.Any:
         """Resolve the client to use for embeddings.
 

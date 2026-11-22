@@ -44,8 +44,33 @@ class BaseRagasEmbedding(ABC):
         self.cache = cache
 
         if self.cache is not None:
-            self.embed_text = cacher(cache_backend=self.cache)(self.embed_text)
-            self.aembed_text = cacher(cache_backend=self.cache)(self.aembed_text)
+            self.embed_text = cacher(
+                cache_backend=self.cache, cache_identity=self._cache_identity
+            )(self.embed_text)
+            self.aembed_text = cacher(
+                cache_backend=self.cache, cache_identity=self._cache_identity
+            )(self.aembed_text)
+
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Configuration that must partition this embedding's cache entries.
+
+        The cache decorator is applied to bound methods, so ``self`` never reaches
+        the cache key on its own. Without this, two embeddings of the same class
+        that differ only in which model they call would share cache entries.
+
+        Only the fields listed here take part in the key - the selection is
+        deliberate, not introspected. Subclasses should override this and extend it
+        with their own output-relevant configuration. The client is excluded so that
+        two instances pointing at the same model still share cached vectors.
+
+        Must not contain per-call or mutable state: a value that changes between
+        calls would prevent the cache from ever hitting.
+        """
+        return {
+            "class": type(self).__name__,
+            "provider": getattr(self, "PROVIDER_NAME", None),
+            "model": getattr(self, "model", None),
+        }
 
     @abstractmethod
     def embed_text(self, text: str, **kwargs: t.Any) -> t.List[float]:
@@ -198,14 +223,38 @@ class BaseRagasEmbeddings(Embeddings, ABC):
         super().__init__()
         self.cache = cache
         if self.cache is not None:
-            self.embed_query = cacher(cache_backend=self.cache)(self.embed_query)
-            self.embed_documents = cacher(cache_backend=self.cache)(
-                self.embed_documents
-            )
-            self.aembed_query = cacher(cache_backend=self.cache)(self.aembed_query)
-            self.aembed_documents = cacher(cache_backend=self.cache)(
-                self.aembed_documents
-            )
+            self.embed_query = cacher(
+                cache_backend=self.cache, cache_identity=self._cache_identity
+            )(self.embed_query)
+            self.embed_documents = cacher(
+                cache_backend=self.cache, cache_identity=self._cache_identity
+            )(self.embed_documents)
+            self.aembed_query = cacher(
+                cache_backend=self.cache, cache_identity=self._cache_identity
+            )(self.aembed_query)
+            self.aembed_documents = cacher(
+                cache_backend=self.cache, cache_identity=self._cache_identity
+            )(self.aembed_documents)
+
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Configuration that must partition this embedding's cache entries.
+
+        The cache decorator is applied to bound methods, so ``self`` never reaches
+        the cache key on its own. Without this, two embeddings of the same class
+        that differ only in which model they call would share cache entries.
+
+        Only the fields listed here take part in the key - the selection is
+        deliberate, not introspected. Subclasses should override this and extend it
+        with their own output-relevant configuration.
+
+        Must not contain per-call or mutable state: a value that changes between
+        calls would prevent the cache from ever hitting.
+        """
+        return {
+            "class": type(self).__name__,
+            "provider": getattr(self, "provider", None),
+            "model": getattr(self, "model", None),
+        }
 
     async def embed_text(self, text: str, is_async=True) -> t.List[float]:
         """
@@ -294,6 +343,20 @@ class LangchainEmbeddingsWrapper(BaseRagasEmbeddings):
         if run_config is None:
             run_config = RunConfig()
         self.set_run_config(run_config)
+
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Cache identity derived from the wrapped langchain embeddings.
+
+        ``dimensions`` is included because it changes the returned vector for
+        providers that support it; ``getattr`` keeps it harmless elsewhere.
+        """
+        return {
+            "class": type(self).__name__,
+            "provider": "langchain",
+            "inner_class": type(self.embeddings).__name__,
+            "model": getattr(self.embeddings, "model", None),
+            "dimensions": getattr(self.embeddings, "dimensions", None),
+        }
 
     def embed_query(self, text: str) -> t.List[float]:
         """
@@ -480,7 +543,28 @@ class HuggingfaceEmbeddings(BaseRagasEmbeddings):
             self.encode_kwargs["convert_to_tensor"] = True
 
         if self.cache is not None:
-            self.predict = cacher(cache_backend=self.cache)(self.predict)
+            self.predict = cacher(
+                cache_backend=self.cache, cache_identity=self._cache_identity
+            )(self.predict)
+
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Cache identity for the local sentence-transformers model.
+
+        Uses ``model_name`` rather than the inherited ``model``, which here holds a
+        loaded ``SentenceTransformer``/``CrossEncoder`` object rather than a name.
+
+        ``cache_folder`` is excluded on purpose: it is a machine-local download
+        path, so including it would make cache keys non-portable between machines
+        without changing what the model returns.
+        """
+        return {
+            "class": type(self).__name__,
+            "provider": "huggingface",
+            "model": self.model_name,
+            "model_kwargs": self.model_kwargs,
+            "encode_kwargs": self.encode_kwargs,
+            "is_cross_encoder": getattr(self, "is_cross_encoder", None),
+        }
 
     def embed_query(self, text: str) -> t.List[float]:
         """
@@ -584,6 +668,15 @@ class LlamaIndexEmbeddingsWrapper(BaseRagasEmbeddings):
         if run_config is None:
             run_config = RunConfig()
         self.set_run_config(run_config)
+
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Cache identity derived from the wrapped LlamaIndex embeddings."""
+        return {
+            "class": type(self).__name__,
+            "provider": "llamaindex",
+            "inner_class": type(self.embeddings).__name__,
+            "model": getattr(self.embeddings, "model_name", None),
+        }
 
     def embed_query(self, text: str) -> t.List[float]:
         return self.embeddings.get_query_embedding(text)

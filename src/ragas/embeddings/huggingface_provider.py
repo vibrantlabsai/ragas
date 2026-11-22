@@ -43,6 +43,22 @@ class HuggingFaceEmbeddings(BaseRagasEmbedding):
         else:
             self._setup_local_model()
 
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Cache identity for HuggingFace embeddings.
+
+        ``api_key`` is excluded as a credential. ``device`` and ``batch_size`` are
+        excluded because they affect only how the work is executed, not the
+        resulting vectors.
+        """
+        return {
+            "class": type(self).__name__,
+            "provider": self.PROVIDER_NAME,
+            "model": self.model,
+            "use_api": self.use_api,
+            "normalize_embeddings": self.normalize_embeddings,
+            "model_kwargs": self.model_kwargs,
+        }
+
     def _setup_api_client(self):
         """Setup HuggingFace API client."""
         try:

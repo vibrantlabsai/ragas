@@ -100,6 +100,20 @@ class HaystackEmbeddingsWrapper(BaseRagasEmbeddings):
             run_config = RunConfig()
         self.set_run_config(run_config)
 
+    def _cache_identity(self) -> t.Dict[str, t.Any]:
+        """Cache identity derived from the wrapped Haystack embedder.
+
+        Azure embedders identify their model by ``azure_deployment`` instead of
+        ``model``; deployment identity is deliberately out of scope (issue #2983),
+        so such wrappers still partition only by embedder class.
+        """
+        return {
+            "class": type(self).__name__,
+            "provider": "haystack",
+            "inner_class": type(self.embedder).__name__,
+            "model": getattr(self.embedder, "model", None),
+        }
+
     def embed_query(self, text: str) -> t.List[float]:
         result = self.embedder.run(text=text)  # type: ignore[reportAttributeAccessIssue]
         embedding = result["embedding"]

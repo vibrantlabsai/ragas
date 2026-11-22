@@ -3,14 +3,24 @@ import hashlib
 import inspect
 import json
 import logging
+import re
 import sys
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, Callable, Dict, Mapping, Optional, Union
 
 from pydantic import BaseModel, GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
 
 logger = logging.getLogger(__name__)
+
+#: An explicit cache namespace: deliberately selected configuration values that
+#: must partition cache entries.
+CacheIdentity = Mapping[str, Any]
+
+#: Either a cache identity, or a zero-argument callable returning one. The
+#: callable form exists because callers wrap bound methods during ``__init__``,
+#: before the attributes that make up the identity have been assigned.
+CacheIdentityProvider = Union[CacheIdentity, Callable[[], CacheIdentity]]
 
 
 class CacheInterface(ABC):
@@ -147,6 +157,62 @@ def _make_hashable(o):
 
 EXCLUDE_KEYS = ["callbacks"]
 
+# Matches the address in a default object repr, e.g. "<httpx.Client object at 0x7f...>".
+_OBJ_REPR_RE = re.compile(r" object at 0x[0-9a-fA-F]+>")
+
+
+def _stable_identity_value(o):
+    """Normalise a cache identity value so it hashes the same in every process.
+
+    Identity values reach the cache key through ``json.dumps(default=str)``. An
+    object without a custom ``__repr__`` serialises to something like
+    ``<httpx.Client object at 0x7f9c1a2b3c40>``, whose address differs on every
+    run - so the key would change every process and the cache would never hit
+    again. Such values are replaced by their stable type name instead.
+
+    This is applied only to identities, never to call arguments, so the key
+    format for callers that supply no identity is unaffected.
+    """
+    if isinstance(o, (str, int, float, bool, type(None))):
+        return o
+    if isinstance(o, Mapping):
+        return {k: _stable_identity_value(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_stable_identity_value(e) for e in o]
+
+    text = repr(o)
+    if _OBJ_REPR_RE.search(text):
+        stable = f"{type(o).__module__}.{type(o).__qualname__}"
+        logger.debug(
+            "Cache identity value with an unstable repr replaced by %s", stable
+        )
+        return stable
+    return text
+
+
+def _resolve_cache_identity(
+    cache_identity: Optional[CacheIdentityProvider],
+) -> Optional[Dict[str, Any]]:
+    """Resolve a cache identity to a plain mapping, or None when absent or empty.
+
+    The provider is resolved on *every* cached call, by design. Wrappers pass a
+    bound method (e.g. ``self._cache_identity``) while still inside ``__init__``,
+    before the attributes it reads have been assigned - resolving it eagerly at
+    decoration time would raise ``AttributeError``. Do not "optimise" this into a
+    single up-front call.
+
+    An empty identity is treated as absent so that the generated key stays
+    byte-identical to the format used before identities existed.
+    """
+    if cache_identity is None:
+        return None
+
+    identity = cache_identity() if callable(cache_identity) else cache_identity
+    if not identity:
+        return None
+
+    return {k: _stable_identity_value(v) for k, v in identity.items()}
+
 
 def _make_pydantic_picklable(obj: Any) -> Any:
     """Make Pydantic models returned by instructor library picklable.
@@ -181,21 +247,33 @@ def _make_pydantic_picklable(obj: Any) -> Any:
     return obj
 
 
-def _generate_cache_key(func, args, kwargs):
+def _generate_cache_key(func, args, kwargs, cache_identity=None):
     filtered_kwargs = {k: v for k, v in kwargs.items() if k not in EXCLUDE_KEYS}
 
+    # This dict must stay byte-identical to the pre-identity format whenever no
+    # identity is supplied: existing on-disk caches are keyed by its hash.
     key_data = {
         "function": func.__qualname__,
         "args": _make_hashable(args),
         "kwargs": _make_hashable(filtered_kwargs),
     }
 
+    # Deliberately a conditional insert. Adding "cache_identity": None
+    # unconditionally would, under sort_keys=True, put `"cache_identity": null`
+    # into the serialised string and re-key every existing cache entry.
+    identity = _resolve_cache_identity(cache_identity)
+    if identity is not None:
+        key_data["cache_identity"] = _make_hashable(identity)
+
     key_string = json.dumps(key_data, sort_keys=True, default=str)
     cache_key = hashlib.sha256(key_string.encode("utf-8")).hexdigest()
     return cache_key
 
 
-def cacher(cache_backend: Optional[CacheInterface] = None):
+def cacher(
+    cache_backend: Optional[CacheInterface] = None,
+    cache_identity: Optional[CacheIdentityProvider] = None,
+):
     """Decorator that adds caching functionality to a function.
 
     This decorator can be applied to both synchronous and asynchronous functions to cache their results.
@@ -204,9 +282,30 @@ def cacher(cache_backend: Optional[CacheInterface] = None):
     Args:
         cache_backend (Optional[CacheInterface]): The cache backend to use for storing results.
             If None, caching is disabled.
+        cache_identity (Optional[CacheIdentityProvider]): An explicit cache namespace,
+            given either as a mapping of deliberately selected configuration values or
+            as a zero-argument callable returning one.
+
+            This is needed when caching a *bound method*, because the bound instance
+            never appears in ``args`` and so instance configuration cannot otherwise
+            reach the cache key. Two objects of the same class that differ only in,
+            say, which model they call would otherwise share cache entries.
+
+            The callable form is resolved on every call, which makes it safe to pass a
+            bound method (``self._cache_identity``) from inside ``__init__`` before the
+            attributes it reads exist.
+
+            When omitted, the generated key is identical to one produced without this
+            argument, so existing caches keep working. Pass ``{}`` to opt out
+            explicitly.
 
     Returns:
         Callable: A decorated function that implements caching behavior.
+
+    Note:
+        Exceptions raised while resolving ``cache_identity`` are propagated rather
+        than swallowed. Falling back to a key without the identity would silently
+        reintroduce cross-configuration cache collisions.
     """
 
     def decorator(func):
@@ -220,7 +319,7 @@ def cacher(cache_backend: Optional[CacheInterface] = None):
 
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
-            cache_key = _generate_cache_key(func, args, kwargs)
+            cache_key = _generate_cache_key(func, args, kwargs, cache_identity)
 
             if backend.has_key(cache_key):
                 logger.debug(f"Cache hit for {cache_key}")
@@ -233,7 +332,7 @@ def cacher(cache_backend: Optional[CacheInterface] = None):
 
         @functools.wraps(func)
         def sync_wrapper(*args, **kwargs):
-            cache_key = _generate_cache_key(func, args, kwargs)
+            cache_key = _generate_cache_key(func, args, kwargs, cache_identity)
 
             if backend.has_key(cache_key):
                 logger.debug(f"Cache hit for {cache_key}")
