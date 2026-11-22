@@ -257,6 +257,9 @@ extra_css:
 
 # Plugins
 extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/vibrantlabsai/ragas
   version:
     provider: mike
   analytics:
