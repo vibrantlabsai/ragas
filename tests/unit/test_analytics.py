@@ -6,6 +6,7 @@ import typing as t
 
 import numpy as np
 import pytest
+from langchain_core.embeddings import Embeddings
 from langchain_core.outputs import Generation, LLMResult
 from langchain_core.prompt_values import StringPromptValue as PromptValue
 
@@ -297,3 +298,43 @@ def test_analytics_batcher_flush(monkeypatch, evaluation_events, expected_num_ro
     assert flush_mock_call_count[0] == math.ceil(
         sum(expected_num_rows_set) / BATCH_SIZE
     )
+
+
+class _NonStringModelEmbeddings(Embeddings):
+    """A langchain embeddings whose ``.model`` is an object rather than a string.
+
+    This mirrors real backends such as ``langchain_community``'s
+    ``FastEmbedEmbeddings``, which store the loaded model object on ``.model``.
+    """
+
+    def __init__(self) -> None:
+        self.model = object()  # non-string, like fastembed's TextEmbedding instance
+
+    def embed_query(self, text: str) -> t.List[float]:
+        return [0.0, 1.0]
+
+    def embed_documents(self, texts: t.List[str]) -> t.List[t.List[float]]:
+        return [[0.0, 1.0] for _ in texts]
+
+
+def test_embedding_usage_telemetry_tolerates_nonstring_model(monkeypatch):
+    """Usage telemetry must never break embeddings when ``.model`` is not a string.
+
+    ``LangchainEmbeddingsWrapper`` logs an ``EmbeddingUsageEvent`` whose ``model``
+    field is typed ``Optional[str]``. When the wrapped embeddings expose a
+    non-string ``.model`` (e.g. fastembed), constructing that event raised a
+    Pydantic ``ValidationError``. Because the event is built as the argument to
+    ``track()``, the error escaped ``track``'s ``@silent`` guard and propagated,
+    silently turning the metric score into NaN.
+    """
+    from ragas._analytics import RAGAS_DO_NOT_TRACK
+    from ragas.embeddings import LangchainEmbeddingsWrapper
+
+    # The bug occurs while *constructing* the event, before the do-not-track check,
+    # so this reproduces it even with telemetry disabled (and avoids a network call).
+    monkeypatch.setenv(RAGAS_DO_NOT_TRACK, "true")
+
+    wrapper = LangchainEmbeddingsWrapper(_NonStringModelEmbeddings())
+
+    assert wrapper.embed_query("hello") == [0.0, 1.0]
+    assert wrapper.embed_documents(["a", "b"]) == [[0.0, 1.0], [0.0, 1.0]]
