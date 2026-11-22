@@ -10,12 +10,14 @@ from ragas.metrics.base import MetricType
 @pytest.fixture
 def mock_sacrebleu():
     """Mock sacrebleu corpus_chrf function."""
+    pytest.importorskip("sacrebleu")
     with patch("sacrebleu.corpus_chrf") as mock:
         yield mock
 
 
 def test_chrf_score_init_sacrebleu_import():
     """Test ChrfScore initialization with sacrebleu import."""
+    pytest.importorskip("sacrebleu")
     metric = ChrfScore()
     assert hasattr(metric, "corpus_chrf")
     assert metric.name == "chrf_score"
@@ -45,6 +47,7 @@ async def test_chrf_score_single_turn_ascore(mock_sacrebleu):
     score = await metric._single_turn_ascore(sample, None)
 
     assert isinstance(score, float)
+
     assert score == 0.80
     mock_sacrebleu.assert_called_once_with(
         ["The Eiffel Tower is located in India."],
@@ -58,12 +61,10 @@ async def test_chrf_score_single_turn_ascore_none_values(mock_sacrebleu):
     """Test single turn async score with None values."""
     metric = ChrfScore()
 
-    # Test with None reference
     sample = SingleTurnSample(reference=None, response="Hello there")
     score = await metric._single_turn_ascore(sample, None)
     assert score == 0.0
 
-    # Test with None response
     sample = SingleTurnSample(reference="Hello world", response=None)
     score = await metric._single_turn_ascore(sample, None)
     assert score == 0.0
@@ -74,12 +75,11 @@ async def test_chrf_score_ascore(mock_sacrebleu):
     """Test async score calculation from dictionary row."""
     metric = ChrfScore()
 
-    # Mock corpus_chrf to return a score object
     mock_sacrebleu.return_value.score = 75.0
 
     row = {"reference": "Hello world", "response": "Hello there"}
     score = await metric._ascore(row, None)
-
+    
     assert isinstance(score, float)
     assert score == 0.75
     mock_sacrebleu.assert_called_once_with(
