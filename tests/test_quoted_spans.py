@@ -48,3 +48,24 @@ def test_no_quotes_returns_zero_with_zero_denominator():
     result = quoted_spans_alignment(answers, sources)
     assert result["citation_alignment_quoted_spans"] == 0.0
     assert result["total"] == 0.0
+
+
+def test_curly_quotes_are_extracted():
+    """Spans in curly double and single quotes are counted like straight ones."""
+    answers = [
+        "Paris is “the capital of France”.",
+        "It is ‘the capital of France’.",
+    ]
+    sources = [["The capital of France is Paris."]] * 2
+    result = quoted_spans_alignment(answers, sources)
+    assert result["citation_alignment_quoted_spans"] == 1.0
+    assert result["total"] == 2.0
+
+
+def test_apostrophe_inside_double_quotes_does_not_end_the_span():
+    """An apostrophe inside a double-quoted span is part of the span."""
+    answers = ['The report says "it\'s the largest city in France".']
+    sources = [["Paris: it's the largest city in France."]]
+    result = quoted_spans_alignment(answers, sources)
+    assert result["citation_alignment_quoted_spans"] == 1.0
+    assert result["total"] == 1.0
