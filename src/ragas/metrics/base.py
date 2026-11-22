@@ -874,42 +874,58 @@ class SimpleLLMMetric(SimpleBaseMetric):
     def score(self, **kwargs) -> "MetricResult":
         from ragas.metrics.result import MetricResult
 
-        llm = kwargs.pop("llm")  # Extract llm from kwargs for compatibility
+        llm = kwargs.pop("llm", None)
+
+        if llm is None:
+            raise ValueError(
+                f"Metric '{self.name}' requires an LLM instance. "
+                "Pass it like: metric.score(llm=your_llm, ...)"
+            )
+
         traces = {}
         traces["input"] = kwargs
 
-        # get prompt
         if not self.prompt:
-            raise Exception("prompt not passed")
+            raise ValueError(f"Metric '{self.name}' has no prompt defined.")
+
         prompt_input = self.prompt.format(**kwargs)
 
         response = llm.generate(prompt_input, response_model=self._response_model)
         traces["output"] = response.model_dump()
+
         result = MetricResult(**response.model_dump())
         result.traces = traces
+
         return result
 
     async def ascore(self, **kwargs) -> "MetricResult":
         from ragas.metrics.result import MetricResult
 
-        llm = kwargs.pop("llm")  # Extract llm from kwargs for compatibility
-        traces = {}
+        llm = kwargs.pop("llm", None)
 
-        # get prompt
+        if llm is None:
+            raise ValueError(
+                f"Metric '{self.name}' requires an LLM instance. "
+                "Pass it like: await metric.ascore(llm=your_llm, ...)"
+            )
+
         if not self.prompt:
-            raise Exception("prompt not passed")
+            raise ValueError(f"Metric '{self.name}' has no prompt defined.")
+
         prompt_input = self.prompt.format(**kwargs)
 
-        traces["input"] = prompt_input
         response = await llm.agenerate(
             prompt_input,
             response_model=self._response_model,
         )
-        traces["output"] = response.model_dump()
-        result = MetricResult(**response.model_dump())  # Fixed missing parentheses
-        result.traces = traces
-        return result
 
+        result = MetricResult(**response.model_dump())
+        result.traces = {
+            "input": prompt_input,
+            "output": response.model_dump(),
+        }
+
+        return result
     def batch_score(
         self, inputs: t.List[t.Dict[str, t.Any]], **kwargs
     ) -> t.List["MetricResult"]:
