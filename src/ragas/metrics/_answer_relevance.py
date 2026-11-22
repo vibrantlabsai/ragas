@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import typing as t
 from dataclasses import dataclass, field
@@ -111,6 +112,39 @@ class ResponseRelevancy(MetricWithLLM, MetricWithEmbeddings, SingleTurnMetric):
             / norm
         )
 
+    async def acalculate_similarity(
+        self, question: str, generated_questions: list[str]
+    ):
+        assert self.embeddings is not None, (
+            f"Error: '{self.name}' requires embeddings to be set."
+        )
+        if hasattr(self.embeddings, "aembed_query") and hasattr(
+            self.embeddings, "aembed_documents"
+        ):
+            q_emb, gen_q_emb = await asyncio.gather(
+                self.embeddings.aembed_query(question),  # type: ignore[attr-defined]
+                self.embeddings.aembed_documents(generated_questions),  # type: ignore[attr-defined]
+            )
+            question_vec = np.asarray(q_emb).reshape(1, -1)
+            gen_question_vec = np.asarray(gen_q_emb).reshape(
+                len(generated_questions), -1
+            )
+        else:
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None, self.calculate_similarity, question, generated_questions
+            )
+
+        norm = np.linalg.norm(gen_question_vec, axis=1) * np.linalg.norm(
+            question_vec, axis=1
+        )
+        return (
+            np.dot(gen_question_vec, question_vec.T).reshape(
+                -1,
+            )
+            / norm
+        )
+
     def _calculate_score(
         self, answers: t.Sequence[ResponseRelevanceOutput], row: t.Dict
     ) -> float:
@@ -124,6 +158,23 @@ class ResponseRelevancy(MetricWithLLM, MetricWithEmbeddings, SingleTurnMetric):
             score = np.nan
         else:
             cosine_sim = self.calculate_similarity(question, gen_questions)
+            score = cosine_sim.mean() * int(not all_noncommittal)
+
+        return score
+
+    async def _acalculate_score(
+        self, answers: t.Sequence[ResponseRelevanceOutput], row: t.Dict
+    ) -> float:
+        question = row["user_input"]
+        gen_questions = [answer.question for answer in answers]
+        all_noncommittal = np.all([answer.noncommittal for answer in answers])
+        if all(q == "" for q in gen_questions):
+            logger.warning(
+                "Invalid JSON response. Expected dictionary with key 'question'"
+            )
+            score = np.nan
+        else:
+            cosine_sim = await self.acalculate_similarity(question, gen_questions)
             score = cosine_sim.mean() * int(not all_noncommittal)
 
         return score
@@ -143,7 +194,7 @@ class ResponseRelevancy(MetricWithLLM, MetricWithEmbeddings, SingleTurnMetric):
             data=prompt_input, llm=self.llm, callbacks=callbacks, n=self.strictness
         )
 
-        return self._calculate_score(responses, row)
+        return await self._acalculate_score(responses, row)
 
 
 class AnswerRelevancy(ResponseRelevancy):
