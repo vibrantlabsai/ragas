@@ -8,7 +8,9 @@ Following TDD approach: Write failing tests first, then implement the fix.
 """
 
 import typing as t
+import warnings
 
+import pydantic
 import pytest
 
 from ragas.metrics import MetricResult, discrete_metric, numeric_metric, ranking_metric
@@ -882,3 +884,96 @@ class TestIDESupport:
         score_result = test_metric.score(input_val="hello")
         assert isinstance(score_result, MetricResult)
         assert score_result.value == "yes"
+
+
+class TestDecoratorValidationFallback:
+    """Tests for fallback behavior when dynamic Pydantic model creation fails."""
+
+    @pytest.mark.asyncio
+    async def test_kwargs_preserved_when_pydantic_model_creation_fails(
+        self, monkeypatch
+    ):
+        """Test that kwargs are passed to the async function when model creation fails."""
+
+        def failing_create_model(*args, **kwargs):
+            raise ValueError("Simulated dynamic model creation failure")
+
+        import ragas.metrics.decorator as dec_mod
+
+        monkeypatch.setattr(dec_mod, "create_model", failing_create_model)
+        monkeypatch.setattr(pydantic, "create_model", failing_create_model)
+
+        @discrete_metric(name="test_fallback_async", allowed_values=["pass", "fail"])
+        async def my_metric(question: str) -> str:
+            return "pass" if question == "expected" else "fail"
+
+        with warnings.catch_warnings(record=True) as recorded_warnings:
+            warnings.simplefilter("always")
+            result = await my_metric.ascore(question="expected")
+
+        assert isinstance(result, MetricResult)
+        assert result.value == "pass"
+        assert result.reason is None
+
+        # Verify warning was emitted explaining the bypass
+        user_warnings = [
+            w for w in recorded_warnings if issubclass(w.category, UserWarning)
+        ]
+        assert any(
+            "Could not create validation model" in str(w.message)
+            and "without Pydantic validation" in str(w.message)
+            for w in user_warnings
+        )
+
+    def test_sync_score_path_also_preserves_kwargs(self, monkeypatch):
+        """Test that kwargs are preserved on synchronous score() when model creation fails."""
+
+        def failing_create_model(*args, **kwargs):
+            raise ValueError("Simulated dynamic model creation failure")
+
+        import ragas.metrics.decorator as dec_mod
+
+        monkeypatch.setattr(dec_mod, "create_model", failing_create_model)
+        monkeypatch.setattr(pydantic, "create_model", failing_create_model)
+
+        @discrete_metric(name="test_fallback_sync", allowed_values=["pass", "fail"])
+        def my_metric(question: str) -> str:
+            return "pass" if question == "expected" else "fail"
+
+        with warnings.catch_warnings(record=True) as recorded_warnings:
+            warnings.simplefilter("always")
+            result = my_metric.score(question="expected")
+
+        assert isinstance(result, MetricResult)
+        assert result.value == "pass"
+        assert result.reason is None
+
+        user_warnings = [
+            w for w in recorded_warnings if issubclass(w.category, UserWarning)
+        ]
+        assert any(
+            "Could not create validation model" in str(w.message)
+            and "without Pydantic validation" in str(w.message)
+            for w in user_warnings
+        )
+
+    def test_validation_model_creation_success_does_not_warn(self):
+        """Sanity check: when model creation succeeds, no fallback warning is emitted."""
+
+        @discrete_metric(name="test_normal", allowed_values=["pass", "fail"])
+        def my_metric(question: str) -> str:
+            return "pass" if question == "expected" else "fail"
+
+        with warnings.catch_warnings(record=True) as recorded_warnings:
+            warnings.simplefilter("always")
+            result = my_metric.score(question="expected")
+
+        assert isinstance(result, MetricResult)
+        assert result.value == "pass"
+
+        fallback_warnings = [
+            w
+            for w in recorded_warnings
+            if "Could not create validation model" in str(w.message)
+        ]
+        assert len(fallback_warnings) == 0
