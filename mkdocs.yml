@@ -65,6 +65,8 @@ nav:
                   - Simple Criteria Scoring: concepts/metrics/available_metrics/general_purpose/#simple-criteria-scoring
                   - Rubrics Based Scoring: concepts/metrics/available_metrics/general_purpose/#rubrics-based-criteria-scoring
                   - Instance Specific Rubrics Scoring: concepts/metrics/available_metrics/general_purpose/#instance-specific-rubrics-criteria-scoring
+              - Safety & Compliance:
+                  - Credential Safety: concepts/metrics/available_metrics/credential_safety.md
               - Other Tasks:
                   - Summarization: concepts/metrics/available_metrics/summarization_score.md
       - Test Data Generation:

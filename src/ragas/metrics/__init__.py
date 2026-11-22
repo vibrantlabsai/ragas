@@ -37,6 +37,12 @@ from ragas.metrics._context_recall import (
     NonLLMContextRecall as _NonLLMContextRecall,
     context_recall as _context_recall,
 )
+from ragas.metrics._credential_safety import (
+    CredentialSafety as _CredentialSafety,
+    SecretLeakage as _SecretLeakage,
+    credential_safety as _credential_safety,
+    secret_leakage as _secret_leakage,
+)
 from ragas.metrics._datacompy_score import DataCompyScore as _DataCompyScore
 from ragas.metrics._domain_specific_rubrics import RubricsScore as _RubricsScore
 from ragas.metrics._factual_correctness import FactualCorrectness as _FactualCorrectness
@@ -117,6 +123,10 @@ __all__ = [
     "discrete_metric",
     "numeric_metric",
     "ranking_metric",
+    "CredentialSafety",
+    "SecretLeakage",
+    "credential_safety",
+    "secret_leakage",
     # Note: Specific metric classes and instances are deprecated from this module
     # and should be imported from ragas.metrics.collections instead.
     # They remain accessible via __getattr__ for backwards compatibility.
@@ -143,6 +153,10 @@ _DEPRECATED_METRICS = {
     "context_recall": _context_recall,
     "ContextRelevance": _ContextRelevance,
     "ContextUtilization": _ContextUtilization,
+    "CredentialSafety": _CredentialSafety,
+    "credential_safety": _credential_safety,
+    "SecretLeakage": _SecretLeakage,
+    "secret_leakage": _secret_leakage,
     "DataCompyScore": _DataCompyScore,
     "DistanceMeasure": _DistanceMeasure,
     "ExactMatch": _ExactMatch,

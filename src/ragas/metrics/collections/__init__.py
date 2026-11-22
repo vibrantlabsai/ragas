@@ -1,5 +1,6 @@
 """Collections of metrics using modern component architecture."""
 
+from ragas.metrics._credential_safety import CredentialSafety, SecretLeakage
 from ragas.metrics.collections._bleu_score import BleuScore
 from ragas.metrics.collections._rouge_score import RougeScore
 from ragas.metrics.collections._semantic_similarity import SemanticSimilarity
@@ -63,6 +64,8 @@ __all__ = [
     "ContextPrecisionWithoutReference",
     "ContextRelevance",
     "ContextUtilization",
+    "CredentialSafety",
+    "SecretLeakage",
     "DistanceMeasure",
     "ExactMatch",
     "FactualCorrectness",
