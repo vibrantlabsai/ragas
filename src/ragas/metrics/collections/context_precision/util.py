@@ -29,6 +29,10 @@ class ContextPrecisionPrompt(BasePrompt[ContextPrecisionInput, ContextPrecisionO
     output_model = ContextPrecisionOutput
 
     instruction = 'Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output.'
+    # Override https client settings to disable SSL verification for self-signed certs
+    # Users can also pass a custom http_client via the LLM wrapper.
+    # This ensures internal prompt calls also honor verify=False if set externally.
+    default_http_client_kwargs = {"verify": False}
 
     examples = [
         (
