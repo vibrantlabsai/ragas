@@ -123,8 +123,9 @@ class LLMContextPrecisionWithReference(MetricWithLLM, SingleTurnMetric):
             if v:
                 numerator += cumsum / (i + 1)
 
-        denominator = cumsum + 1e-10
-        score = numerator / denominator
+        # Guard zero-relevant only; unconditional 1e-10 made perfect rankings
+        # score 0.9999999999 instead of 1.0.
+        score = numerator / cumsum if cumsum else 0.0
         if np.isnan(score):
             logger.warning(
                 "Invalid response format. Expected a list of dictionaries with keys 'verdict'"
@@ -242,9 +243,8 @@ class NonLLMContextPrecisionWithReference(SingleTurnMetric):
             if v:
                 numerator += cumsum / (i + 1)
 
-        denominator = cumsum + 1e-10
-        score = numerator / denominator
-        return score
+        # Guard zero-relevant only so a perfect ranking can score exactly 1.0.
+        return numerator / cumsum if cumsum else 0.0
 
 
 @dataclass

@@ -46,7 +46,7 @@ print(f"Context Precision Score: {result.value}")
 
 Output:
 ```
-Context Precision Score: 0.9999999999
+Context Precision Score: 1.0
 ```
 
 !!! note "Synchronous Usage"
@@ -90,7 +90,7 @@ print(f"Context Utilization Score: {result.value}")
 
 Output:
 ```
-Context Utilization Score: 0.9999999999
+Context Utilization Score: 1.0
 ```
 
 Note that even if an irrelevant chunk is present at the second position in the array, context precision remains the same. However, if this irrelevant chunk is placed at the first position, context precision reduces:
@@ -138,12 +138,12 @@ await context_precision.single_turn_ascore(sample)
 
 Output:
 ```
-0.9999999999
+1.0
 ```
 
 ### Context Precision without reference
 
-The `LLMContextPrecisionWithoutReference` metric can be used without the availability of a reference answer. To estimate if the retrieved contexts are relevant, this method uses the LLM to compare each chunk in `retrieved_contexts` with the `response`.
+The `LLMContextPrecisionWithoutReference` metric can be used when you have `user_input`, `response`, and `retrieved_contexts` — **without** a reference answer or reference contexts. To estimate whether each retrieved chunk is relevant, the LLM compares the chunk against the generated `response` (not against gold contexts).
 
 #### Example
 
@@ -164,7 +164,7 @@ await context_precision.single_turn_ascore(sample)
 
 Output:
 ```
-0.9999999999
+1.0
 ```
 
 ### Context Precision with reference
@@ -190,7 +190,7 @@ await context_precision.single_turn_ascore(sample)
 
 Output:
 ```
-0.9999999999
+1.0
 ```
 
 ## Non LLM Based Context Precision
@@ -224,7 +224,7 @@ await context_precision.single_turn_ascore(sample)
 
 Output:
 ```
-0.9999999999
+1.0
 ```
 
 ## ID Based Context Precision
