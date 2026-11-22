@@ -115,14 +115,14 @@ class EvaluatorChain(Chain, RunEvaluator):
 
         self._validate(inputs)
         _run_manager = run_manager or AsyncCallbackManagerForChainRun.get_noop_manager()
-        # TODO: currently AsyncCallbacks are not supported in ragas
-        _run_manager.get_child()
+        
+        callbacks = _run_manager.get_child()
         assert isinstance(self.metric, SingleTurnMetric), (
             "Metric must be SingleTurnMetric"
         )
         score = await self.metric.single_turn_ascore(
             inputs,
-            callbacks=[],
+            callbacks=callbacks,
         )
         return {self.metric.name: score}
 
