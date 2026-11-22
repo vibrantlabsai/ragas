@@ -84,6 +84,12 @@ class LLMContextPrecisionWithReference(MetricWithLLM, SingleTurnMetric):
     Average Precision is a metric that evaluates whether all of the
     relevant items selected by the model are ranked higher or not.
 
+    This is the LLM-based context precision metric that requires a reference
+    answer: the LLM verifies whether each context in `retrieved_contexts`
+    was useful in arriving at the given `reference`, and the verdicts are
+    aggregated into an average precision score. Requires the `user_input`,
+    `retrieved_contexts` and `reference` columns.
+
     Attributes
     ----------
     name : str
@@ -172,6 +178,17 @@ class LLMContextPrecisionWithReference(MetricWithLLM, SingleTurnMetric):
 
 @dataclass
 class LLMContextPrecisionWithoutReference(LLMContextPrecisionWithReference):
+    """
+    Average Precision is a metric that evaluates whether all of the
+    relevant items selected by the model are ranked higher or not.
+
+    This is the LLM-based context precision metric that works without a
+    reference answer: instead of comparing against a `reference`, the LLM
+    verifies whether each context in `retrieved_contexts` was useful in
+    arriving at the given `response`. Requires the `user_input`, `response`
+    and `retrieved_contexts` columns - no reference is needed.
+    """
+
     name: str = "llm_context_precision_without_reference"
     _required_columns: t.Dict[MetricType, t.Set[str]] = field(
         default_factory=lambda: {
@@ -309,6 +326,14 @@ class IDBasedContextPrecision(SingleTurnMetric):
 
 @dataclass
 class ContextPrecision(LLMContextPrecisionWithReference):
+    """
+    Context Precision with the legacy metric name.
+
+    Alias of `LLMContextPrecisionWithReference` that keeps the
+    `context_precision` name for backwards compatibility. Requires the
+    `user_input`, `retrieved_contexts` and `reference` columns.
+    """
+
     name: str = "context_precision"
 
     async def _single_turn_ascore(
@@ -319,6 +344,15 @@ class ContextPrecision(LLMContextPrecisionWithReference):
 
 @dataclass
 class ContextUtilization(LLMContextPrecisionWithoutReference):
+    """
+    Context Utilization with the legacy metric name.
+
+    Alias of `LLMContextPrecisionWithoutReference` that keeps the
+    `context_utilization` name for backwards compatibility. Requires the
+    `user_input`, `response` and `retrieved_contexts` columns - no
+    reference is needed.
+    """
+
     name: str = "context_utilization"
 
     async def _single_turn_ascore(
