@@ -51,6 +51,27 @@ class PersonaGenerationPrompt(PydanticPrompt[StringIO, Persona]):
 class PersonaList(BaseModel):
     personas: t.List[Persona]
 
+    @staticmethod
+    def _normalize_name(name: str) -> str:
+        """Normalize a persona name for case/whitespace-insensitive matching."""
+        return " ".join(name.split()).casefold()
+
+    def get(self, key: str, default: t.Optional[Persona] = None) -> t.Optional[Persona]:
+        """Return the persona whose name matches ``key``, or ``default`` if none.
+
+        Unlike ``__getitem__``, this never raises. It first tries an exact name
+        match and then falls back to a case- and whitespace-insensitive match, so
+        a persona name that an LLM has lightly reformatted still resolves.
+        """
+        for persona in self.personas:
+            if persona.name == key:
+                return persona
+        normalized_key = self._normalize_name(key)
+        for persona in self.personas:
+            if self._normalize_name(persona.name) == normalized_key:
+                return persona
+        return default
+
     def __getitem__(self, key: str) -> Persona:
         for persona in self.personas:
             if persona.name == key:

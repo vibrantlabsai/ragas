@@ -66,11 +66,11 @@ class MultiHopQuerySynthesizer(BaseSynthesizer[Scenario]):
             valid_personas = []
             for persona, concept_list in persona_item_mapping.items():
                 concept_list = [c.lower() for c in concept_list]
-                if (
-                    any(concept.lower() in concept_list for concept in combination)
-                    and persona_list[persona]
+                matched_persona = persona_list.get(persona)
+                if matched_persona is not None and any(
+                    concept.lower() in concept_list for concept in combination
                 ):
-                    valid_personas.append(persona_list[persona])
+                    valid_personas.append(matched_persona)
             dict["personas"] = valid_personas
             valid_nodes = []
             for node in nodes:
