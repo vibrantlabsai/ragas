@@ -26,6 +26,30 @@ if t.TYPE_CHECKING:
 DEFAULT_MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
 
+def _get_model_name(embeddings: t.Any) -> t.Optional[str]:
+    """Best-effort, telemetry-safe model name for an embeddings object.
+
+    Some providers (e.g. ``langchain_community``'s ``FastEmbedEmbeddings``) store
+    the loaded model *object* on ``.model`` rather than a string.
+    ``EmbeddingUsageEvent.model`` is typed ``Optional[str]`` and Pydantic
+    validates it at construction time — which happens before the ``@silent``
+    ``track()`` guard runs — so a non-string ``.model`` would raise a
+    ``ValidationError`` out of the embed call and silently NaN the metric.
+    Coerce to a readable string (or ``None``) so usage telemetry can never break
+    an embed call.
+    """
+    model = getattr(embeddings, "model", None)
+    if model is None or isinstance(model, str):
+        return model
+    # Non-string model object: prefer a stable, human-readable identifier over
+    # the default object repr (which includes a memory address).
+    for attr in ("model_name", "name"):
+        value = getattr(model, attr, None)
+        if isinstance(value, str):
+            return value
+    return type(model).__name__
+
+
 class BaseRagasEmbedding(ABC):
     """Modern abstract base class for Ragas embedding implementations.
 
@@ -305,7 +329,7 @@ class LangchainEmbeddingsWrapper(BaseRagasEmbeddings):
         track(
             EmbeddingUsageEvent(
                 provider="langchain",
-                model=getattr(self.embeddings, "model", None),
+                model=_get_model_name(self.embeddings),
                 embedding_type="legacy",
                 num_requests=1,
                 is_async=False,
@@ -323,7 +347,7 @@ class LangchainEmbeddingsWrapper(BaseRagasEmbeddings):
         track(
             EmbeddingUsageEvent(
                 provider="langchain",
-                model=getattr(self.embeddings, "model", None),
+                model=_get_model_name(self.embeddings),
                 embedding_type="legacy",
                 num_requests=len(texts),
                 is_async=False,
@@ -341,7 +365,7 @@ class LangchainEmbeddingsWrapper(BaseRagasEmbeddings):
         track(
             EmbeddingUsageEvent(
                 provider="langchain",
-                model=getattr(self.embeddings, "model", None),
+                model=_get_model_name(self.embeddings),
                 embedding_type="legacy",
                 num_requests=1,
                 is_async=True,
@@ -359,7 +383,7 @@ class LangchainEmbeddingsWrapper(BaseRagasEmbeddings):
         track(
             EmbeddingUsageEvent(
                 provider="langchain",
-                model=getattr(self.embeddings, "model", None),
+                model=_get_model_name(self.embeddings),
                 embedding_type="legacy",
                 num_requests=len(texts),
                 is_async=True,
