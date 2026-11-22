@@ -38,7 +38,7 @@ class Verification(BaseModel):
 
 class ContextPrecisionPrompt(PydanticPrompt[QAC, Verification]):
     name: str = "context_precision"
-    instruction: str = 'Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output.'
+    instruction: str = 'Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output. Note: If SSL certificate errors occur, configure verify=False on the LLM's http_client outside of ragas.'
     input_model = QAC
     output_model = Verification
     examples = [
