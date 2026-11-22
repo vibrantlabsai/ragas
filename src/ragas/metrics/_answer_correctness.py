@@ -9,11 +9,8 @@ from pydantic import BaseModel
 
 from ragas.dataset_schema import SingleTurnSample
 from ragas.metrics._answer_similarity import AnswerSimilarity
-from ragas.metrics._faithfulness import (
-    StatementGeneratorInput,
-    StatementGeneratorOutput,
-    StatementGeneratorPrompt,
-)
+from ragas.metrics._factual_correctness import FactualCorrectness
+from ragas.metrics._faithfulness import StatementGeneratorPrompt
 from ragas.metrics.base import (
     MetricOutputType,
     MetricType,
@@ -21,7 +18,6 @@ from ragas.metrics.base import (
     MetricWithLLM,
     SingleTurnMetric,
 )
-from ragas.metrics.utils import fbeta_score
 from ragas.prompt import PydanticPrompt
 from ragas.run_config import RunConfig
 
@@ -143,6 +139,12 @@ class AnswerCorrectness(MetricWithLLM, MetricWithEmbeddings, SingleTurnMetric):
     Measures answer correctness compared to ground truth as a combination of
     factuality and semantic similarity.
 
+    Factuality is delegated to ``FactualCorrectness`` so that this metric and
+    the standalone ``FactualCorrectness`` metric report consistent scores for
+    the same input. The legacy ``correctness_prompt`` and
+    ``statement_generator_prompt`` fields are retained for backwards
+    compatibility but are no longer used in scoring.
+
     Attributes
     ----------
     name: string
@@ -152,6 +154,9 @@ class AnswerCorrectness(MetricWithLLM, MetricWithEmbeddings, SingleTurnMetric):
         Defaults [0.75, 0.25]
     answer_similarity:
         The AnswerSimilarity object
+    factual_correctness:
+        The FactualCorrectness instance used to compute the factuality
+        component. Created lazily during ``init`` if not supplied.
     """
 
     name: str = "answer_correctness"
@@ -168,6 +173,7 @@ class AnswerCorrectness(MetricWithLLM, MetricWithEmbeddings, SingleTurnMetric):
     weights: list[float] = field(default_factory=lambda: [0.75, 0.25])
     beta: float = 1.0
     answer_similarity: t.Optional[AnswerSimilarity] = None
+    factual_correctness: t.Optional[FactualCorrectness] = None
     max_retries: int = 1
 
     def __post_init__(self):
@@ -189,29 +195,13 @@ class AnswerCorrectness(MetricWithLLM, MetricWithEmbeddings, SingleTurnMetric):
         super().init(run_config)
         if self.answer_similarity is None and self.weights[1] != 0:
             self.answer_similarity = AnswerSimilarity(embeddings=self.embeddings)
-
-    def _compute_statement_presence(
-        self, prediction: ClassificationWithReason
-    ) -> float:
-        tp = len(prediction.TP)
-        fp = len(prediction.FP)
-        fn = len(prediction.FN)
-        score = fbeta_score(tp, fp, fn, self.beta)
-        return score
-
-    async def _create_simplified_statements(
-        self, question: str, text: str, callbacks: Callbacks
-    ) -> StatementGeneratorOutput:
-        assert self.llm is not None, "llm is not set"
-
-        prompt_input = StatementGeneratorInput(question=question, answer=text)
-        statements = await self.statement_generator_prompt.generate(
-            llm=self.llm,
-            data=prompt_input,
-            callbacks=callbacks,
-        )
-
-        return statements
+        if self.factual_correctness is None and self.weights[0] != 0:
+            self.factual_correctness = FactualCorrectness(llm=self.llm, beta=self.beta)
+        if (
+            self.factual_correctness is not None
+            and self.factual_correctness.llm is None
+        ):
+            self.factual_correctness.llm = self.llm
 
     async def _single_turn_ascore(
         self, sample: SingleTurnSample, callbacks: Callbacks
@@ -223,34 +213,15 @@ class AnswerCorrectness(MetricWithLLM, MetricWithEmbeddings, SingleTurnMetric):
     async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> float:
         assert self.llm is not None, "LLM must be set"
 
-        # extract the statements from the answer and the ground truth
-        question = row["user_input"]
-        statements: t.Dict[str, t.List[str]] = {}
-        for item in ["response", "reference"]:
-            statements_x = await self._create_simplified_statements(
-                question, row[item], callbacks
-            )
-            statements_x = statements_x.statements
-            statements[item] = statements_x
-
-        if not all([val == [] for val in statements.values()]):
-            ground_truth = [statement for statement in statements["reference"]]
-            answer = [statement for statement in statements["response"]]
-            answers = await self.correctness_prompt.generate(
-                llm=self.llm,
-                data=QuestionAnswerGroundTruth(
-                    question=question,
-                    answer=answer,
-                    ground_truth=ground_truth,
-                ),
-                callbacks=callbacks,
-            )
-            if answers is None:
-                return np.nan
-
-            f1_score = self._compute_statement_presence(answers)
+        if self.weights[0] == 0:
+            f1_score = 0.0
         else:
-            f1_score = 1.0
+            assert self.factual_correctness is not None, (
+                "FactualCorrectness must be set"
+            )
+            f1_score = await self.factual_correctness._single_turn_ascore(
+                SingleTurnSample(**row), callbacks=callbacks
+            )
 
         if self.weights[1] == 0:
             similarity_score = 0.0
