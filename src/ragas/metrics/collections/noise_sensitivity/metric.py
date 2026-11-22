@@ -7,6 +7,7 @@ import numpy as np
 
 from ragas.metrics.collections.base import BaseMetric
 from ragas.metrics.result import MetricResult
+from ragas.prompt import PromptMixin
 
 from .util import (
     StatementFaithfulnessInput,
@@ -21,7 +22,7 @@ if t.TYPE_CHECKING:
     from ragas.llms.base import InstructorBaseRagasLLM
 
 
-class NoiseSensitivity(BaseMetric):
+class NoiseSensitivity(BaseMetric, PromptMixin):
     """
     Modern v2 implementation of noise sensitivity evaluation.
 
