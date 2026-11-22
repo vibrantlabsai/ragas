@@ -175,7 +175,7 @@ class ToolCallAccuracy(MultiTurnMetric):
             coverage_penalty = compared_count / len(reference_tool_calls)
             score *= coverage_penalty
 
-        return score * sequence_aligned
+        return min(score * sequence_aligned, 1.0)
 
     async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> float:
         return await self._multi_turn_ascore(MultiTurnSample(**row), callbacks)

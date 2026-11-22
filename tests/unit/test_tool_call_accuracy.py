@@ -316,6 +316,41 @@ class TestToolCallAccuracy:
         strict_metric = ToolCallAccuracy(strict_order=True)
         assert strict_metric.is_sequence_aligned(pred_seq, ref_seq) is False
 
+    @pytest.mark.asyncio
+    async def test_score_clamped_to_max_one(self, tool_call_accuracy, mock_callbacks):
+        """Test that score never exceeds 1.0 when multiple predictions match one reference.
+
+        Regression test for https://github.com/explodinggradients/ragas/issues/2079
+        """
+        ref_tool_calls = [ToolCall(name="weather_check", args={"location": "Shanghai"})]
+
+        # Multiple predicted calls matching the same reference tool
+        pred_tool_calls = [
+            ToolCall(
+                name="weather_check", args={"location": "Shanghai", "time": "9:00"}
+            ),
+            ToolCall(
+                name="weather_check", args={"location": "Shanghai", "time": "13:00"}
+            ),
+            ToolCall(
+                name="weather_check", args={"location": "Shanghai", "time": "21:00"}
+            ),
+        ]
+
+        sample = MultiTurnSample(
+            user_input=[AIMessage(content="...", tool_calls=pred_tool_calls)],
+            reference_tool_calls=ref_tool_calls,
+        )
+
+        tool_call_accuracy.arg_comparison_metric.single_turn_ascore = AsyncMock(
+            return_value=1.0
+        )
+
+        with pytest.warns(UserWarning, match="Length mismatch"):
+            score = await tool_call_accuracy._multi_turn_ascore(sample, mock_callbacks)
+
+        assert 0.0 <= score <= 1.0, f"Score should be between 0.0 and 1.0, got {score}"
+
     def test_flexible_order_sorting_behavior(self):
         """Test that flexible mode sorts tool calls before evaluation."""
 

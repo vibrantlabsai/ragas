@@ -139,6 +139,41 @@ class TestToolCallAccuracyCollections:
         assert result.value == 1.0
 
     @pytest.mark.asyncio
+    async def test_score_clamped_to_max_one(self, tool_call_accuracy):
+        """Test that score never exceeds 1.0 when multiple predictions match one reference.
+
+        Regression test for https://github.com/explodinggradients/ragas/issues/2079
+        """
+        ref_tool_calls = [ToolCall(name="weather_check", args={"location": "Shanghai"})]
+
+        pred_tool_calls = [
+            ToolCall(
+                name="weather_check", args={"location": "Shanghai", "time": "9:00"}
+            ),
+            ToolCall(
+                name="weather_check", args={"location": "Shanghai", "time": "13:00"}
+            ),
+            ToolCall(
+                name="weather_check", args={"location": "Shanghai", "time": "21:00"}
+            ),
+        ]
+
+        user_input = [
+            HumanMessage(content="What's the weather in Shanghai at different times?"),
+            AIMessage(content="...", tool_calls=pred_tool_calls),
+        ]
+
+        with pytest.warns(UserWarning, match="Length mismatch"):
+            result = await tool_call_accuracy.ascore(
+                user_input=user_input,
+                reference_tool_calls=ref_tool_calls,
+            )
+
+        assert 0.0 <= result.value <= 1.0, (
+            f"Score should be between 0.0 and 1.0, got {result.value}"
+        )
+
+    @pytest.mark.asyncio
     async def test_length_mismatch(self, tool_call_accuracy):
         """Test case with length mismatch."""
         ref_tool_calls = [

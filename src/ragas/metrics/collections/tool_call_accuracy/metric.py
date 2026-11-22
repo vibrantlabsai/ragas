@@ -164,7 +164,7 @@ class ToolCallAccuracy(BaseMetric):
             coverage_penalty = compared_count / len(reference_tool_calls)
             score *= coverage_penalty
 
-        # Apply sequence alignment factor
-        final_score = score * sequence_aligned
+        # Apply sequence alignment factor and clamp to [0, 1]
+        final_score = min(score * sequence_aligned, 1.0)
 
         return MetricResult(value=float(final_score))
