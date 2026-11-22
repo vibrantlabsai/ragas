@@ -6,7 +6,7 @@ Ragas supports multiple structured output backends through an adapter pattern. T
 
 Ragas uses adapters to handle structured output from different LLM providers:
 
-- **Instructor Adapter**: Works with OpenAI, Anthropic, Azure, Groq, Mistral, Cohere, and many others
+- **Instructor Adapter**: Works with OpenAI, Anthropic, Azure, Groq, Mistral, Cohere, DeepSeek, and many others
 - **LiteLLM Adapter**: Works with all 100+ LiteLLM-supported providers (Gemini, Ollama, vLLM, Bedrock, etc.)
 
 The framework automatically selects the best adapter for your provider, but you can also choose explicitly.
@@ -180,6 +180,38 @@ llm = llm_factory("command-r-plus", provider="cohere", client=client)
 # Uses Instructor adapter automatically
 ```
 
+### DeepSeek
+
+DeepSeek exposes an OpenAI-compatible API, so you can talk to it directly with the
+`openai` client and `provider="deepseek"` — no LiteLLM proxy required ([#1895](https://github.com/explodinggradients/ragas/issues/1895)):
+
+```python
+from openai import OpenAI
+from ragas.llms import llm_factory
+
+client = OpenAI(
+    api_key="your-deepseek-key",
+    base_url="https://api.deepseek.com",
+)
+llm = llm_factory("deepseek-chat", provider="deepseek", client=client)
+# Uses Instructor adapter automatically
+```
+
+This also works with `AsyncOpenAI` for async evaluation runs:
+
+```python
+from openai import AsyncOpenAI
+from ragas.llms import llm_factory
+
+client = AsyncOpenAI(
+    api_key="your-deepseek-key",
+    base_url="https://api.deepseek.com",
+)
+llm = llm_factory("deepseek-chat", provider="deepseek", client=client)
+
+response = await llm.agenerate(prompt, ResponseModel)
+```
+
 ## Adapter Selection Guide
 
 Choose your adapter based on your needs:
@@ -310,8 +342,9 @@ from ragas.llms import llm_factory
 
 # Set up LiteLLM proxy first:
 # litellm --model grok-1  (for xAI)
-# litellm --model deepseek-chat  (for DeepSeek)
 # etc.
+# Note: DeepSeek doesn't need this proxy — see the DeepSeek section above
+# for a direct provider="deepseek" example.
 
 client = OpenAI(
     api_key="your-provider-api-key",
@@ -320,9 +353,6 @@ client = OpenAI(
 
 # xAI Grok
 llm = llm_factory("grok-1", client=client, adapter="litellm")
-
-# DeepSeek
-llm = llm_factory("deepseek-chat", client=client, adapter="litellm")
 
 # Together AI
 llm = llm_factory("mistral-7b", client=client, adapter="litellm")
