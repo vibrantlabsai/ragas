@@ -102,6 +102,80 @@ class TestToolCallAccuracyCollections:
         assert result.value == 1.0
 
     @pytest.mark.asyncio
+    async def test_flexible_order_mode_with_nested_args(self):
+        """Flexible order must ignore the key order of nested mapping arguments.
+
+        The sort key and the argument comparison both stringify argument values,
+        and ``str()`` on a dict follows insertion order. Without canonicalizing
+        nested mappings, these semantically identical calls score 0.0 while the
+        equivalent flat-argument case scores 1.0.
+        """
+        metric = ToolCallAccuracy(strict_order=False)
+
+        ref_tool_calls = [
+            ToolCall(name="search", args={"filter": {"year": 2024, "lang": "en"}}),
+            ToolCall(name="fetch", args={"opt": {"a": 1, "b": 2}}),
+        ]
+
+        pred_tool_calls = [
+            ToolCall(name="fetch", args={"opt": {"b": 2, "a": 1}}),
+            ToolCall(name="search", args={"filter": {"lang": "en", "year": 2024}}),
+        ]
+
+        user_input = [
+            HumanMessage(content="Do a search"),
+            AIMessage(content="Searching...", tool_calls=pred_tool_calls),
+        ]
+
+        result = await metric.ascore(
+            user_input=user_input,
+            reference_tool_calls=ref_tool_calls,
+        )
+        assert result.value == 1.0
+
+    @pytest.mark.asyncio
+    async def test_nested_args_with_different_content_still_differ(self):
+        """Canonicalization must not make genuinely different nested args match."""
+        metric = ToolCallAccuracy()
+
+        ref_tool_calls = [
+            ToolCall(name="search", args={"filter": {"year": 2024, "lang": "en"}}),
+        ]
+        pred_tool_calls = [
+            ToolCall(name="search", args={"filter": {"year": 2023, "lang": "en"}}),
+        ]
+
+        user_input = [
+            HumanMessage(content="Do a search"),
+            AIMessage(content="Searching...", tool_calls=pred_tool_calls),
+        ]
+
+        result = await metric.ascore(
+            user_input=user_input,
+            reference_tool_calls=ref_tool_calls,
+        )
+        assert result.value == 0.0
+
+    @pytest.mark.asyncio
+    async def test_list_arg_order_remains_significant(self):
+        """Element order inside a list argument stays meaningful."""
+        metric = ToolCallAccuracy()
+
+        ref_tool_calls = [ToolCall(name="rank", args={"ids": [1, 2, 3]})]
+        pred_tool_calls = [ToolCall(name="rank", args={"ids": [3, 2, 1]})]
+
+        user_input = [
+            HumanMessage(content="Rank these"),
+            AIMessage(content="Ranking...", tool_calls=pred_tool_calls),
+        ]
+
+        result = await metric.ascore(
+            user_input=user_input,
+            reference_tool_calls=ref_tool_calls,
+        )
+        assert result.value == 0.0
+
+    @pytest.mark.asyncio
     async def test_partial_argument_match(self, tool_call_accuracy):
         """Test case with partial argument matches."""
         ref_tool_calls = [

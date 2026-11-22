@@ -8,6 +8,10 @@ from ragas.dataset_schema import MultiTurnSample, SingleTurnSample
 from ragas.messages import AIMessage, ToolCall
 from ragas.metrics._string import ExactMatch
 from ragas.metrics.base import MetricType, MultiTurnMetric, SingleTurnMetric
+from ragas.metrics.collections.tool_call_accuracy.util import (
+    canonical_arg_value,
+    sorted_key_for_tool_call,
+)
 
 if t.TYPE_CHECKING:
     from langchain_core.callbacks.base import Callbacks
@@ -75,7 +79,8 @@ class ToolCallAccuracy(MultiTurnMetric):
             if arg in preds:
                 score += await self.arg_comparison_metric.single_turn_ascore(
                     SingleTurnSample(
-                        response=str(preds[arg]), reference=str(refs[arg])
+                        response=canonical_arg_value(preds[arg]),
+                        reference=canonical_arg_value(refs[arg]),
                     ),
                     callbacks,
                 )
@@ -88,15 +93,10 @@ class ToolCallAccuracy(MultiTurnMetric):
         Generate a consistent sorting key for tool calls.
 
         This ensures tool calls with the same content are compared correctly
-        regardless of argument order in the original call.
+        regardless of argument order in the original call, including the key
+        order of nested mappings.
         """
-        key_list = [tc.name]
-        args = tc.args
-        args_name = sorted(args)
-        for name in args_name:
-            key_list.append(name)
-            key_list.append(str(args[name]))
-        return tuple(key_list)
+        return sorted_key_for_tool_call(tc)
 
     def is_sequence_aligned(
         self, pred_sequence: t.List[str], ref_sequence: t.List[str]

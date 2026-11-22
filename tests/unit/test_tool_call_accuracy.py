@@ -350,6 +350,47 @@ class TestToolCallAccuracy:
         flexible_aligned = flexible_metric.is_sequence_aligned(pred_seq, ref_seq)
         assert flexible_aligned is True
 
+    def test_sorted_key_ignores_nested_mapping_order(self):
+        """Nested mapping key order must not change the sort key.
+
+        ``str()`` on a dict follows insertion order, so without canonicalizing
+        nested values these two identical calls sort differently -- which
+        defeats the point of the flexible-order mode.
+        """
+        call_1 = ToolCall(name="search", args={"filter": {"lang": "en", "year": 2024}})
+        call_2 = ToolCall(name="search", args={"filter": {"year": 2024, "lang": "en"}})
+
+        assert ToolCallAccuracy._sorted_key_for_tool_call(
+            call_1
+        ) == ToolCallAccuracy._sorted_key_for_tool_call(call_2)
+
+        # Genuinely different nested content must still differ.
+        call_3 = ToolCall(name="search", args={"filter": {"lang": "de", "year": 2024}})
+        assert ToolCallAccuracy._sorted_key_for_tool_call(
+            call_1
+        ) != ToolCallAccuracy._sorted_key_for_tool_call(call_3)
+
+    @pytest.mark.asyncio
+    async def test_flexible_order_with_nested_args(self):
+        """Flexible order scores 1.0 for nested args differing only in key order."""
+        metric = ToolCallAccuracy(strict_order=False)
+
+        ref_tool_calls = [
+            ToolCall(name="search", args={"filter": {"year": 2024, "lang": "en"}}),
+            ToolCall(name="fetch", args={"opt": {"a": 1, "b": 2}}),
+        ]
+        pred_tool_calls = [
+            ToolCall(name="fetch", args={"opt": {"b": 2, "a": 1}}),
+            ToolCall(name="search", args={"filter": {"lang": "en", "year": 2024}}),
+        ]
+
+        sample = MultiTurnSample(
+            user_input=[AIMessage(content="...", tool_calls=pred_tool_calls)],
+            reference_tool_calls=ref_tool_calls,
+        )
+
+        assert await metric.multi_turn_ascore(sample) == 1.0
+
     def test_sorted_key_for_tool_call(self):
         """Test the sorting key generation for tool calls."""
         tool_call_1 = ToolCall(
