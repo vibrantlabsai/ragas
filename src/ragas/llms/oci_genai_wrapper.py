@@ -253,7 +253,7 @@ class OCIGenAIWrapper(BaseRagasLLM):
 
         try:
             # Run synchronous calls in thread pool for async compatibility
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
 
             for _ in range(n):
                 request = self._create_generation_request(

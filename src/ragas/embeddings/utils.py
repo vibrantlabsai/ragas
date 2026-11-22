@@ -81,7 +81,7 @@ async def run_sync_in_async(func: t.Callable, *args, **kwargs) -> t.Any:
     Returns:
         The result of the function
     """
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     with ThreadPoolExecutor() as executor:
         return await loop.run_in_executor(executor, lambda: func(*args, **kwargs))
 

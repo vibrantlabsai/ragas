@@ -226,7 +226,7 @@ class BaseRagasEmbeddings(Embeddings, ABC):
             )
             return await aembed_documents_with_retry(texts)
         else:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             embed_documents_with_retry = add_retry(
                 self.embed_documents, self.run_config
             )
