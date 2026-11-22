@@ -68,10 +68,16 @@ class HeadlineSplitter(Splitter):
             return [node], []
         # create the chunks for the different sections
         indices = [0]
+        # Search for each headline starting after the previous match so that
+        # headlines are located at their actual sequential positions. Searching
+        # from the start of the text can match an earlier mention of a later
+        # headline, producing out-of-order indices and empty/overlapping chunks.
+        search_start = 0
         for headline in headlines:
-            index = text.find(headline)
+            index = text.find(headline, search_start)
             if index != -1:
                 indices.append(index)
+                search_start = index + len(headline)
         indices.append(len(text))
         chunks = [text[indices[i] : indices[i + 1]] for i in range(len(indices) - 1)]
         chunks = self.adjust_chunks(chunks)
