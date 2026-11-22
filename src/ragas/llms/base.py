@@ -65,6 +65,15 @@ def is_multiple_completion_supported(llm: BaseLanguageModel) -> bool:
     return False
 
 
+# Finish reasons that indicate the model completed generation normally. Providers
+# report different values — OpenAI "stop"; Vertex AI "STOP"/"MAX_TOKENS"; WatsonX
+# "eos_token"; TogetherAI/Llama "eos". Extend this set as new providers surface.
+# See https://github.com/vibrantlabsai/ragas/issues/1548
+FINISH_REASONS = frozenset({"stop", "STOP", "MAX_TOKENS", "eos_token", "eos"})
+# Anthropic-style `stop_reason` values that also indicate normal completion.
+STOP_REASONS = FINISH_REASONS | {"end_turn"}
+
+
 @dataclass
 class BaseRagasLLM(ABC):
     run_config: RunConfig = field(default_factory=RunConfig, repr=False)
@@ -202,15 +211,7 @@ class LangchainLLMWrapper(BaseRagasLLM):
                 # generation_info is provided - so we parse that
                 finish_reason = resp.generation_info.get("finish_reason")
                 if finish_reason is not None:
-                    # OpenAI uses "stop"
-                    # Vertex AI uses "STOP" or "MAX_TOKENS"
-                    # WatsonX AI uses "eos_token"
-                    is_finished_list.append(
-                        finish_reason in ["stop", "STOP", "MAX_TOKENS", "eos_token"]
-                    )
-
-                # provied more conditions here
-                # https://github.com/vibrantlabsai/ragas/issues/1548
+                    is_finished_list.append(finish_reason in FINISH_REASONS)
 
             # if generation_info is empty, we parse the response_metadata
             # this is less reliable
@@ -222,15 +223,10 @@ class LangchainLLMWrapper(BaseRagasLLM):
                 resp_message: BaseMessage = t.cast(ChatGeneration, resp).message
                 if resp_message.response_metadata.get("finish_reason") is not None:
                     finish_reason = resp_message.response_metadata.get("finish_reason")
-                    is_finished_list.append(
-                        finish_reason in ["stop", "STOP", "MAX_TOKENS", "eos_token"]
-                    )
+                    is_finished_list.append(finish_reason in FINISH_REASONS)
                 elif resp_message.response_metadata.get("stop_reason") is not None:
                     stop_reason = resp_message.response_metadata.get("stop_reason")
-                    is_finished_list.append(
-                        stop_reason
-                        in ["end_turn", "stop", "STOP", "MAX_TOKENS", "eos_token"]
-                    )
+                    is_finished_list.append(stop_reason in STOP_REASONS)
             # default to True
             else:
                 is_finished_list.append(True)
