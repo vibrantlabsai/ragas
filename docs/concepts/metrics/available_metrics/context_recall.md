@@ -2,13 +2,22 @@
 
 Context Recall measures how many of the relevant documents (or pieces of information) were successfully retrieved. It focuses on not missing important results. Higher recall means fewer relevant documents were left out. In short, recall is about not missing anything important. 
 
-Since it is about not missing anything, calculating context recall always requires a reference to compare against. The LLM-based Context Recall metric uses `reference` as a proxy to `reference_contexts`, which makes it easier to use as annotating reference contexts can be very time-consuming. To estimate context recall from the `reference`, the reference is broken down into claims, and each claim is analyzed to determine whether it can be attributed to the retrieved context or not. In an ideal scenario, all claims in the reference answer should be attributable to the retrieved context.
+The LLM-based Context Recall metric uses the `reference` answer as a proxy for `reference_contexts`. A **claim** is an assertion in the reference that the evaluator can check against the retrieved context. The implementation calls each assertion a **statement**. The evaluator returns one classification for each statement it identifies. The denominator is the number of classifications it returns, so a sentence containing two facts can contribute twice if the evaluator classifies them separately.
 
 The formula for calculating context recall is as follows:
 
 $$
 \text{Context Recall} = \frac{\text{Number of claims in the reference supported by the retrieved context}}{\text{Total number of claims in the reference}}
 $$
+
+## Comparing Context Recall and Faithfulness
+
+Suppose the retrieved context says, “The library opens at 9 a.m. and has a reading room.” The reference gives those same two facts. The generated response repeats both and adds, “The library has free Wi-Fi.” Assume the evaluator judges the opening time and reading room separately and marks both as supported. The retrieved context gives no evidence about Wi-Fi.
+
+| Metric | Statements scored | Supported / total |
+| --- | --- | --- |
+| Context Recall | Opening time and reading room, from the reference | 2/2 = 1 |
+| [Faithfulness](faithfulness.md#what-counts-as-a-statement) | Opening time, reading room and Wi-Fi, from the response | 2/3 ≈ 0.67 |
 
 ## Example
 
