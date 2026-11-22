@@ -38,7 +38,7 @@ def get_error_analysis(client: OpenAI, row: Dict[str, Any]) -> Dict[str, Any]:
 
 Available error codes:
 - AGGR_DISTINCT_MISSING: Used COUNT/SUM without DISTINCT or deduplication
-- WRONG_FILTER_COLUMN: Filtered on the wrong column 
+- WRONG_FILTER_COLUMN: Filtered on the wrong column
 - WRONG_SOURCE_TABLE_OR_COLUMN: Selected metric from the wrong table/column
 - EXTRA_TRANSFORMATION_OR_CONDITION: Added ABS(), extra filters that change results
 - OUTPUT_COLUMN_ALIAS_MISMATCH: Output column names don't match
