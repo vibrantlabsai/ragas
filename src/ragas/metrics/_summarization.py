@@ -193,6 +193,8 @@ class SummarizationScore(MetricWithLLM, SingleTurnMetric):
         )
 
     def _compute_qa_score(self, answers: t.List[str]) -> float:
+        if not answers:
+            return 0.0
         correct = sum([1 for a in answers if a.lower() == "1"])
         return correct / len(answers)
 

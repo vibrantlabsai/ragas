@@ -185,11 +185,11 @@ class SummaryScore(BaseMetric):
         return result.answers
 
     def _compute_qa_score(self, answers: List[str]) -> float:
-        """Compute QA score as ratio of correct answers. Matches legacy behavior exactly."""
+        """Compute QA score as ratio of correct answers."""
+        if not answers:
+            return 0.0
         correct = sum([1 for a in answers if a.lower() == "1"])
-        return correct / len(
-            answers
-        )  # Will raise ZeroDivisionError if answers is empty (legacy behavior)
+        return correct / len(answers)
 
     def _compute_conciseness_score(self, text: str, summary: str) -> float:
         """Compute conciseness score based on length ratio."""
