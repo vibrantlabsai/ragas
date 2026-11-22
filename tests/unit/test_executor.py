@@ -20,7 +20,7 @@ async def test_order_of_execution(batch_size):
         executor.submit(echo_order, i, name=f"echo_order_{i}")
 
     # Act
-    results = executor.results()
+    results = await executor.aresults()
     # Assert
     assert results == list(range(1, 11))
 
@@ -39,14 +39,13 @@ async def test_executor_in_script(batch_size):
         executor.submit(echo_order, i, name=f"echo_order_{i}")
 
     # Act
-    results = executor.results()
+    results = await executor.aresults()
     # Assert
     assert results == list(range(1, 4))
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("batch_size", [None, 3, 20])
-async def test_executor_with_running_loop(batch_size):
+def test_executor_with_running_loop(batch_size):
     loop = asyncio.new_event_loop()
     loop.run_until_complete(asyncio.sleep(0.1))
 

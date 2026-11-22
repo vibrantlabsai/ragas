@@ -257,17 +257,9 @@ def create_metric_decorator():
                     async def _async_wrapper():
                         return await self.ascore(*args, **kwargs)
 
-                    # Check if we're already in an event loop
-                    try:
-                        # If we're in a running event loop, we need nest_asyncio for compatibility
-                        _ = asyncio.get_running_loop()
-                        # Import nest_asyncio style runner from ragas
-                        from ragas.async_utils import run
-
-                        return run(_async_wrapper())
-                    except RuntimeError:
-                        # No running event loop, safe to use asyncio.run
-                        return asyncio.run(_async_wrapper())
+                    # Use updated run utility which handles event loop checking
+                    from ragas.async_utils import run
+                    return run(_async_wrapper)
 
                 async def ascore(self, *args, **kwargs):
                     """Asynchronous scoring method."""
