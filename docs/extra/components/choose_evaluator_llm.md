@@ -275,3 +275,26 @@
     For more information on how to use LlamaIndex, please refer to the [LlamaIndex Integration guide](./../../howtos/integrations/_llamaindex.md).
 
     If your still not able use Ragas with your favorite LLM provider, please let us know by by commenting on this [issue](https://github.com/vibrantlabsai/ragas/issues/1617) and we'll add support for it 🙂.
+
+
+## Tips for reliable evaluations
+
+### Avoiding timeouts with `bypass_n`
+
+Some metrics request multiple generations per sample by default (`n>1`), which can cause frequent timeouts with models like `gpt-4o-mini`. Setting `bypass_n=True` on the LLM wrapper forces single-generation requests and significantly improves reliability for larger evaluation runs:
+
+```python
+evaluator_llm = LangchainLLMWrapper(llm)
+evaluator_llm.bypass_n = True
+```
+
+### Embeddings wrapper for `answer_relevancy`
+
+The `answer_relevancy` metric requires an `embed_query` method. Ragas's native embeddings interface doesn't expose this directly, so wrap your LangChain embeddings:
+
+```python
+from ragas.embeddings import LangchainEmbeddingsWrapper
+from langchain_openai import OpenAIEmbeddings
+
+evaluator_embeddings = LangchainEmbeddingsWrapper(OpenAIEmbeddings())
+```
