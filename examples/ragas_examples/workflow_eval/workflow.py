@@ -306,17 +306,15 @@ class ConfigurableSupportTriageAgent:
         """Classify email into categories using LLM"""
         print("🔍 Step 1: Classifying email category...")
 
-        prompt = f"""
-        Classify the following customer email into exactly one of these categories:
+        prompt = f"""Classify the following customer email into exactly one of these categories:
         - Billing
-        - Bug Report  
+        - Bug Report
         - Feature Request
 
         Email content:
         {email_content}
 
-        Respond with only the category name, nothing else.
-        """
+        Respond with only the category name, nothing else."""
 
         self.traces.append(
             TraceEvent(
