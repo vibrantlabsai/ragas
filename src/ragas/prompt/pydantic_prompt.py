@@ -86,6 +86,9 @@ class PydanticPrompt(BasePrompt, t.Generic[InputModel, OutputModel]):
     instruction: str
     examples: t.List[t.Tuple[InputModel, OutputModel]] = []
 
+    # cache for static prompt prefix
+    _static_prompt_prefix: t.Optional[str] = None
+
     def _generate_instruction(self) -> str:
         return self.instruction
 
@@ -117,21 +120,35 @@ class PydanticPrompt(BasePrompt, t.Generic[InputModel, OutputModel]):
         else:
             return ""
 
-    def to_string(self, data: t.Optional[InputModel] = None) -> str:
-        return (
-            f"{self.instruction}\n"
-            + self._generate_output_signature()
-            + "\n"
-            + self._generate_examples()
-            + "\n-----------------------------\n"
-            + "\nNow perform the same with the following input\n"
-            + (
-                "input: " + data.model_dump_json(indent=4, exclude_none=True) + "\n"
-                if data is not None
-                else "Input: (None)\n"
+    def _get_static_prompt_prefix(self) -> str:
+        """
+        Build and cache the input-independent prefix of the prompt.
+
+        This enables stable prefix reuse across invocations, allowing
+        LLM providers to apply implicit prefix caching.
+        """
+        if self._static_prompt_prefix is None:
+            self._static_prompt_prefix = (
+                f"{self.instruction}\n"
+                + self._generate_output_signature()
+                + "\n"
+                + self._generate_examples()
+                + "\n-----------------------------\n"
+                + "\nNow perform the same with the following input\n"
             )
-            + "Output: "
-        )
+        return self._static_prompt_prefix
+
+    def to_string(self, data: t.Optional[InputModel] = None) -> str:
+        static_prefix = self._get_static_prompt_prefix()
+
+        if data is not None:
+            dynamic_part = (
+                "input: " + data.model_dump_json(indent=4, exclude_none=True) + "\n"
+            )
+        else:
+            dynamic_part = "Input: (None)\n"
+
+        return static_prefix + dynamic_part + "Output: "
 
     async def generate(
         self,
@@ -379,6 +396,7 @@ class PydanticPrompt(BasePrompt, t.Generic[InputModel, OutputModel]):
         new_prompt = copy.deepcopy(self)
         new_prompt.examples = translated_examples
         new_prompt.language = target_language
+        new_prompt._static_prompt_prefix = None
 
         if adapt_instruction:
             translated_instruction = await translate_statements_prompt.generate(
