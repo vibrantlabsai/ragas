@@ -23,3 +23,7 @@ Learn how to evaluate different types of AI applications:
 - [Evaluate a simple RAG system](../tutorials/rag.md) - Evaluate a RAG application
 - [Evaluate an AI Workflow](../tutorials/workflow.md) - Evaluate multi-step workflows
 - [Evaluate an AI Agent](../tutorials/agent.md) - Evaluate agentic applications
+
+## Further Reading
+
+- [WFGY 16 Problem Map](https://github.com/onestardao/WFGY/tree/main/ProblemMap#readme) – A comprehensive taxonomy of RAG failure modes to help you identify what to evaluate.
