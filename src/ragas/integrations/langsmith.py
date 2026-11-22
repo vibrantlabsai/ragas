@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import typing as t
 
-from langchain.smith import RunEvalConfig
+# LangChain exposes these LangSmith helpers from different modules depending on
+# which package layout is installed.
+try:
+    from langchain.smith import RunEvalConfig, run_on_dataset
+except ImportError:  # pragma: no cover - compatibility across LangChain package layouts
+    from langchain_classic.smith import (  # type: ignore[no-redef]
+        RunEvalConfig,
+        run_on_dataset,
+    )
 
 from ragas.integrations.langchain import EvaluatorChain
 
@@ -12,7 +20,7 @@ if t.TYPE_CHECKING:
     from ragas.testset import Testset
 
 try:
-    from langsmith import Client
+    from langsmith.client import Client
     from langsmith.utils import LangSmithNotFoundError
 except ImportError:
     raise ImportError(
@@ -124,7 +132,8 @@ def evaluate(
     See Also
     --------
     Client.read_dataset : Method to read an existing dataset.
-    Client.run_on_dataset : Method to run the evaluation on the specified dataset.
+    langchain.smith.run_on_dataset / langchain_classic.smith.run_on_dataset :
+        LangChain helpers that execute the chain-factory evaluation flow used here.
 
     Examples
     --------
@@ -168,12 +177,12 @@ def evaluate(
     )
 
     # run evaluation with langsmith
-    run = client.run_on_dataset(  # type: ignore[attr-defined]
-        dataset_name=dataset_name,
-        llm_or_chain_factory=llm_or_chain_factory,
+    run = run_on_dataset(
+        client,
+        dataset_name,
+        llm_or_chain_factory,
         evaluation=eval_config,
         verbose=verbose,
-        # Any experiment metadata can be specified here
         project_name=experiment_name,
     )
 

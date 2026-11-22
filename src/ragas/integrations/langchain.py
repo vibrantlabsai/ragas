@@ -2,13 +2,40 @@ from __future__ import annotations
 
 import typing as t
 
-from langchain.chains.base import Chain
-from langchain.schema import RUN_KEY
+# Callback manager imports stayed in the modern `langchain_core` namespace, but
+# older supported layouts still expose them from `langchain.callbacks`.
+try:
+    from langchain_core.callbacks.manager import (
+        AsyncCallbackManager,
+        AsyncCallbackManagerForChainRun,
+        CallbackManager,
+        CallbackManagerForChainRun,
+    )
+except ImportError:  # pragma: no cover - compatibility for older LangChain layouts
+    from langchain.callbacks.manager import (  # type: ignore[no-redef]
+        AsyncCallbackManager,
+        AsyncCallbackManagerForChainRun,
+        CallbackManager,
+        CallbackManagerForChainRun,
+    )
 from langchain_core.documents import Document as LCDocument
 from langchain_openai.chat_models import ChatOpenAI
 from langchain_openai.embeddings import OpenAIEmbeddings
 from langsmith.evaluation import EvaluationResult, RunEvaluator
 from langsmith.schemas import Example, Run
+
+# LangChain's legacy `Chain` APIs were moved into `langchain_classic` in newer
+# releases, while older supported versions still provide them from `langchain`.
+if t.TYPE_CHECKING:
+    from langchain_classic.chains.base import Chain as ChainBase
+    from langchain_classic.schema import RUN_KEY
+else:
+    try:
+        from langchain.chains.base import Chain as ChainBase
+        from langchain.schema import RUN_KEY
+    except ImportError:  # pragma: no cover - compatibility for split LangChain packages
+        from langchain_classic.chains.base import Chain as ChainBase
+        from langchain_classic.schema import RUN_KEY
 
 from ragas.dataset_schema import SingleTurnSample
 from ragas.embeddings import LangchainEmbeddingsWrapper
@@ -22,14 +49,21 @@ from ragas.metrics.base import (
 from ragas.run_config import RunConfig
 from ragas.utils import convert_row_v1_to_v2, get_or_init, get_required_columns_v1
 
-if t.TYPE_CHECKING:
-    from langchain.callbacks.manager import (
-        AsyncCallbackManagerForChainRun,
-        CallbackManagerForChainRun,
+
+def _to_sync_callback_manager(async_callbacks: AsyncCallbackManager) -> CallbackManager:
+    """Preserve callback lineage while adapting async children to ragas' sync APIs."""
+    return CallbackManager(
+        handlers=async_callbacks.handlers.copy(),
+        inheritable_handlers=async_callbacks.inheritable_handlers.copy(),
+        parent_run_id=async_callbacks.parent_run_id,
+        tags=async_callbacks.tags.copy(),
+        inheritable_tags=async_callbacks.inheritable_tags.copy(),
+        metadata=async_callbacks.metadata.copy(),
+        inheritable_metadata=async_callbacks.inheritable_metadata.copy(),
     )
 
 
-class EvaluatorChain(Chain, RunEvaluator):
+class EvaluatorChain(ChainBase, RunEvaluator):
     """
     Wrapper around ragas Metrics to use them with langsmith.
     """
@@ -115,14 +149,13 @@ class EvaluatorChain(Chain, RunEvaluator):
 
         self._validate(inputs)
         _run_manager = run_manager or AsyncCallbackManagerForChainRun.get_noop_manager()
-        # TODO: currently AsyncCallbacks are not supported in ragas
-        _run_manager.get_child()
+        callbacks = _to_sync_callback_manager(_run_manager.get_child())
         assert isinstance(self.metric, SingleTurnMetric), (
             "Metric must be SingleTurnMetric"
         )
         score = await self.metric.single_turn_ascore(
             inputs,
-            callbacks=[],
+            callbacks=callbacks,
         )
         return {self.metric.name: score}
 
