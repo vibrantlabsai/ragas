@@ -9,7 +9,7 @@ How to customize various aspects of Ragas to suit your needs.
 - [Cancelling long-running tasks](cancellation.md)
 
 ## Metrics
-- [Modify prompts in metrics](./metrics/_modifying-prompts-metrics.md)
+- [Modify prompts in metrics](./metrics/modifying-prompts-metrics.md)
 - [Adapt metrics to target language](./metrics/metrics_language_adaptation.md)
 - [Trace evaluations with Observability tools](metrics/tracing.md)
 

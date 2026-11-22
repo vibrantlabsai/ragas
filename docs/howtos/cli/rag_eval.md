@@ -276,6 +276,6 @@ print(f"Pass rate: {pass_rate:.1%}")
 ## Next Steps
 
 - [Improve RAG Guide](improve_rag.md) - Compare naive vs agentic RAG
-- [Custom Metrics](../customizations/metrics/_write_your_own_metric.md) - Write your own metrics
+- [Custom Metrics](../../concepts/metrics/overview/index.md) - Write your own metrics
 - [Datasets](../../concepts/datasets.md) - Learn about dataset management
 - [Experimentation](../../concepts/experimentation.md) - Advanced experiment tracking

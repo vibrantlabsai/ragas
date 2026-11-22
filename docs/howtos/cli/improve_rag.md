@@ -322,5 +322,5 @@ The first run downloads the HuggingFace documentation dataset (~300MB). Subseque
 ## Next Steps
 
 - [RAG Evaluation Guide](rag_eval.md) - Simpler evaluation setup
-- [Custom Metrics](../customizations/metrics/_write_your_own_metric.md) - Write your own metrics
+- [Custom Metrics](../../concepts/metrics/overview/index.md) - Write your own metrics
 - [Evaluate and Improve RAG](../applications/evaluate-and-improve-rag.md) - Production RAG evaluation

@@ -126,4 +126,4 @@ uv run python evals.py
 
 - [RAG Evaluation Guide](rag_eval.md) - Detailed walkthrough of the rag_eval template
 - [Improve RAG Guide](improve_rag.md) - Compare naive vs agentic RAG approaches
-- [Custom Metrics](../customizations/metrics/_write_your_own_metric.md) - Create your own evaluation metrics
+- [Custom Metrics](../../concepts/metrics/overview/index.md) - Create your own evaluation metrics

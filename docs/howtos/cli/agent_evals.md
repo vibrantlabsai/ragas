@@ -79,4 +79,4 @@ def correctness_metric(prediction: float, actual: float):
 ## Next Steps
 
 - [LlamaIndex Agent Evaluation](llamaIndex_agent_evals.md) - Evaluate LlamaIndex agents
-- [Custom Metrics](../customizations/metrics/_write_your_own_metric.md) - Write your own metrics
+- [Custom Metrics](../../concepts/metrics/overview/index.md) - Write your own metrics
