@@ -71,16 +71,11 @@ class BleuScore(BaseMetric):
         assert isinstance(reference, str), "BleuScore expects a valid reference string"
         assert isinstance(response, str), "BleuScore expects a valid response string"
 
-        reference_sentences = reference.split(". ")
-        response_sentences = response.split(". ")
-
-        reference_formatted = [[ref] for ref in reference_sentences]
-        response_formatted = response_sentences
-
-        score = (
-            corpus_bleu(response_formatted, reference_formatted, **self.kwargs).score
-            / 100
-        )
+        # corpus_bleu expects one hypothesis stream and one reference stream,
+        # each containing the full text as a single segment. Passing split
+        # sentences creates one reference stream per sentence, so zip()
+        # inside sacrebleu would truncate the corpus to the first sentence.
+        score = corpus_bleu([response], [[reference]], **self.kwargs).score / 100
 
         assert isinstance(score, float), "Expecting a float"
         return MetricResult(value=float(score))
