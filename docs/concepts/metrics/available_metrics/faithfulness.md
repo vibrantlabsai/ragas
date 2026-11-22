@@ -4,15 +4,15 @@ The **Faithfulness** metric measures how factually consistent a `response` is wi
 
 A response is considered **faithful** if all its claims can be supported by the retrieved context.
 
-To calculate this:
-1. Identify all the claims in the response.
-2. Check each claim to see if it can be inferred from the retrieved context.
-3. Compute the faithfulness score using the formula:
+### What counts as a statement?
+
+A **claim** is an assertion in the generated `response` that can be checked against the `retrieved_contexts`. The implementation calls these assertions **statements**. It first asks the evaluator to break the response into statements that can be judged independently. A second prompt checks each statement against the retrieved context. The denominator is the number of verdicts this second prompt returns.
 
 $$
 \text{Faithfulness Score} = \frac{\text{Number of claims in the response supported by the retrieved context}}{\text{Total number of claims in the response}}
 $$
 
+Suppose a response says a library opens at 9 a.m., has a reading room and offers free Wi-Fi. If the evaluator returns one verdict for each of those facts and the retrieved context supports only the first two, Faithfulness is 2/3. [See how Context Recall scores the same retrieved context](context_recall.md#comparing-context-recall-and-faithfulness).
 
 ### Example
 
