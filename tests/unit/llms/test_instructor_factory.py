@@ -60,6 +60,22 @@ class MockInstructor:
             self.chat.completions.create = sync_create
 
 
+class MockMistralClient:
+    """Mimics the native ``mistralai.Mistral`` SDK client.
+
+    The Mistral SDK uses a single client class exposing ``chat.complete`` (and
+    ``chat.complete_async``) rather than OpenAI's ``chat.completions.create`` or
+    Anthropic's ``messages.create``. Using ``Mock(spec=...)`` keeps ``hasattr``
+    honest (no auto-created attributes), so this client matches the native
+    Mistral shape that ``_is_mistral_client`` detects.
+    """
+
+    is_async = False
+
+    def __init__(self):
+        self.chat = Mock(spec=["complete", "complete_async"])
+
+
 @pytest.fixture
 def mock_sync_client():
     """Create a mock synchronous client."""
@@ -357,6 +373,69 @@ def test_openai_compatible_providers_with_openai_client(monkeypatch):
 
         assert llm.model == "test-model"
         assert llm.is_async
+
+
+def test_mistral_native_client_uses_from_mistral(monkeypatch):
+    """Native Mistral SDK clients route through instructor.from_mistral.
+
+    Regression test for issue #2774: a ``mistralai.Mistral`` client exposes
+    ``chat.complete`` (not ``chat.completions.create`` or ``messages.create``),
+    so it previously fell through to
+    ``ValueError: Unable to detect API style for mistral client``.
+    """
+    import instructor
+
+    captured = {}
+
+    def mock_from_mistral(client, mode=None, use_async=False, **kwargs):
+        captured["called"] = True
+        captured["mode"] = mode
+        captured["use_async"] = use_async
+        return MockInstructor(client)
+
+    monkeypatch.setattr(instructor, "from_mistral", mock_from_mistral, raising=False)
+
+    client = MockMistralClient()
+    llm = llm_factory("mistral-large-latest", provider="mistral", client=client)
+
+    assert captured.get("called") is True
+    # single Mistral client class -> sync by default (see _check_client_async)
+    assert captured.get("use_async") is False
+    assert llm.model == "mistral-large-latest"  # type: ignore
+    assert not llm.is_async  # type: ignore
+
+
+def test_mistral_openai_client_still_uses_from_openai(monkeypatch):
+    """provider="mistral" with an OpenAI SDK client must keep using from_openai.
+
+    The OpenAI-style shape (chat.completions.create) is detected first, so an
+    OpenAI-compatible client is never mistaken for a native Mistral client.
+    """
+    import instructor
+
+    from_openai_called = {"v": False}
+    from_mistral_called = {"v": False}
+
+    def mock_from_openai(client, mode=None):
+        from_openai_called["v"] = True
+        return MockInstructor(client)
+
+    def mock_from_mistral(client, mode=None, use_async=False, **kwargs):
+        from_mistral_called["v"] = True
+        return MockInstructor(client)
+
+    monkeypatch.setattr(instructor, "from_openai", mock_from_openai)
+    monkeypatch.setattr(instructor, "from_mistral", mock_from_mistral, raising=False)
+
+    # OpenAI-style client (has chat.completions.create); drop messages to mimic OpenAI SDK
+    mock_client = MockClient(is_async=False)
+    delattr(mock_client, "messages")
+
+    llm = llm_factory("mistral-large-latest", provider="mistral", client=mock_client)
+
+    assert from_openai_called["v"] is True
+    assert from_mistral_called["v"] is False
+    assert llm.model == "mistral-large-latest"  # type: ignore
 
 
 def test_llm_factory_with_custom_mode(mock_sync_client, monkeypatch):

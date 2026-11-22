@@ -480,10 +480,12 @@ def _patch_client_for_provider(
 
     Detects the client API style and uses the appropriate instructor patching method:
     - OpenAI-compatible (chat.completions.create): Uses instructor.from_openai()
+    - Native Mistral (chat.complete): Uses instructor.from_mistral()
     - Anthropic-compatible (messages.create): Uses instructor.AsyncInstructor/Instructor
 
     This allows OpenAI-compatible providers (DeepSeek, Groq, Mistral, etc.) to work
-    correctly when using OpenAI SDK clients.
+    correctly when using OpenAI SDK clients, as well as the native ``mistralai.Mistral``
+    client whose API shape differs from the OpenAI/Anthropic conventions (see #2774).
     """
     from instructor import Provider
 
@@ -512,6 +514,15 @@ def _patch_client_for_provider(
         and hasattr(client.chat.completions, "create")
     ):
         return instructor.from_openai(client, mode=mode)
+
+    elif _is_mistral_client(client):
+        # Native Mistral SDK (mistralai.Mistral): a single client class exposing
+        # chat.complete / chat.complete_async instead of OpenAI's
+        # chat.completions.create. instructor.from_mistral() handles it.
+        # Default to sync because a single Mistral client class cannot signal
+        # async intent at patch time; async support would require an explicit
+        # flag and is out of scope for this fix. See issue #2774.
+        return instructor.from_mistral(client, mode=mode, use_async=False)
 
     elif (
         hasattr(client, "messages")
@@ -573,6 +584,31 @@ def _is_new_google_genai_client(client: t.Any) -> bool:
         return True
 
     return False
+
+
+def _is_mistral_client(client: t.Any) -> bool:
+    """Detect a native Mistral SDK client (``mistralai.Mistral``).
+
+    Unlike OpenAI-compatible clients, the Mistral SDK uses a single client class
+    that exposes ``chat.complete`` / ``chat.complete_async`` rather than the
+    OpenAI-style ``chat.completions.create`` or the Anthropic-style
+    ``messages.create``. Detection is by module name first, falling back to the
+    distinctive method shape so it also works without importing ``mistralai``.
+
+    Note: passing an OpenAI SDK client with ``provider="mistral"`` is unaffected;
+    such clients match the OpenAI-style branch (checked first) and are not
+    treated as native Mistral clients here.
+    """
+    client_module = (getattr(type(client), "__module__", "") or "").lower()
+    if client_module.startswith("mistralai"):
+        return True
+
+    chat = getattr(client, "chat", None)
+    return (
+        chat is not None
+        and hasattr(chat, "complete")
+        and not hasattr(chat, "completions")
+    )
 
 
 def _get_instructor_client(
