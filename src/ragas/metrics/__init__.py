@@ -98,6 +98,13 @@ from ragas.metrics.numeric import NumericMetric, numeric_metric
 from ragas.metrics.ranking import RankingMetric, ranking_metric
 from ragas.metrics.result import MetricResult
 
+from ragas.metrics._conversation_metrics import (
+    ConversationFaithfulness,
+    ConversationRelevancy,
+    MultiTurnConversation,
+    ConversationTurn,
+)
+
 __all__ = [
     # basic metrics primitives
     "Metric",
@@ -117,6 +124,11 @@ __all__ = [
     "discrete_metric",
     "numeric_metric",
     "ranking_metric",
+    # Multi-turn conversation metrics
+    "ConversationFaithfulness",
+    "ConversationRelevancy",
+    "MultiTurnConversation",
+    "ConversationTurn",
     # Note: Specific metric classes and instances are deprecated from this module
     # and should be imported from ragas.metrics.collections instead.
     # They remain accessible via __getattr__ for backwards compatibility.
