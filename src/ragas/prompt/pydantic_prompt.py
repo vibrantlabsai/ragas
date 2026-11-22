@@ -521,6 +521,17 @@ class FixOutputFormat(PydanticPrompt[OutputStringAndPrompt, StringIO]):
 
 fix_output_format_prompt = FixOutputFormat()
 
+# Temperature used when re-prompting the LLM to fix malformed output.
+#
+# The default generation temperature is near-zero (see
+# ``BaseRagasLLM.get_temperature``), which makes generation effectively
+# deterministic. If the first attempt produced output that failed to parse, a
+# deterministic retry would send the *same* input and get back the *same*
+# invalid output, so every retry is wasted and parsing always fails after
+# exhausting ``retries_left``. Using a non-zero temperature for the fix attempt
+# gives the model a chance to produce different, valid output.
+FIX_OUTPUT_FORMAT_TEMPERATURE = 0.7
+
 
 class RagasOutputParser(PydanticOutputParser[OutputModel]):
     async def parse_output_string(
@@ -548,6 +559,7 @@ class RagasOutputParser(PydanticOutputParser[OutputModel]):
                         output_string=output_string,
                         prompt_value=prompt_value.to_string(),
                     ),
+                    temperature=FIX_OUTPUT_FORMAT_TEMPERATURE,
                     callbacks=retry_cb,
                     retries_left=retries_left - 1,
                 )

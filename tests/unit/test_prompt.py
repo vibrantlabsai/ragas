@@ -233,6 +233,72 @@ async def test_prompt_parse_retry():
         )
 
 
+@pytest.mark.asyncio
+async def test_prompt_fix_output_uses_nonzero_temperature():
+    """Regression guard for the low-temperature JSON retry death-spiral.
+
+    When the first generation produces output that fails to parse, ragas
+    re-prompts the LLM to fix it. That fix attempt must run at a
+    non-deterministic temperature -- otherwise a deterministic model (e.g. any
+    provider at temperature ~0) re-emits the identical malformed output and
+    every retry is wasted. Here we assert the initial attempt stays
+    deterministic while every fix retry uses ``FIX_OUTPUT_FORMAT_TEMPERATURE``.
+    """
+    from ragas.exceptions import RagasOutputParserException
+    from ragas.prompt import PydanticPrompt, StringIO
+    from ragas.prompt.pydantic_prompt import FIX_OUTPUT_FORMAT_TEMPERATURE
+
+    recorded_temperatures: t.List[t.Optional[float]] = []
+
+    class RecordingLLM(BaseRagasLLM):
+        """Always echoes back invalid JSON, recording each call's temperature."""
+
+        def generate_text(  # type: ignore
+            self,
+            prompt: StringPromptValue,
+            *args,
+            **kwargs,
+        ) -> LLMResult:
+            return LLMResult(generations=[[Generation(text="not valid json")]])
+
+        async def agenerate_text(  # type: ignore
+            self,
+            prompt: StringPromptValue,
+            n: int = 1,
+            temperature: t.Optional[float] = None,
+            stop: t.Optional[t.List[str]] = None,
+            callbacks: t.Any = None,
+        ) -> LLMResult:
+            recorded_temperatures.append(temperature)
+            return LLMResult(generations=[[Generation(text="not valid json")]])
+
+        def is_finished(self, response: LLMResult) -> bool:
+            return True
+
+    class OutputModel(BaseModel):
+        example: str
+
+    class Prompt(PydanticPrompt[StringIO, OutputModel]):
+        instruction = ""
+        input_model = StringIO
+        output_model = OutputModel
+
+    llm = RecordingLLM(run_config=RunConfig())
+    prompt = Prompt()
+
+    with pytest.raises(RagasOutputParserException):
+        await prompt.generate(data=StringIO(text="x"), llm=llm)
+
+    # The initial generation is deterministic (default temperature for n=1).
+    assert recorded_temperatures, "LLM was never called"
+    assert recorded_temperatures[0] == 0.01
+    # Every subsequent call is a fix-output retry and must be non-deterministic.
+    assert len(recorded_temperatures) > 1, "no fix-output retry was attempted"
+    assert all(
+        temp == FIX_OUTPUT_FORMAT_TEMPERATURE for temp in recorded_temperatures[1:]
+    )
+
+
 def cosine_similarity(v1: t.List[float], v2: t.List[float]) -> float:
     """Calculate cosine similarity between two vectors."""
     v1_array = np.array(v1)
