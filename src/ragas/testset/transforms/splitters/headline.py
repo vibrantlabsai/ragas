@@ -62,7 +62,7 @@ class HeadlineSplitter(Splitter):
 
         headlines = node.get_property("headlines")
         if headlines is None:
-            raise ValueError("'headlines' property not found in this node")
+            headlines = []
 
         if num_tokens_from_string(text) < self.min_tokens:
             return [node], []
