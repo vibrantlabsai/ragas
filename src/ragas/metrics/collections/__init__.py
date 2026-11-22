@@ -48,6 +48,22 @@ from ragas.metrics.collections.tool_call_accuracy import ToolCallAccuracy
 from ragas.metrics.collections.tool_call_f1 import ToolCallF1
 from ragas.metrics.collections.topic_adherence import TopicAdherence
 
+# Backward-compatible aliases for metrics that were renamed between the old API
+# (ragas.metrics) and the new collections API. The deprecation warnings in
+# ragas.metrics.__init__ tell users to do:
+#     from ragas.metrics.collections import <OldName>
+# These aliases ensure those imports work.
+AnswerSimilarity = SemanticSimilarity
+ChrfScore = CHRFScore
+InstanceRubrics = InstanceSpecificRubrics
+LLMContextPrecisionWithoutReference = ContextPrecisionWithoutReference
+LLMContextPrecisionWithReference = ContextPrecisionWithReference
+LLMSQLEquivalence = SQLSemanticEquivalence
+ResponseRelevancy = AnswerRelevancy
+RubricsScore = DomainSpecificRubrics
+SummarizationScore = SummaryScore
+TopicAdherenceScore = TopicAdherence
+
 __all__ = [
     "BaseMetric",  # Base class
     # RAG metrics
@@ -92,4 +108,15 @@ __all__ = [
     # SQL & Data metrics
     "DataCompyScore",
     "SQLSemanticEquivalence",
+    # Backward-compatible aliases (old API names → new collections names)
+    "AnswerSimilarity",  # → SemanticSimilarity
+    "ChrfScore",  # → CHRFScore
+    "InstanceRubrics",  # → InstanceSpecificRubrics
+    "LLMContextPrecisionWithoutReference",  # → ContextPrecisionWithoutReference
+    "LLMContextPrecisionWithReference",  # → ContextPrecisionWithReference
+    "LLMSQLEquivalence",  # → SQLSemanticEquivalence
+    "ResponseRelevancy",  # → AnswerRelevancy
+    "RubricsScore",  # → DomainSpecificRubrics
+    "SummarizationScore",  # → SummaryScore
+    "TopicAdherenceScore",  # → TopicAdherence
 ]
