@@ -48,7 +48,7 @@ def test_wrappers_with_missing_haystack(monkeypatch):
     - Non-Haystack wrappers import and instantiate without error.
     - Importing HaystackEmbeddingsWrapper fails with an ImportError.
     """
-
+    pytest.importorskip("llama_index")
     real_import = builtins.__import__
 
     # Define our mock import function that raises ImportError if "haystack" is imported

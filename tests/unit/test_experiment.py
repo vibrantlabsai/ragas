@@ -39,6 +39,7 @@ def temp_dir():
 @pytest.fixture
 def mock_git_repo(temp_dir):
     """Create a mock git repository."""
+    pytest.importorskip("git")
     git_dir = temp_dir / ".git"
     git_dir.mkdir()
 

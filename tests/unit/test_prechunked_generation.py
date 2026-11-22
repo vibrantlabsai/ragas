@@ -1,5 +1,5 @@
 from langchain_core.documents import Document
-
+import pytest
 from ragas.embeddings import BaseRagasEmbeddings
 from ragas.llms import BaseRagasLLM
 from ragas.testset.graph import NodeType
@@ -38,6 +38,7 @@ class MockEmbeddings(BaseRagasEmbeddings):
 
 def test_prechunked_transforms_has_no_splitter():
     """Prechunked transforms should not contain any splitter."""
+    pytest.importorskip("rapidfuzz")
     llm = MockLLM()
     embeddings = MockEmbeddings()
 
