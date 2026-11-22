@@ -5,7 +5,7 @@ repos:
     hooks:
       - id: monorepo-ci
         name: Run complete monorepo CI pipeline
-        entry: make run-ci-format-check
+        entry: make -f Makefile run-ci-format-check
         language: system
         pass_filenames: false
         always_run: true

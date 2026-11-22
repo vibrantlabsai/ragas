@@ -147,20 +147,22 @@ class FactualCorrectness(BaseMetric):
             response_reference = np.array([], dtype=bool)
 
         # Step 2: Compute TP, FP, FN exactly like legacy
-        tp = int(np.sum(reference_response))
+        tp_precision = int(np.sum(reference_response))
         fp = int(np.sum(~reference_response))
         if self.mode != "precision":
+            tp_recall = int(np.sum(response_reference))
             fn = int(np.sum(~response_reference))
         else:
+            tp_recall = 0
             fn = 0
 
         # Step 3: Compute final score based on mode
         if self.mode == "precision":
-            score = tp / (tp + fp + 1e-8)
+            score = tp_precision / (tp_precision + fp + 1e-8)
         elif self.mode == "recall":
-            score = tp / (tp + fn + 1e-8)
+            score = tp_recall / (tp_recall + fn + 1e-8)
         else:  # f1
-            score = fbeta_score(tp, fp, fn, self.beta)
+            score = fbeta_score(tp_precision, fp, fn, self.beta)
 
         return MetricResult(value=float(np.round(score, 2)))
 
