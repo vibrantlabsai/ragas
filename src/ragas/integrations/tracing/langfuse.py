@@ -125,9 +125,9 @@ async def sync_trace(
             trace = TraceWithFullDetails(
                 id=trace_id,
                 timestamp=datetime.now(),
-                htmlPath="",
+                html_path="",
                 latency=0,
-                totalCost=0.0,
+                total_cost=0.0,
                 observations=[],
                 scores=[],
                 tags=[],
