@@ -5,10 +5,8 @@ from openai import OpenAI
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 
-SYSTEM_PROMPT = """
-You are a helpful assistant. I will provide a movie review and you will classify it as either positive or negative.
-Please respond with "positive" or "negative" only.
-"""
+SYSTEM_PROMPT = """You are a helpful assistant. I will provide a movie review and you will classify it as either positive or negative.
+Please respond with "positive" or "negative" only."""
 
 
 def run_prompt(prompt: str):
