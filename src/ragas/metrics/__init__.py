@@ -97,7 +97,7 @@ from ragas.metrics.discrete import DiscreteMetric, discrete_metric
 from ragas.metrics.numeric import NumericMetric, numeric_metric
 from ragas.metrics.ranking import RankingMetric, ranking_metric
 from ragas.metrics.result import MetricResult
-
+from ragas.metrics.hallucination import HallucinationMetric
 __all__ = [
     # basic metrics primitives
     "Metric",
