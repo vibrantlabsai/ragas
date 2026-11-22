@@ -105,6 +105,36 @@ def test_evaluation_dataset_save_load_jsonl(tmpdir, eval_sample):
     assert loaded_dataset == dataset
 
 
+def test_evaluation_dataset_export_non_ascii_is_utf8(tmpdir, monkeypatch):
+    """to_csv/to_jsonl/from_jsonl use UTF-8 even where the locale default (e.g. cp1252 on Windows) can't encode the text."""
+    import builtins
+    import csv
+
+    real_open = builtins.open
+
+    def cp1252_default(file, mode="r", *args, encoding=None, **kwargs):
+        if "b" not in mode and encoding is None:
+            encoding = "cp1252"
+        return real_open(file, mode, *args, encoding=encoding, **kwargs)
+
+    monkeypatch.setattr("ragas.dataset_schema.open", cp1252_default, raising=False)
+    sample = SingleTurnSample(
+        user_input="中国的首都是哪里",
+        response="北京",
+        retrieved_contexts=["北京是中国的首都。"],
+    )
+    dataset = EvaluationDataset(samples=[sample])
+
+    jsonl_path = tmpdir / "non_ascii.jsonl"
+    dataset.to_jsonl(jsonl_path)
+    assert EvaluationDataset.from_jsonl(jsonl_path) == dataset
+
+    csv_path = tmpdir / "non_ascii.csv"
+    dataset.to_csv(csv_path)
+    with real_open(csv_path, encoding="utf-8", newline="") as f:
+        assert next(csv.DictReader(f))["user_input"] == "中国的首都是哪里"
+
+
 @pytest.mark.parametrize("eval_sample", samples)
 def test_evaluation_dataset_load_from_hf(eval_sample):
     dataset = EvaluationDataset(samples=[eval_sample, eval_sample])
