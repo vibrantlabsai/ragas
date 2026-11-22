@@ -19,9 +19,10 @@ from __future__ import annotations
 import re
 from typing import Dict, Sequence
 
-# Regular expression to extract both straight and curly quoted spans.  Matches
-# pairs of quotes and captures the inner text.
-_QUOTE_RE = re.compile(r"[\"" "''`´](.*?)[\"" "''`´]")
+# Regular expression to extract both straight and curly quoted spans.  Each
+# opening quote is matched with its own closing quote, so an apostrophe inside
+# a double-quoted span does not end it.
+_QUOTE_RE = re.compile(r"\"(.*?)\"|“(.*?)”|‘(.*?)’|'(.*?)'|`(.*?)`|´(.*?)´")
 
 
 def _normalize(text: str) -> str:
@@ -49,7 +50,8 @@ def _extract_quoted_spans(answer: str, *, min_len: int = 3) -> Sequence[str]:
     """
     spans: list[str] = []
     for match in _QUOTE_RE.finditer(answer):
-        span = (match.group(1) or "").strip()
+        span = next((group for group in match.groups() if group is not None), "")
+        span = span.strip()
         # filter out spans shorter than min_len words
         if len(span.split()) >= min_len:
             spans.append(span)
