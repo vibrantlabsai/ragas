@@ -295,6 +295,17 @@ class LangchainEmbeddingsWrapper(BaseRagasEmbeddings):
             run_config = RunConfig()
         self.set_run_config(run_config)
 
+    def _model_name(self) -> t.Optional[str]:
+        raw = getattr(self.embeddings, "model", None)
+        if isinstance(raw, str):
+            return raw
+        # Some backends (e.g. FastEmbed) store the loaded model object on .model;
+        # fall back to model_name, then the class name, to keep telemetry working.
+        name = getattr(self.embeddings, "model_name", None)
+        if isinstance(name, str):
+            return name
+        return type(self.embeddings).__name__
+
     def embed_query(self, text: str) -> t.List[float]:
         """
         Embed a single query text.
@@ -305,7 +316,7 @@ class LangchainEmbeddingsWrapper(BaseRagasEmbeddings):
         track(
             EmbeddingUsageEvent(
                 provider="langchain",
-                model=getattr(self.embeddings, "model", None),
+                model=self._model_name(),
                 embedding_type="legacy",
                 num_requests=1,
                 is_async=False,
@@ -323,7 +334,7 @@ class LangchainEmbeddingsWrapper(BaseRagasEmbeddings):
         track(
             EmbeddingUsageEvent(
                 provider="langchain",
-                model=getattr(self.embeddings, "model", None),
+                model=self._model_name(),
                 embedding_type="legacy",
                 num_requests=len(texts),
                 is_async=False,
@@ -341,7 +352,7 @@ class LangchainEmbeddingsWrapper(BaseRagasEmbeddings):
         track(
             EmbeddingUsageEvent(
                 provider="langchain",
-                model=getattr(self.embeddings, "model", None),
+                model=self._model_name(),
                 embedding_type="legacy",
                 num_requests=1,
                 is_async=True,
@@ -359,7 +370,7 @@ class LangchainEmbeddingsWrapper(BaseRagasEmbeddings):
         track(
             EmbeddingUsageEvent(
                 provider="langchain",
-                model=getattr(self.embeddings, "model", None),
+                model=self._model_name(),
                 embedding_type="legacy",
                 num_requests=len(texts),
                 is_async=True,
