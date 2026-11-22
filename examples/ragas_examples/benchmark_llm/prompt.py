@@ -22,12 +22,11 @@ def get_client() -> AsyncOpenAI:
     return AsyncOpenAI(api_key=api_key)
 
 
-SYSTEM_PROMPT = """
-You are a discount calculation assistant. I will provide a customer profile and you must calculate their discount percentage and explain your reasoning.
+SYSTEM_PROMPT = """You are a discount calculation assistant. I will provide a customer profile and you must calculate their discount percentage and explain your reasoning.
 
 Discount rules:
 - Age 65+ OR student status: 15% discount
-- Annual income < $30,000: 20% discount  
+- Annual income < $30,000: 20% discount
 - Premium member for 2+ years: 10% discount
 - New customer (< 6 months): 5% discount
 
@@ -38,8 +37,7 @@ Respond in JSON format only:
   "discount_percentage": number,
   "reason": "clear explanation of which rules apply and calculations",
   "applied_rules": ["list", "of", "applied", "rule", "names"]
-}
-"""
+}"""
 
 
 async def run_prompt(prompt: str, model: str = DEFAULT_MODEL):
