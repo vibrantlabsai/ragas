@@ -130,6 +130,32 @@ bedrock_claude_result = LLMResult(
     llm_output={},
 )
 
+# Current langchain-aws ChatBedrock / ChatBedrockConverse shape: token counts on
+# the message-level usage_metadata, model under response_metadata["model_name"].
+bedrock_converse_result = LLMResult(
+    generations=[
+        [
+            ChatGeneration(
+                text="Hello, world!",
+                message=AIMessage(
+                    content="Hello, world!",
+                    usage_metadata={
+                        "input_tokens": 10,
+                        "output_tokens": 10,
+                        "total_tokens": 20,
+                    },
+                    response_metadata={
+                        "model_provider": "bedrock",
+                        "model_name": "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+                        "stop_reason": "end_turn",
+                    },
+                ),
+            )
+        ]
+    ],
+    llm_output={},
+)
+
 azure_ai_result = LLMResult(
     generations=[[ChatGeneration(message=AIMessage(content="Hello, world!"))]],
     llm_output={
@@ -162,6 +188,14 @@ def test_parse_llm_results():
 
     # Bedrock Claude
     token_usage = get_token_usage_for_bedrock(bedrock_claude_result)
+    assert token_usage == TokenUsage(
+        input_tokens=10,
+        output_tokens=10,
+        model="us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+    )
+
+    # Bedrock via current langchain-aws (usage_metadata + model_name)
+    token_usage = get_token_usage_for_bedrock(bedrock_converse_result)
     assert token_usage == TokenUsage(
         input_tokens=10,
         output_tokens=10,

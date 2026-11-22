@@ -116,20 +116,34 @@ def get_token_usage_for_bedrock(
     for gs in llm_result.generations:
         for g in gs:
             if isinstance(g, ChatGeneration):
-                if g.message.response_metadata != {}:
+                # langchain-aws ChatBedrock / ChatBedrockConverse expose token
+                # counts on the message-level usage_metadata and the model under
+                # response_metadata["model_name"]. Older releases used
+                # response_metadata["usage"] and "model_id"; kept as fallbacks.
+                usage_metadata = getattr(g.message, "usage_metadata", None) or {}
+                if usage_metadata or g.message.response_metadata != {}:
                     token_usages.append(
                         TokenUsage(
-                            input_tokens=get_from_dict(
-                                g.message.response_metadata,
-                                "usage.prompt_tokens",
-                                0,
+                            input_tokens=usage_metadata.get(
+                                "input_tokens",
+                                get_from_dict(
+                                    g.message.response_metadata,
+                                    "usage.prompt_tokens",
+                                    0,
+                                ),
                             ),
-                            output_tokens=get_from_dict(
-                                g.message.response_metadata,
-                                "usage.completion_tokens",
-                                0,
+                            output_tokens=usage_metadata.get(
+                                "output_tokens",
+                                get_from_dict(
+                                    g.message.response_metadata,
+                                    "usage.completion_tokens",
+                                    0,
+                                ),
                             ),
                             model=get_from_dict(
+                                g.message.response_metadata, "model_name", ""
+                            )
+                            or get_from_dict(
                                 g.message.response_metadata, "model_id", ""
                             ),
                         )
