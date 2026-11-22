@@ -39,11 +39,13 @@ class BleuScore(BaseMetric):
         self,
         name: str = "bleu_score",
         kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        sentence_separator: t.Optional[str] = ". ",
         **base_kwargs,
     ):
         """Initialize BleuScore metric."""
         super().__init__(name=name, **base_kwargs)
         self.kwargs = kwargs or {}
+        self.sentence_separator = sentence_separator
 
     async def ascore(
         self,
@@ -71,8 +73,8 @@ class BleuScore(BaseMetric):
         assert isinstance(reference, str), "BleuScore expects a valid reference string"
         assert isinstance(response, str), "BleuScore expects a valid response string"
 
-        reference_sentences = reference.split(". ")
-        response_sentences = response.split(". ")
+        reference_sentences = reference.split(self.sentence_separator) if self.sentence_separator else [reference]
+        response_sentences = response.split(self.sentence_separator) if self.sentence_separator else [response]
 
         reference_formatted = [[ref] for ref in reference_sentences]
         response_formatted = response_sentences

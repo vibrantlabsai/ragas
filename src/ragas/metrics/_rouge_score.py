@@ -16,6 +16,7 @@ class RougeScore(SingleTurnMetric):
     )
     rouge_type: t.Literal["rouge1", "rougeL"] = "rougeL"
     mode: t.Literal["fmeasure", "precision", "recall"] = "fmeasure"
+    use_stemmer: bool = True
 
     def __post_init__(self):
         try:
@@ -34,7 +35,7 @@ class RougeScore(SingleTurnMetric):
     ) -> float:
         assert isinstance(sample.reference, str), "Sample reference must be a string"
         assert isinstance(sample.response, str), "Sample response must be a string"
-        scorer = self.rouge_scorer.RougeScorer([self.rouge_type], use_stemmer=True)
+        scorer = self.rouge_scorer.RougeScorer([self.rouge_type], use_stemmer=self.use_stemmer)
         scores = scorer.score(sample.reference, sample.response)
         return getattr(scores[self.rouge_type], self.mode)
 

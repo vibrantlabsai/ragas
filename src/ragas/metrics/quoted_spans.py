@@ -20,8 +20,9 @@ import re
 from typing import Dict, Sequence
 
 # Regular expression to extract both straight and curly quoted spans.  Matches
-# pairs of quotes and captures the inner text.
-_QUOTE_RE = re.compile(r"[\"" "''`´](.*?)[\"" "''`´]")
+# pairs of quotes and captures the inner text.  Also supports Arabic/French
+# guillemets (« ») commonly used in Arabic and other non-English texts.
+_QUOTE_RE = re.compile(r"[\"" "''`´«](.*?)[\"" "''`´»]")
 
 
 def _normalize(text: str) -> str:

@@ -46,12 +46,14 @@ class RougeScore(BaseMetric):
         name: str = "rouge_score",
         rouge_type: t.Literal["rouge1", "rougeL"] = "rougeL",
         mode: t.Literal["fmeasure", "precision", "recall"] = "fmeasure",
+        use_stemmer: bool = True,
         **kwargs,
     ):
         """Initialize RougeScore metric."""
         super().__init__(name=name, **kwargs)
         self.rouge_type = rouge_type
         self.mode = mode
+        self.use_stemmer = use_stemmer
 
     async def ascore(
         self,
@@ -78,7 +80,7 @@ class RougeScore(BaseMetric):
             )
 
         # Calculate ROUGE score
-        scorer = rouge_scorer.RougeScorer([self.rouge_type], use_stemmer=True)
+        scorer = rouge_scorer.RougeScorer([self.rouge_type], use_stemmer=self.use_stemmer)
         scores = scorer.score(reference, response)
         score_value = getattr(scores[self.rouge_type], self.mode)
 

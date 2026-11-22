@@ -15,6 +15,7 @@ class BleuScore(SingleTurnMetric):
         default_factory=lambda: {MetricType.SINGLE_TURN: {"reference", "response"}}
     )
     kwargs: t.Dict[str, t.Any] = field(default_factory=dict)
+    sentence_separator: t.Optional[str] = ". "
 
     def __post_init__(self):
         try:
@@ -35,8 +36,8 @@ class BleuScore(SingleTurnMetric):
         assert isinstance(reference, str), "BleuScore expects a valid reference string"
         assert isinstance(response, str), "BleuScore expects a valid response string"
 
-        reference_sentences = reference.split(". ")
-        response_sentences = response.split(". ")
+        reference_sentences = reference.split(self.sentence_separator) if self.sentence_separator else [reference]
+        response_sentences = response.split(self.sentence_separator) if self.sentence_separator else [response]
 
         reference = [[reference] for reference in reference_sentences]
         response = response_sentences
