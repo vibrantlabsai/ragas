@@ -39,6 +39,50 @@ def test_debug_tracking_flag(monkeypatch):
     assert os.environ.get(RAGAS_DEBUG_TRACKING, "").lower() == "true"
 
 
+@pytest.mark.parametrize(
+    "env_var,env_value,expected",
+    [
+        ("RAGAS_DO_NOT_TRACK", "true", True),
+        ("RAGAS_DO_NOT_TRACK", "false", False),
+        ("DO_NOT_TRACK", "1", True),
+        ("DO_NOT_TRACK", "true", True),
+        ("DO_NOT_TRACK", "0", False),
+        ("DO_NOT_TRACK", "", False),
+        ("DISABLE_TELEMETRY", "1", True),
+        ("DISABLE_TELEMETRY", "true", True),
+        ("DISABLE_TELEMETRY", "0", False),
+        ("DISABLE_TELEMETRY", "false", False),
+    ],
+)
+def test_do_not_track_env_vars(monkeypatch, env_var, env_value, expected):
+    """Test that do_not_track() respects DO_NOT_TRACK and DISABLE_TELEMETRY env vars."""
+    from ragas._analytics import do_not_track
+
+    # Clear cache and ensure clean env
+    do_not_track.cache_clear()
+    monkeypatch.delenv("RAGAS_DO_NOT_TRACK", raising=False)
+    monkeypatch.delenv("DO_NOT_TRACK", raising=False)
+    monkeypatch.delenv("DISABLE_TELEMETRY", raising=False)
+
+    monkeypatch.setenv(env_var, env_value)
+    assert do_not_track() == expected
+    do_not_track.cache_clear()
+
+
+def test_is_truthy():
+    from ragas._analytics import _is_truthy
+
+    assert _is_truthy("1") is True
+    assert _is_truthy("true") is True
+    assert _is_truthy("yes") is True
+    assert _is_truthy("anything") is True
+    assert _is_truthy("0") is False
+    assert _is_truthy("false") is False
+    assert _is_truthy("no") is False
+    assert _is_truthy("") is False
+    assert _is_truthy(None) is False
+
+
 def test_base_event():
     from ragas._analytics import BaseEvent
 

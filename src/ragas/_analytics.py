@@ -41,12 +41,38 @@ USER_DATA_DIR_NAME = "ragas"
 RAGAS_DO_NOT_TRACK = "RAGAS_DO_NOT_TRACK"
 RAGAS_DEBUG_TRACKING = "__RAGAS_DEBUG_TRACKING"
 
+# Standard telemetry opt-out env vars (see https://consoledonottrack.com/)
+DO_NOT_TRACK = "DO_NOT_TRACK"
+DISABLE_TELEMETRY = "DISABLE_TELEMETRY"
+
+
+def _is_truthy(val: t.Optional[str]) -> bool:
+    """Check if an environment variable value is truthy (non-empty and not '0'/'false')."""
+    if val is None or val == "":
+        return False
+    return val.lower() not in ("0", "false", "no")
+
 
 @lru_cache(maxsize=1)
 def do_not_track() -> bool:  # pragma: no cover
-    # Returns True if and only if the environment variable is defined and has value True
-    # The function is cached for better performance.
-    return os.environ.get(RAGAS_DO_NOT_TRACK, str(False)).lower() == "true"
+    """Returns True if telemetry should be disabled.
+
+    Respects the following environment variables:
+    - RAGAS_DO_NOT_TRACK: Ragas-specific opt-out (legacy, checks for "true")
+    - DO_NOT_TRACK: Standard opt-out (see https://consoledonottrack.com/)
+    - DISABLE_TELEMETRY: Alternative standard opt-out
+
+    The function is cached for better performance.
+    """
+    # Legacy behavior: RAGAS_DO_NOT_TRACK=true
+    if os.environ.get(RAGAS_DO_NOT_TRACK, str(False)).lower() == "true":
+        return True
+    # Standard opt-out: DO_NOT_TRACK=1 or DISABLE_TELEMETRY=1
+    if _is_truthy(os.environ.get(DO_NOT_TRACK)):
+        return True
+    if _is_truthy(os.environ.get(DISABLE_TELEMETRY)):
+        return True
+    return False
 
 
 @lru_cache(maxsize=1)
