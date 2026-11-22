@@ -174,3 +174,44 @@ bedrock_embeddings = embedding_factory(
 )
 ```
 Yay! Now you are ready to use ragas with AWS Bedrock endpoints
+
+### DeepSeek (OpenAI-Compatible)
+
+DeepSeek provides an OpenAI-compatible API, which allows it to be used with Ragas via LangChain or other OpenAI-compatible clients. While not natively listed as a provider, it can be integrated through this approach.
+
+```bash
+pip install langchain-openai
+```
+
+```python
+import os
+from langchain_openai import ChatOpenAI
+from ragas.llms import LangchainLLMWrapper
+
+# Initialize DeepSeek model via LangChain
+base_llm = ChatOpenAI(
+    model="deepseek-chat",
+    base_url="https://api.deepseek.com",
+    api_key="your-deepseek-api-key",
+)
+
+# Wrap with Ragas LLM wrapper
+deepseek_llm = LangchainLLMWrapper(base_llm)
+```
+
+You can now use `deepseek_llm` as the evaluation LLM in Ragas:
+```python
+from ragas import evaluate
+from ragas.metrics import faithfulness, answer_relevancy
+
+result = evaluate(
+    dataset,
+    llm=deepseek_llm,
+    metrics=[faithfulness, answer_relevancy],
+)
+
+print(result)
+```
+> Note: Since Ragas uses the LLM as a judge, evaluation results may vary depending on the model used. DeepSeek may produce different scoring behavior compared to OpenAI or other providers.
+
+Yay! Now you are ready to use ragas with DeepSeek endpoints
