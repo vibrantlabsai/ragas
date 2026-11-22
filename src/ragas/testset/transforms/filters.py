@@ -67,7 +67,7 @@ class CustomNodeFilter(LLMBasedNodeFilter):
             if len(parent_nodes) > 0:
                 summary = parent_nodes[0].properties.get("summary", "")
             else:
-                summary = ""
+                summary = node.properties.get("summary", "")
         else:
             summary = node.properties.get("summary", "")
 

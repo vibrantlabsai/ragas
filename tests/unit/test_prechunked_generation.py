@@ -1,10 +1,14 @@
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
+
 from langchain_core.documents import Document
 
 from ragas.embeddings import BaseRagasEmbeddings
 from ragas.llms import BaseRagasLLM
-from ragas.testset.graph import NodeType
+from ragas.testset.graph import KnowledgeGraph, Node, NodeType
 from ragas.testset.synthesizers.generate import TestsetGenerator
 from ragas.testset.transforms.default import default_transforms_for_prechunked
+from ragas.testset.transforms.filters import CustomNodeFilter, QuestionPotentialOutput
 from ragas.testset.transforms.splitters import HeadlineSplitter
 
 
@@ -164,3 +168,27 @@ def test_generate_with_chunks_handles_empty_sequence():
 
     kg = generator.knowledge_graph
     assert len(kg.nodes) == 0
+
+
+def test_custom_node_filter_scores_prechunked_chunk_summary_without_parent():
+    """Prechunked CHUNK nodes with summaries should be scored without parents."""
+    node = Node(
+        type=NodeType.CHUNK,
+        properties={
+            "page_content": "Chunk content about climate policy.",
+            "summary": "A summary of the climate policy chunk.",
+        },
+    )
+    kg = KnowledgeGraph(nodes=[node])
+    scoring_prompt = MagicMock()
+    scoring_prompt.generate = AsyncMock(return_value=QuestionPotentialOutput(score=1))
+    node_filter = CustomNodeFilter(
+        llm=MagicMock(),
+        scoring_prompt=scoring_prompt,
+        min_score=2,
+    )
+
+    result = asyncio.run(node_filter.custom_filter(node, kg))
+
+    assert result is True
+    scoring_prompt.generate.assert_awaited_once()
