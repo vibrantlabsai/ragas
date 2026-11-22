@@ -246,11 +246,15 @@ class LangchainLLMWrapper(BaseRagasLLM):
     ) -> LLMResult:
         # figure out the temperature to set
         old_temperature: float | None = None
-        if temperature is None:
-            temperature = self.get_temperature(n=n)
-        if hasattr(self.langchain_llm, "temperature"):
+        if hasattr(self.langchain_llm, "temperature") and not self.bypass_temperature:
             old_temperature = self.langchain_llm.temperature  # type: ignore
+            if temperature is None:
+                llm_temperature = self.langchain_llm.temperature  # type: ignore
+                temperature = llm_temperature if llm_temperature is not None else self.get_temperature(n=n)
             self.langchain_llm.temperature = temperature  # type: ignore
+        else:
+            if temperature is None:
+                temperature = self.get_temperature(n=n)
 
         if is_multiple_completion_supported(self.langchain_llm) and not self.bypass_n:
             result = self.langchain_llm.generate_prompt(
@@ -298,11 +302,15 @@ class LangchainLLMWrapper(BaseRagasLLM):
     ) -> LLMResult:
         # handle temperature
         old_temperature: float | None = None
-        if temperature is None:
-            temperature = self.get_temperature(n=n)
         if hasattr(self.langchain_llm, "temperature") and not self.bypass_temperature:
             old_temperature = self.langchain_llm.temperature  # type: ignore
+            if temperature is None:
+                llm_temperature = self.langchain_llm.temperature  # type: ignore
+                temperature = llm_temperature if llm_temperature is not None else self.get_temperature(n=n)
             self.langchain_llm.temperature = temperature  # type: ignore
+        else:
+            if temperature is None:
+                temperature = self.get_temperature(n=n)
 
         # handle n
         if hasattr(self.langchain_llm, "n") and not self.bypass_n:
