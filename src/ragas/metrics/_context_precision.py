@@ -16,6 +16,7 @@ from ragas.metrics.base import (
     SingleTurnMetric,
     ensembler,
 )
+from ragas.metrics.utils import meets_threshold
 from ragas.prompt import PydanticPrompt
 from ragas.run_config import RunConfig
 
@@ -231,7 +232,10 @@ class NonLLMContextPrecisionWithReference(SingleTurnMetric):
                     ]
                 )
             )
-        scores = [1 if score >= self.threshold else 0 for score in scores]
+        # Same shared boundary rule as NonLLMContextRecall (issue #2777).
+        scores = [
+            1 if meets_threshold(score, self.threshold) else 0 for score in scores
+        ]
         return self._calculate_average_precision(scores)
 
     def _calculate_average_precision(self, verdict_list: t.List[int]) -> float:
