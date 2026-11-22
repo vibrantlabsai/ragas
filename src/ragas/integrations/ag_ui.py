@@ -633,14 +633,42 @@ class AGUIEventCollector:
                     tool_calls = []
                     for tc in msg.tool_calls:
                         tc_obj = t.cast(Any, tc)
-                        name = t.cast(str, getattr(tc_obj, "name", "unknown_tool"))
-                        raw_args = getattr(tc_obj, "args", {})
-                        if not isinstance(raw_args, dict):
-                            raw_args = {"raw_args": raw_args}
+                        func = getattr(tc_obj, "function", None)
+                        if func is not None:
+                            name = t.cast(
+                                str,
+                                getattr(func, "name", None)
+                                or getattr(tc_obj, "name", "unknown_tool"),
+                            )
+                            raw_args = (
+                                getattr(func, "arguments", None)
+                                if hasattr(func, "arguments")
+                                else getattr(tc_obj, "args", {})
+                            )
+                        else:
+                            name = t.cast(str, getattr(tc_obj, "name", "unknown_tool"))
+                            raw_args = getattr(tc_obj, "args", {})
+
+                        if isinstance(raw_args, str):
+                            try:
+                                parsed = json.loads(raw_args)
+                                if isinstance(parsed, dict):
+                                    args = parsed
+                                else:
+                                    args = {"raw_args": parsed}
+                            except (json.JSONDecodeError, TypeError):
+                                args = {"raw_args": raw_args}
+                        elif isinstance(raw_args, dict):
+                            args = raw_args
+                        elif raw_args is None:
+                            args = {}
+                        else:
+                            args = {"raw_args": raw_args}
+
                         tool_calls.append(
                             ToolCall(
                                 name=name,
-                                args=t.cast(Dict[str, Any], raw_args),
+                                args=t.cast(Dict[str, Any], args),
                             )
                         )
                 self.messages.append(

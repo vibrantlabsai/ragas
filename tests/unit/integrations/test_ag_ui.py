@@ -236,6 +236,55 @@ def test_snapshot_with_metadata():
     assert messages[0].metadata["message_id"] == "msg-1"
 
 
+def test_messages_snapshot_with_tool_calls():
+    """Test that tool call name and arguments are preserved in MessagesSnapshotEvent."""
+    from ag_ui.core import FunctionCall, ToolCall as AGUIToolCall
+    from ragas.integrations.ag_ui import convert_messages_snapshot
+
+    snapshot = MessagesSnapshotEvent(
+        messages=[
+            AssistantMessage(
+                id="msg-1",
+                content="Checking weather",
+                tool_calls=[
+                    AGUIToolCall(
+                        id="tc-1",
+                        type="function",
+                        function=FunctionCall(
+                            name="get_weather",
+                            arguments='{"location": "San Francisco", "unit": "celsius"}',
+                        ),
+                    ),
+                    AGUIToolCall(
+                        id="tc-2",
+                        type="function",
+                        function=FunctionCall(
+                            name="get_time",
+                            arguments="not-valid-json",
+                        ),
+                    ),
+                ],
+            )
+        ]
+    )
+
+    messages = convert_messages_snapshot(snapshot)
+
+    assert len(messages) == 1
+    assert isinstance(messages[0], AIMessage)
+    assert messages[0].tool_calls is not None
+    assert len(messages[0].tool_calls) == 2
+
+    assert messages[0].tool_calls[0].name == "get_weather"
+    assert messages[0].tool_calls[0].args == {
+        "location": "San Francisco",
+        "unit": "celsius",
+    }
+
+    assert messages[0].tool_calls[1].name == "get_time"
+    assert messages[0].tool_calls[1].args == {"raw_args": "not-valid-json"}
+
+
 def test_non_message_events_filtered():
     """Test that non-message events are silently filtered."""
     from ragas.integrations.ag_ui import convert_to_ragas_messages
