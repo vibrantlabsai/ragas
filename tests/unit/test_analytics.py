@@ -297,3 +297,94 @@ def test_analytics_batcher_flush(monkeypatch, evaluation_events, expected_num_ro
     assert flush_mock_call_count[0] == math.ceil(
         sum(expected_num_rows_set) / BATCH_SIZE
     )
+
+def test_do_not_track_standard_env_vars(monkeypatch):
+    """Test that all standard do-not-track env vars are respected."""
+    from ragas._analytics import do_not_track
+
+    # Test DO_NOT_TRACK=1
+    do_not_track.cache_clear()
+    monkeypatch.setenv("DO_NOT_TRACK", "1")
+    assert do_not_track() is True
+    monkeypatch.delenv("DO_NOT_TRACK")
+
+    # Test DISABLE_TELEMETRY=1
+    do_not_track.cache_clear()
+    monkeypatch.setenv("DISABLE_TELEMETRY", "1")
+    assert do_not_track() is True
+    monkeypatch.delenv("DISABLE_TELEMETRY")
+
+    # Test RAGAS_ANALYTICS_ENABLED=false
+    do_not_track.cache_clear()
+    monkeypatch.setenv("RAGAS_ANALYTICS_ENABLED", "false")
+    assert do_not_track() is True
+    monkeypatch.delenv("RAGAS_ANALYTICS_ENABLED")
+
+    # Test RAGAS_TELEMETRY_ENABLED=false
+    do_not_track.cache_clear()
+    monkeypatch.setenv("RAGAS_TELEMETRY_ENABLED", "false")
+    assert do_not_track() is True
+    monkeypatch.delenv("RAGAS_TELEMETRY_ENABLED")
+
+    # Test default — tracking enabled
+    do_not_track.cache_clear()
+    assert do_not_track() is False
+
+
+def test_track_runs_in_daemon_thread(monkeypatch):
+    """Test that track() fires in a daemon thread and doesn't block."""
+    import threading
+    import time
+    from ragas._analytics import BaseEvent, track
+
+    monkeypatch.setattr("ragas._analytics.do_not_track", lambda: False)
+    monkeypatch.setattr("ragas._analytics._usage_event_debugging", lambda: False)
+
+    threads_used = []
+
+    original_thread_init = threading.Thread.__init__
+
+    def patched_init(self, *args, **kwargs):
+        original_thread_init(self, *args, **kwargs)
+        threads_used.append(self)
+
+    monkeypatch.setattr(threading.Thread, "__init__", patched_init)
+
+    # Mock requests.post to avoid real network call
+    monkeypatch.setattr(
+        "ragas._analytics.requests.post",
+        lambda *a, **kw: None,
+    )
+
+    event = BaseEvent(event_type="test_event")
+    start = time.time()
+    track(event)
+    elapsed = time.time() - start
+
+    # Should return almost instantly — not block for DNS timeout
+    assert elapsed < 1.0, f"track() blocked for {elapsed:.2f}s — DNS fix not working"
+    # A daemon thread should have been created
+    assert any(t.daemon for t in threads_used)
+
+
+def test_track_dns_failure_does_not_block(monkeypatch):
+    """Test that a simulated DNS failure doesn't block the main thread."""
+    import time
+    from ragas._analytics import BaseEvent, track
+
+    monkeypatch.setattr("ragas._analytics.do_not_track", lambda: False)
+    monkeypatch.setattr("ragas._analytics._usage_event_debugging", lambda: False)
+
+    def slow_post(*args, **kwargs):
+        # Simulate a 10s DNS hang
+        time.sleep(10)
+
+    monkeypatch.setattr("ragas._analytics.requests.post", slow_post)
+
+    event = BaseEvent(event_type="test_event")
+    start = time.time()
+    track(event)
+    elapsed = time.time() - start
+
+    # Main thread must return in under 1s even with 10s DNS hang
+    assert elapsed < 1.0, f"track() blocked for {elapsed:.2f}s"

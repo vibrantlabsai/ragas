@@ -39,14 +39,32 @@ USAGE_REQUESTS_TIMEOUT_SEC = 1
 USER_DATA_DIR_NAME = "ragas"
 # Any chance you chance this also change the variable in our ci.yaml file
 RAGAS_DO_NOT_TRACK = "RAGAS_DO_NOT_TRACK"
+# Standard do-not-track env vars (issue #2603)
+DO_NOT_TRACK = "DO_NOT_TRACK"
+DISABLE_TELEMETRY = "DISABLE_TELEMETRY"
+RAGAS_ANALYTICS_ENABLED = "RAGAS_ANALYTICS_ENABLED"
+RAGAS_TELEMETRY_ENABLED = "RAGAS_TELEMETRY_ENABLED"
 RAGAS_DEBUG_TRACKING = "__RAGAS_DEBUG_TRACKING"
 
 
 @lru_cache(maxsize=1)
 def do_not_track() -> bool:  # pragma: no cover
-    # Returns True if and only if the environment variable is defined and has value True
-    # The function is cached for better performance.
-    return os.environ.get(RAGAS_DO_NOT_TRACK, str(False)).lower() == "true"
+    # Check RAGAS_DO_NOT_TRACK (primary ragas env var)
+    if os.environ.get(RAGAS_DO_NOT_TRACK, "false").lower() == "true":
+        return True
+    # Check standard DO_NOT_TRACK=1 (consoledonottrack.com standard)
+    if os.environ.get(DO_NOT_TRACK, "0") == "1":
+        return True
+    # Check DISABLE_TELEMETRY=1
+    if os.environ.get(DISABLE_TELEMETRY, "0") == "1":
+        return True
+    # Check RAGAS_ANALYTICS_ENABLED=false
+    if os.environ.get(RAGAS_ANALYTICS_ENABLED, "true").lower() == "false":
+        return True
+    # Check RAGAS_TELEMETRY_ENABLED=false
+    if os.environ.get(RAGAS_TELEMETRY_ENABLED, "true").lower() == "false":
+        return True
+    return False
 
 
 @lru_cache(maxsize=1)
@@ -230,7 +248,19 @@ def track(event_properties: BaseEvent):
         logger.info("Tracking Payload: %s", payload)
         return
 
-    requests.post(USAGE_TRACKING_URL, json=payload, timeout=USAGE_REQUESTS_TIMEOUT_SEC)
+    # Run in a daemon thread so DNS failures never block evaluation (issue #2751)
+    def _send() -> None:
+        try:
+            requests.post(
+                USAGE_TRACKING_URL,
+                json=payload,
+                timeout=USAGE_REQUESTS_TIMEOUT_SEC,
+            )
+        except Exception as err:
+            logger.debug("Telemetry send error: %s", err)
+
+    t = Thread(target=_send, daemon=True)
+    t.start()
 
 
 class IsCompleteEvent(BaseEvent):
