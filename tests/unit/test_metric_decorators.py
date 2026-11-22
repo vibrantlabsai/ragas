@@ -8,6 +8,7 @@ Following TDD approach: Write failing tests first, then implement the fix.
 """
 
 import typing as t
+from unittest.mock import patch
 
 import pytest
 
@@ -650,6 +651,31 @@ class TestErrorHandling:
             simple_str="ok", simple_int=1
         )  # optional_str not provided
         assert result.value == "pass"
+
+    def test_regression_stale_validated_data(self):
+        """Test that metric doesn't use stale validated data when Pydantic model creation fails."""
+
+        received_kwargs = {}
+
+        @discrete_metric(name="stale_data_test", allowed_values=["pass", "fail"])
+        def my_metric(input_text: str) -> str:
+            received_kwargs["input_text"] = input_text
+            return "pass"
+
+        # 1. Call successfully with INPUT_A
+        result = my_metric.score(input_text="INPUT_A")
+        assert result.value == "pass"
+        assert received_kwargs["input_text"] == "INPUT_A"
+
+        # 2. Force Pydantic model creation to fail for the next invocation
+        with patch.object(my_metric, "_create_pydantic_model", side_effect=Exception("forced failure")):
+            with pytest.warns(UserWarning, match="Could not create validation model"):
+                # 3. Supply INPUT_B
+                result = my_metric.score(input_text="INPUT_B")
+
+        # 4. Expected behavior: the underlying metric receives INPUT_B, not stale INPUT_A
+        assert result.value == "pass"
+        assert received_kwargs["input_text"] == "INPUT_B"
 
 
 class TestCustomTypeValidation:

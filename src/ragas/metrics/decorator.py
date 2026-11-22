@@ -224,6 +224,7 @@ def create_metric_decorator():
                         warnings.warn(
                             f"Could not create validation model: {e}", UserWarning
                         )
+                        self._validated_data = kwargs
                         return
 
                     # Warn about unknown arguments (but continue processing)
