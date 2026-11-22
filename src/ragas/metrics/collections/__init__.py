@@ -1,5 +1,6 @@
 """Collections of metrics using modern component architecture."""
 
+from ragas.metrics._faithfulness import FaithfulnesswithHHEM
 from ragas.metrics.collections._bleu_score import BleuScore
 from ragas.metrics.collections._rouge_score import RougeScore
 from ragas.metrics.collections._semantic_similarity import SemanticSimilarity
@@ -67,6 +68,7 @@ __all__ = [
     "ExactMatch",
     "FactualCorrectness",
     "Faithfulness",
+    "FaithfulnesswithHHEM",
     "MultiModalFaithfulness",
     "MultiModalRelevance",
     "NoiseSensitivity",
