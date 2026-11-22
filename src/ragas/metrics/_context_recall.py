@@ -216,7 +216,9 @@ class NonLLMContextRecall(SingleTurnMetric):
         return await self._single_turn_ascore(SingleTurnSample(**row), callbacks)
 
     def _compute_score(self, verdict_list: t.List[float]) -> float:
-        response = [1 if score > self.threshold else 0 for score in verdict_list]
+        # >= so a score exactly at the threshold counts as relevant, consistent
+        # with NonLLMContextPrecisionWithReference.
+        response = [1 if score >= self.threshold else 0 for score in verdict_list]
         denom = len(response)
         numerator = sum(response)
         score = numerator / denom if denom > 0 else np.nan
