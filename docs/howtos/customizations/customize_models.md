@@ -38,6 +38,7 @@ System prompts are particularly useful for:
   - [Azure OpenAI](#azure-openai)
   - [Google Vertex](#google-vertex)
   - [AWS Bedrock](#aws-bedrock)
+  - [DeepSeek](#deepseek)
 
 
 ### Azure OpenAI
@@ -174,3 +175,47 @@ bedrock_embeddings = embedding_factory(
 )
 ```
 Yay! Now you are ready to use ragas with AWS Bedrock endpoints
+
+### DeepSeek
+
+DeepSeek is supported through the OpenAI-compatible API (or via LiteLLM).
+
+```bash
+pip install openai
+# or: pip install litellm
+```
+
+#### Option A: OpenAI-compatible client
+
+```python
+from openai import OpenAI
+from ragas.llms import llm_factory
+
+client = OpenAI(
+    api_key="your-deepseek-api-key",
+    base_url="https://api.deepseek.com",
+)
+
+deepseek_llm = llm_factory(
+    "deepseek-chat",  # or deepseek-reasoner
+    client=client,
+)
+```
+
+#### Option B: LiteLLM
+
+```python
+import litellm
+from ragas.llms import llm_factory
+
+# export DEEPSEEK_API_KEY=...
+deepseek_llm = llm_factory(
+    "deepseek/deepseek-chat",
+    provider="litellm",
+    client=litellm.completion,
+)
+```
+
+Use `deepseek_llm` anywhere Ragas expects an evaluator LLM (metrics, testset generation, etc.).
+
+Yay! Now you are ready to use ragas with DeepSeek
