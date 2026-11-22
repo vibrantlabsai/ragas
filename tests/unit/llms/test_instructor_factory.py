@@ -331,7 +331,7 @@ def test_llm_factory_missing_model():
 
 def test_openai_compatible_providers_with_openai_client(monkeypatch):
     """
-    Test that OpenAI-compatible providers (DeepSeek, Groq, Mistral, etc.)
+    Test that OpenAI-compatible providers (DeepSeek, Groq, Mistral, Abliteration, etc.)
     work correctly with OpenAI SDK clients.
 
     This tests the fix for issue #2560 where provider="deepseek" with
@@ -344,7 +344,14 @@ def test_openai_compatible_providers_with_openai_client(monkeypatch):
     monkeypatch.setattr("instructor.from_openai", mock_from_openai)
 
     # Test OpenAI-compatible providers that use chat.completions.create
-    openai_compatible_providers = ["deepseek", "groq", "mistral", "cohere", "xai"]
+    openai_compatible_providers = [
+        "deepseek",
+        "groq",
+        "mistral",
+        "cohere",
+        "xai",
+        "abliteration",
+    ]
 
     for provider in openai_compatible_providers:
         # Create a mock client with OpenAI-style API (chat.completions.create)

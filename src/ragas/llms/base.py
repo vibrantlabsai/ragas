@@ -482,7 +482,7 @@ def _patch_client_for_provider(
     - OpenAI-compatible (chat.completions.create): Uses instructor.from_openai()
     - Anthropic-compatible (messages.create): Uses instructor.AsyncInstructor/Instructor
 
-    This allows OpenAI-compatible providers (DeepSeek, Groq, Mistral, etc.) to work
+    This allows OpenAI-compatible providers (DeepSeek, Groq, Mistral, Abliteration, etc.) to work
     correctly when using OpenAI SDK clients.
     """
     from instructor import Provider
@@ -495,6 +495,7 @@ def _patch_client_for_provider(
         "google": Provider.GENAI,
         "gemini": Provider.GENAI,
         "azure": Provider.OPENAI,
+        "abliteration": Provider.OPENAI,
         "groq": Provider.GROQ,
         "mistral": Provider.MISTRAL,
         "cohere": Provider.COHERE,
@@ -645,7 +646,7 @@ def llm_factory(
     Args:
         model: Model name (e.g., "gpt-4o", "claude-3-sonnet", "gemini-2.0-flash").
         provider: LLM provider (default: "openai").
-                 Examples: openai, anthropic, google, groq, mistral, etc.
+                 Examples: openai, anthropic, google, groq, mistral, abliteration, etc.
         client: Pre-initialized client instance (required). For OpenAI, can be
                OpenAI(...) or AsyncOpenAI(...).
         adapter: Structured output adapter to use (default: "auto").

@@ -621,17 +621,22 @@ def _infer_embedding_provider_from_llm(llm: t.Any) -> str:
     if llm is None:
         return "openai"
 
+    provider_aliases = {
+        "abliteration": "openai",
+    }
+
     # Check for InstructorLLM with provider attribute
     if hasattr(llm, "provider"):
         provider = getattr(llm, "provider", "").lower()
         if provider:
-            return provider
+            return provider_aliases.get(provider, provider)
 
     # Check for other LLM types
     llm_class_name = llm.__class__.__name__.lower()
 
     # Map common LLM class patterns to providers
     provider_mapping = {
+        "abliteration": "openai",
         "anthropic": "anthropic",
         "claude": "anthropic",
         "gemini": "google",

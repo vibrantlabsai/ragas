@@ -76,3 +76,13 @@ def test_backward_compatibility_alias():
     # They should be the same class
     assert RagasBaseEmbedding is BaseRagasEmbedding
     print("Backward compatibility confirmed: RagasBaseEmbedding is BaseRagasEmbedding")
+
+
+def test_infer_embedding_provider_maps_abliteration_to_openai():
+    """Test that Abliteration LLMs fall back to OpenAI embeddings."""
+    from ragas.embeddings.base import _infer_embedding_provider_from_llm
+
+    class MockLLM:
+        provider = "abliteration"
+
+    assert _infer_embedding_provider_from_llm(MockLLM()) == "openai"
