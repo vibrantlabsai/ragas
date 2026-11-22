@@ -38,6 +38,7 @@ System prompts are particularly useful for:
   - [Azure OpenAI](#azure-openai)
   - [Google Vertex](#google-vertex)
   - [AWS Bedrock](#aws-bedrock)
+  - [DeepSeek](#deepseek)
 
 
 ### Azure OpenAI
@@ -174,3 +175,34 @@ bedrock_embeddings = embedding_factory(
 )
 ```
 Yay! Now you are ready to use ragas with AWS Bedrock endpoints
+
+### DeepSeek
+
+```bash
+pip install litellm
+```
+
+```python
+import litellm
+import os
+from ragas.llms import llm_factory
+
+config = {
+    "api_key": "your-deepseek-api-key",
+    "chat_model_id": "deepseek-chat",
+}
+
+# Set environment variables for DeepSeek (used by litellm)
+os.environ["DEEPSEEK_API_KEY"] = config["api_key"]
+
+# Create LLM using llm_factory with litellm provider
+# Important: Pass litellm.completion (the function), not the module
+deepseek_llm = llm_factory(
+    f"deepseek/{config['chat_model_id']}",
+    provider="litellm",
+    client=litellm.completion,
+    # Optional: Add system prompt
+    # system_prompt="You are a helpful assistant that evaluates RAG systems."
+)
+```
+Yay! Now you are ready to use ragas with DeepSeek endpoints
