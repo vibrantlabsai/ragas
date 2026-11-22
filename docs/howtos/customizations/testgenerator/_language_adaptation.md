@@ -1,6 +1,6 @@
 ## Synthetic test generation from non-English corpus
 
-In this notebook, you'll learn how to adapt synthetic test data generation to non-English corpus settings. For the sake of this tutorial, I am generating queries in Spanish from Spanish Wikipedia articles.
+In this notebook, you'll learn how to adapt synthetic test data generation to non-English corpus settings. For the sake of this tutorial, I am generating queries in French from French Wikipedia articles.
 
 ### Download and Load corpus
 
@@ -110,7 +110,7 @@ distribution = [
 ]
 
 for query, _ in distribution:
-    prompts = await query.adapt_prompts("spanish", llm=generator_llm)
+    prompts = await query.adapt_prompts("french", llm=generator_llm)
     query.set_prompts(**prompts)
 ```
 
