@@ -1,4 +1,5 @@
 import typing as t
+import warnings
 
 import pytest
 
@@ -224,3 +225,41 @@ def test_multiturn_sample_validate_user_input_valid_types():
     assert len(sample.user_input) == 2
     assert isinstance(sample.user_input[0], HumanMessage)
     assert isinstance(sample.user_input[1], AIMessage)
+
+
+def _make_eval_result(monkeypatch, scores):
+    from ragas.dataset_schema import EvaluationResult
+
+    # Trace parsing is exercised elsewhere and needs a populated tracer; stub it
+    # out so these tests isolate the NaN-warning behaviour in __post_init__.
+    monkeypatch.setattr("ragas.dataset_schema.parse_run_traces", lambda *a, **k: [])
+    dataset = EvaluationDataset(
+        samples=[
+            SingleTurnSample(user_input="What is X", response="Y")
+            for _ in range(len(scores))
+        ]
+    )
+    return EvaluationResult(scores=scores, dataset=dataset)
+
+
+def test_evaluation_result_warns_on_nan_scores(monkeypatch):
+    """A NaN score means a metric failed silently -- the user must be warned."""
+    import numpy as np
+
+    scores = [
+        {"faithfulness": 0.5, "answer_relevancy": 0.9},
+        {"faithfulness": np.nan, "answer_relevancy": 0.8},
+    ]
+    with pytest.warns(RuntimeWarning, match="faithfulness: 1/2"):
+        _make_eval_result(monkeypatch, scores)
+
+
+def test_evaluation_result_no_warning_when_all_scores_present(monkeypatch):
+    """A fully successful evaluation must not emit the NaN warning."""
+    scores = [
+        {"faithfulness": 0.5, "answer_relevancy": 0.9},
+        {"faithfulness": 0.7, "answer_relevancy": 0.8},
+    ]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # turn any warning into a failure
+        _make_eval_result(monkeypatch, scores)

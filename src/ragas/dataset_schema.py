@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import random
 import typing as t
+import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -14,7 +15,7 @@ from pydantic import BaseModel, field_validator
 from ragas.callbacks import parse_run_traces
 from ragas.cost import CostCallbackHandler
 from ragas.messages import AIMessage, HumanMessage, ToolCall, ToolMessage
-from ragas.utils import safe_nanmean
+from ragas.utils import is_nan, safe_nanmean
 
 if t.TYPE_CHECKING:
     from pathlib import Path
@@ -447,6 +448,33 @@ class EvaluationResult:
             if metric_name not in self.binary_columns:
                 value = t.cast(float, value)
                 values.append(value + 1e-10)
+
+        # Surface NaN scores instead of returning them silently. A NaN score
+        # means the metric could not be computed for that row -- almost always
+        # because it raised an exception that was swallowed (the default
+        # raise_exceptions=False), e.g. an LLM output parse failure, a rate
+        # limit, or empty/invalid input. Without this warning an all-NaN result
+        # looks indistinguishable from a successful run.
+        total_rows = len(self.scores)
+        nan_counts = {
+            metric_name: sum(1 for v in metric_values if is_nan(v))
+            for metric_name, metric_values in self._scores_dict.items()
+        }
+        nan_counts = {name: count for name, count in nan_counts.items() if count}
+        if nan_counts:
+            details = ", ".join(
+                f"{name}: {count}/{total_rows}" for name, count in nan_counts.items()
+            )
+            warnings.warn(
+                f"Evaluation returned NaN for some scores ({details}). A NaN "
+                "score usually means the metric raised an exception that was "
+                "silently caught, such as an LLM output parse failure, a rate "
+                "limit, or empty/invalid input. Re-run evaluate() with "
+                "raise_exceptions=True to see the underlying error, or enable "
+                "logging on the 'ragas' logger for details.",
+                category=RuntimeWarning,
+                stacklevel=2,
+            )
 
         # parse the traces
         run_id = str(self.run_id) if self.run_id is not None else None
