@@ -5,6 +5,7 @@ from typing import List
 
 import numpy as np
 
+from ragas.decision_models import BaseDecisionModel, BinaryDecisionResult
 from ragas.metrics.collections.base import BaseMetric
 from ragas.metrics.result import MetricResult
 
@@ -26,8 +27,9 @@ class ContextPrecisionWithReference(BaseMetric):
     each context against a reference answer. The metric calculates average precision
     based on the usefulness verdicts from an LLM.
 
-    This implementation uses modern instructor LLMs with structured output.
-    Only supports modern components - legacy wrappers are rejected with clear error messages.
+    Uses a modern structured-output LLM by default. An explicit decision_model
+    instead evaluates each context without requiring an LLM. Its selected binary
+    verdicts feed the same average precision calculation.
 
     Usage:
         >>> import openai
@@ -51,17 +53,20 @@ class ContextPrecisionWithReference(BaseMetric):
 
     Attributes:
         llm: Modern instructor-based LLM for context evaluation
+        decision_model: Optional binary judge, taking precedence over llm
         name: The metric name
         allowed_values: Score range (0.0 to 1.0, higher is better)
     """
 
     # Type hints for linter (attributes are set in __init__)
-    llm: "InstructorBaseRagasLLM"
+    llm: t.Optional["InstructorBaseRagasLLM"]
 
     def __init__(
         self,
-        llm: "InstructorBaseRagasLLM",
+        llm: t.Optional["InstructorBaseRagasLLM"] = None,
         name: str = "context_precision_with_reference",
+        *,
+        decision_model: t.Optional[BaseDecisionModel] = None,
         **kwargs,
     ):
         """
@@ -70,13 +75,26 @@ class ContextPrecisionWithReference(BaseMetric):
         Args:
             llm: Modern instructor-based LLM for context evaluation
             name: The metric name
+            decision_model: Optional binary judge. Receives question, context,
+                and answer fields. Its value is used without rethresholding.
+                Per-context results are retained in result.traces["output"]["decisions"].
         """
         # Set attributes explicitly before calling super()
         self.llm = llm
+        if decision_model is not None and not isinstance(
+            decision_model, BaseDecisionModel
+        ):
+            raise TypeError("decision_model must be a BaseDecisionModel")
+        self.decision_model = decision_model
         self.prompt = ContextPrecisionPrompt()  # Initialize prompt class once
 
         # Call super() for validation (without passing llm in kwargs)
         super().__init__(name=name, **kwargs)
+
+    def _validate_llm(self):
+        if self.llm is None and self.decision_model is not None:
+            return
+        super()._validate_llm()
 
     async def ascore(
         self, user_input: str, reference: str, retrieved_contexts: List[str]
@@ -102,17 +120,39 @@ class ContextPrecisionWithReference(BaseMetric):
 
         # Evaluate each retrieved context
         verdicts = []
+        decisions = []
         for context in retrieved_contexts:
             # Create input data and generate prompt
             input_data = ContextPrecisionInput(
                 question=user_input, context=context, answer=reference
             )
-            prompt_string = self.prompt.to_string(input_data)
-            result = await self.llm.agenerate(prompt_string, ContextPrecisionOutput)
-            verdicts.append(result.verdict)
+            if self.decision_model is not None:
+                decision = await self.decision_model.binary(
+                    instruction=(
+                        "Given question, answer and context, decide whether the context "
+                        "was useful in arriving at the given answer."
+                    ),
+                    data=input_data.model_dump(),
+                )
+                if not isinstance(decision, BinaryDecisionResult):
+                    raise TypeError(
+                        "decision_model.binary() must return BinaryDecisionResult"
+                    )
+                decision = BinaryDecisionResult.model_validate(decision)
+                verdicts.append(int(decision.value))
+                decisions.append(decision.model_dump())
+            else:
+                assert self.llm is not None
+                prompt_string = self.prompt.to_string(input_data)
+                result = await self.llm.agenerate(prompt_string, ContextPrecisionOutput)
+                verdicts.append(result.verdict)
 
         # Calculate average precision
         score = self._calculate_average_precision(verdicts)
+        if self.decision_model is not None:
+            return MetricResult(
+                value=float(score), traces={"output": {"decisions": decisions}}
+            )
         return MetricResult(value=float(score))
 
     def _calculate_average_precision(self, verdicts: List[int]) -> float:
@@ -287,11 +327,15 @@ class ContextPrecision(ContextPrecisionWithReference):
 
     def __init__(
         self,
-        llm: "InstructorBaseRagasLLM",
+        llm: t.Optional["InstructorBaseRagasLLM"] = None,
+        *,
+        decision_model: t.Optional[BaseDecisionModel] = None,
         **kwargs,
     ):
         """Initialize ContextPrecision with the legacy default name."""
-        super().__init__(llm, name="context_precision", **kwargs)
+        super().__init__(
+            llm, name="context_precision", decision_model=decision_model, **kwargs
+        )
 
 
 class ContextUtilization(ContextPrecisionWithoutReference):

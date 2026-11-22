@@ -3,6 +3,7 @@
 import typing as t
 from typing import List
 
+from ragas.decision_models import BaseDecisionModel, BinaryDecisionResult
 from ragas.metrics.collections.base import BaseMetric
 from ragas.metrics.result import MetricResult
 
@@ -10,6 +11,7 @@ from .util import (
     NLIStatementInput,
     NLIStatementOutput,
     NLIStatementPrompt,
+    StatementFaithfulnessAnswer,
     StatementGeneratorInput,
     StatementGeneratorOutput,
     StatementGeneratorPrompt,
@@ -31,8 +33,9 @@ class Faithfulness(BaseMetric):
     2. Checking each statement against the retrieved contexts using NLI
     3. Computing faithfulness as the ratio of supported statements
 
-    This implementation uses modern instructor LLMs with structured output.
-    Only supports modern components - legacy wrappers are rejected with clear error messages.
+    Uses a modern structured-output LLM to generate statements and, by default,
+    judge their support. An explicit decision_model instead judges each statement
+    against the retrieved contexts. Statement generation still requires an LLM.
 
     Usage:
         >>> import instructor
@@ -57,6 +60,7 @@ class Faithfulness(BaseMetric):
 
     Attributes:
         llm: Modern instructor-based LLM for statement generation and NLI evaluation
+        decision_model: Optional binary judge for statement support
         name: The metric name
         allowed_values: Score range (0.0 to 1.0, higher is better)
     """
@@ -68,6 +72,8 @@ class Faithfulness(BaseMetric):
         self,
         llm: "InstructorBaseRagasLLM",
         name: str = "faithfulness",
+        *,
+        decision_model: t.Optional[BaseDecisionModel] = None,
         **kwargs,
     ):
         """
@@ -76,9 +82,19 @@ class Faithfulness(BaseMetric):
         Args:
             llm: Modern instructor-based LLM for statement generation and NLI evaluation
             name: The metric name
+            decision_model: Optional judge receiving context and statement fields.
+                Its selected value is used without rethresholding. Statements,
+                verdicts, and probabilities are retained in
+                result.traces["output"]["decisions"]. The NLI prompt is only used
+                by the default LLM path.
         """
         # Set attributes explicitly before calling super()
         self.llm = llm
+        if decision_model is not None and not isinstance(
+            decision_model, BaseDecisionModel
+        ):
+            raise TypeError("decision_model must be a BaseDecisionModel")
+        self.decision_model = decision_model
         self.statement_generator_prompt = StatementGeneratorPrompt()
         self.nli_statement_prompt = NLIStatementPrompt()
 
@@ -122,11 +138,41 @@ class Faithfulness(BaseMetric):
 
         # Step 2: Join all contexts and evaluate statements against them
         context_str = "\n".join(retrieved_contexts)
-        verdicts = await self._create_verdicts(statements, context_str)
+        decisions = []
+        if self.decision_model is not None:
+            answers = []
+            for statement in statements:
+                decision = await self.decision_model.binary(
+                    instruction=(
+                        "Decide whether the statement can be directly inferred "
+                        "from the context."
+                    ),
+                    data={"context": context_str, "statement": statement},
+                )
+                if not isinstance(decision, BinaryDecisionResult):
+                    raise TypeError(
+                        "decision_model.binary() must return BinaryDecisionResult"
+                    )
+                decision = BinaryDecisionResult.model_validate(decision)
+                decisions.append({"statement": statement, **decision.model_dump()})
+                answers.append(
+                    StatementFaithfulnessAnswer(
+                        statement=statement,
+                        reason="",  # A binary decision need not generate a rationale.
+                        verdict=int(decision.value),
+                    )
+                )
+            verdicts = NLIStatementOutput(statements=answers)
+        else:
+            verdicts = await self._create_verdicts(statements, context_str)
 
         # Step 3: Compute faithfulness score
         score = self._compute_score(verdicts)
 
+        if self.decision_model is not None:
+            return MetricResult(
+                value=float(score), traces={"output": {"decisions": decisions}}
+            )
         return MetricResult(value=float(score))
 
     async def _create_statements(self, question: str, response: str) -> List[str]:
