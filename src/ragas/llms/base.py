@@ -189,7 +189,7 @@ class LangchainLLMWrapper(BaseRagasLLM):
     def is_finished(self, response: LLMResult) -> bool:
         """
         Parse the response to check if the LLM finished by checking the finish_reason
-        or stop_reason. Supports OpenAI and Vertex AI models.
+        or stop_reason. Supports OpenAI, Vertex AI, WatsonX and Anthropic models.
         """
         if self.is_finished_parser is not None:
             return self.is_finished_parser(response)
@@ -220,15 +220,26 @@ class LangchainLLMWrapper(BaseRagasLLM):
                 and t.cast(ChatGeneration, resp).message is not None
             ):
                 resp_message: BaseMessage = t.cast(ChatGeneration, resp).message
-                if resp_message.response_metadata.get("finish_reason") is not None:
-                    finish_reason = resp_message.response_metadata.get("finish_reason")
+                metadata = resp_message.response_metadata
+
+                # langchain-core normalises provider vocabularies onto a shared
+                # set, so prefer it when the installed version supplies it.
+                # Anthropic's "end_turn" arrives here as "stop".
+                normalized = metadata.get("normalized_finish_reason")
+                finish_reason = metadata.get("finish_reason")
+                stop_reason = metadata.get("stop_reason")
+
+                if normalized is not None:
+                    is_finished_list.append(normalized in ["stop", "STOP"])
+
+                # Either key, not whichever is seen first. langchain-anthropic
+                # sets both to "end_turn", so an if/elif that consulted
+                # finish_reason alone never reached the stop_reason check and
+                # reported every completed Anthropic generation as unfinished.
+                elif finish_reason is not None or stop_reason is not None:
                     is_finished_list.append(
                         finish_reason in ["stop", "STOP", "MAX_TOKENS", "eos_token"]
-                    )
-                elif resp_message.response_metadata.get("stop_reason") is not None:
-                    stop_reason = resp_message.response_metadata.get("stop_reason")
-                    is_finished_list.append(
-                        stop_reason
+                        or stop_reason
                         in ["end_turn", "stop", "STOP", "MAX_TOKENS", "eos_token"]
                     )
             # default to True
