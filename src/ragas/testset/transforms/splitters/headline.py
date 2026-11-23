@@ -18,6 +18,11 @@ class HeadlineSplitter(Splitter):
         for chunk in chunks:
             chunk_token_count = num_tokens_from_string(chunk)
 
+            # Flush earlier text before emitting any part of an oversized section.
+            if current_chunk and chunk_token_count > self.max_tokens:
+                adjusted_chunks.append(current_chunk)
+                current_chunk = ""
+
             # Split chunks that are over max_tokens
             while chunk_token_count > self.max_tokens:
                 # For chunks over max_tokens, we need to split by words since we can't
