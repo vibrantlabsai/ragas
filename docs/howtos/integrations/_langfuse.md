@@ -36,7 +36,7 @@ os.environ["LANGFUSE_PUBLIC_KEY"] = "pk-..."
 
 
 ```python
-%pip install datasets ragas llama_index python-dotenv --upgrade
+%pip install datasets ragas llama_index python-dotenv "langfuse>=4.7,<5" --upgrade
 ```
 
 ### The Data
@@ -169,13 +169,13 @@ print("answer: ", row["answer"])
     It is important to note that the specific implications will depend on the nature of the Supreme Court ruling and the subsequent actions taken by governments, activists, and organizations both within and outside the United States.
 
 
-Now let's initialize a Langfuse client SDK to instrument you app.
+Initialize the Langfuse SDK client from the project keys you configured above.
 
 
 ```python
-from langfuse import Langfuse
+from langfuse import get_client, observe
 
-langfuse = Langfuse()
+langfuse = get_client()
 ```
 
 Here we are defining a utility function to score your trace with the metrics you chose.
@@ -249,46 +249,32 @@ for row in amnesty_qa:
 
 
 ```python
-# if your running this in a notebook - please run this cell
-# to manage asyncio event loops
-import nest_asyncio
-
-nest_asyncio.apply()
-```
-
-
-```python
-from langfuse.decorators import observe, langfuse_context
-from asyncio import run
+@observe()
+def retrieve(question_hash: str):
+    return q_to_c[question_hash]
 
 
 @observe()
-def retriver(question: str):
-    return q_to_c[question]
+def generator(question_hash: str):
+    return q_to_a[question_hash]
 
 
 @observe()
-def generator(question):
-    return q_to_a[question]
-
-
-@observe()
-def rag_pipeline(question):
+async def rag_pipeline(question: str):
     q_hash = hash_string(question)
-    contexts = retriver(q_hash)
+    contexts = retrieve(q_hash)
     generated_answer = generator(q_hash)
 
-    # score the runs
-    score = run(score_with_ragas(question, contexts, answer=generated_answer))
-    for s in score:
-        langfuse_context.score_current_trace(name=s, value=score[s])
+    scores = await score_with_ragas(question, contexts, answer=generated_answer)
+    for name, value in scores.items():
+        langfuse.score_current_trace(name=name, value=value)
     return generated_answer
 ```
 
 
 ```python
-question, contexts, answer = row["question"], row["contexts"], row["answer"]
-generated_answer = rag_pipeline(amnesty_qa[0]["question"])
+generated_answer = await rag_pipeline(amnesty_qa[0]["question"])
+langfuse.flush()
 ```
 
     calculating faithfulness
