@@ -41,6 +41,16 @@ def test_mixed_case_and_whitespace():
     assert result["citation_alignment_quoted_spans"] == 1.0
 
 
+def test_apostrophe_does_not_hide_a_verbatim_quote():
+    """A contraction before a real quote must not replace that quote."""
+    answers = ['It\'s what the paper calls "the capital of France".']
+    sources = [["The capital of France is Paris."]]
+    result = quoted_spans_alignment(answers, sources)
+    assert result["citation_alignment_quoted_spans"] == 1.0
+    assert result["matched"] == 1.0
+    assert result["total"] == 1.0
+
+
 def test_no_quotes_returns_zero_with_zero_denominator():
     """An answer with no quoted spans should yield score 0.0 and total 0."""
     answers = ["No quotes here."]
