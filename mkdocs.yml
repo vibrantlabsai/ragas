@@ -124,6 +124,7 @@ nav:
             - Align an LLM as a Judge: howtos/applications/align-llm-as-judge.md
           - RAG Evaluation:
             - Evaluate and Improve a RAG App: howtos/applications/evaluate-and-improve-rag.md
+            - Evaluate Document Retrieval from Loom: howtos/applications/evaluate-loom-retrieval.md
       - CLI:
           - howtos/cli/index.md
           - RAG Evaluation: howtos/cli/rag_eval.md
