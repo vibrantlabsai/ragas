@@ -28,7 +28,7 @@ install-minimal: ## Install minimal dev dependencies (fast setup - 79 packages)
 	@echo "Installing core ragas + essential dev tools..."
 	$(Q)uv pip install -e ".[dev-minimal]"
 	@echo "Setting up pre-commit hooks..."
-	$(Q)uv run pre-commit install
+	$(Q)uv run --no-sync pre-commit install
 	@echo "Minimal installation complete! (79 packages)"
 	@echo "Note: For full features including ML packages, use 'make install'"
 
