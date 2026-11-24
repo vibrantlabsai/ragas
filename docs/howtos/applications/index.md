@@ -27,6 +27,7 @@ usecases to solve problems you might encounter when you're building.
 ## RAG Evaluation
 
 - [Evaluate and Improve a RAG System](evaluate-and-improve-rag.md)
+- [Evaluate Document Retrieval from Loom](evaluate-loom-retrieval.md)
 
 ## Agent Evaluation
 
