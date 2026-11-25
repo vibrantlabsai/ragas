@@ -885,7 +885,7 @@ class SimpleLLMMetric(SimpleBaseMetric):
 
         response = llm.generate(prompt_input, response_model=self._response_model)
         traces["output"] = response.model_dump()
-        result = MetricResult(**response.model_dump())
+        result = self._validated_result(MetricResult(**response.model_dump()))
         result.traces = traces
         return result
 
@@ -906,8 +906,24 @@ class SimpleLLMMetric(SimpleBaseMetric):
             response_model=self._response_model,
         )
         traces["output"] = response.model_dump()
-        result = MetricResult(**response.model_dump())  # Fixed missing parentheses
+        result = self._validated_result(MetricResult(**response.model_dump()))
         result.traces = traces
+        return result
+
+    def _validated_result(self, result: "MetricResult") -> "MetricResult":
+        """Apply the metric's validator, as the @metric decorator path does.
+
+        Returns a result with ``value=None`` and the validation error as the
+        reason when the LLM's value is outside ``allowed_values``.
+        """
+        from ragas.metrics.result import MetricResult
+
+        validate = getattr(self, "validate_result_value", None)
+        if validate is None:
+            return result
+        error = validate(result.value)
+        if error:
+            return MetricResult(value=None, reason=error)
         return result
 
     def batch_score(
@@ -1426,9 +1442,20 @@ class SimpleLLMMetric(SimpleBaseMetric):
             score = self.score(llm=llm, **values)
             pred_scores.append(score.value)
 
-        # Convert to strings for correlation calculation, filtering out None values
-        gold_scores = [str(score) for score in gold_scores_raw if score is not None]
-        pred_scores_str = [str(score) for score in pred_scores if score is not None]
+        # Convert to strings for correlation calculation, keeping only rows where
+        # both scores are present so gold and predicted values stay paired
+        pairs = [
+            (str(gold), str(pred))
+            for gold, pred in zip(gold_scores_raw, pred_scores)
+            if gold is not None and pred is not None
+        ]
+        if len(pairs) < 2:
+            raise ValueError(
+                f"Need at least 2 rows with both a gold and a predicted "
+                f"{self.name} score to validate alignment, got {len(pairs)}"
+            )
+        gold_scores = [gold for gold, _ in pairs]
+        pred_scores_str = [pred for _, pred in pairs]
 
         df = test_dataset.to_pandas()
         df[f"{self.name}_pred"] = pred_scores

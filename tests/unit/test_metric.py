@@ -338,3 +338,139 @@ def test_metric_prompt_conversion():
 
     # After __post_init__, prompt should be converted to Prompt object
     assert hasattr(metric.prompt, "format")
+
+
+def _llm_returning(mock_llm, payload):
+    """Point mock_llm's generate/agenerate at a fixed judge reply."""
+
+    def mock_generate(prompt, response_model):
+        return response_model(**payload)
+
+    async def mock_agenerate(prompt, response_model):
+        return response_model(**payload)
+
+    mock_llm.generate = mock_generate
+    mock_llm.agenerate = mock_agenerate
+    return mock_llm
+
+
+@pytest.mark.parametrize(
+    "allowed_values, value",
+    [((0.0, 10.0), 11.0), ((0.0, 10.0), -1.0), ((1.0, 5.0), 0.0), (range(1, 6), 7)],
+)
+def test_numeric_metric_score_rejects_out_of_range_value(
+    mock_llm, allowed_values, value
+):
+    """Class-based NumericMetric validates like the @numeric_metric path."""
+    from ragas.metrics import NumericMetric
+
+    metric = NumericMetric(
+        name="m", prompt="Rate {response}", allowed_values=allowed_values
+    )
+    llm = _llm_returning(mock_llm, {"value": value, "reason": "judge"})
+
+    result = metric.score(llm=llm, response="x")
+
+    assert result.value is None
+    assert "expected value in range" in result.reason
+    assert result.traces["output"]["value"] == value
+
+
+@pytest.mark.asyncio
+async def test_numeric_metric_ascore_rejects_out_of_range_value(mock_llm):
+    from ragas.metrics import NumericMetric
+
+    metric = NumericMetric(name="m", prompt="Rate {response}", allowed_values=(0, 10))
+    llm = _llm_returning(mock_llm, {"value": 11.0, "reason": "judge"})
+
+    result = await metric.ascore(llm=llm, response="x")
+
+    assert result.value is None
+    assert "expected value in range" in result.reason
+
+
+@pytest.mark.parametrize("value", [0.0, 7.5, 10.0])
+def test_numeric_metric_score_keeps_in_range_value(mock_llm, value):
+    from ragas.metrics import NumericMetric
+
+    metric = NumericMetric(name="m", prompt="Rate {response}", allowed_values=(0, 10))
+    llm = _llm_returning(mock_llm, {"value": value, "reason": "judge"})
+
+    result = metric.score(llm=llm, response="x")
+
+    assert result.value == value
+    assert result.reason == "judge"
+
+
+def test_ranking_metric_score_rejects_wrong_length(mock_llm):
+    from ragas.metrics import RankingMetric
+
+    metric = RankingMetric(name="r", prompt="Rank {items}", allowed_values=3)
+    llm = _llm_returning(mock_llm, {"value": ["a", "b"], "reason": "judge"})
+
+    result = metric.score(llm=llm, items="a, b, c")
+
+    assert result.value is None
+    assert "expected 3 items" in result.reason
+
+
+class _FakeGoldDataset:
+    """Minimal stand-in for the Dataset API used by validate_alignment."""
+
+    def __init__(self, rows):
+        self.rows = rows
+
+    def reload(self):
+        pass
+
+    def __iter__(self):
+        return iter(self.rows)
+
+    def get_row_value(self, row, key):
+        return row[key]
+
+    def to_pandas(self):
+        import pandas as pd
+
+        return pd.DataFrame(self.rows)
+
+
+def test_numeric_metric_alignment_skips_rejected_scores_in_pairs(mock_llm):
+    """A rejected score drops that row from both gold and predicted lists."""
+    pytest.importorskip("scipy")
+    from ragas.metrics import NumericMetric
+
+    metric = NumericMetric(name="m", prompt="Rate {response}", allowed_values=(0, 10))
+    replies = iter([1.0, 11.0, 3.0])
+
+    def mock_generate(prompt, response_model):
+        return response_model(value=next(replies), reason="judge")
+
+    mock_llm.generate = mock_generate
+    dataset = _FakeGoldDataset(
+        [{"response": r, "m": g} for r, g in zip("abc", [1.0, 2.0, 3.0])]
+    )
+
+    result = metric.validate_alignment(llm=mock_llm, test_dataset=dataset)
+
+    assert result["agreement_rate"] == 1.0
+    assert result["df"]["m_pred"].isna().tolist() == [False, True, False]
+
+
+def test_numeric_metric_alignment_needs_two_valid_pairs(mock_llm):
+    """Too few valid pairs gives a clear error instead of a scipy one."""
+    from ragas.metrics import NumericMetric
+
+    metric = NumericMetric(name="m", prompt="Rate {response}", allowed_values=(0, 10))
+    replies = iter([1.0, 11.0])
+
+    def mock_generate(prompt, response_model):
+        return response_model(value=next(replies), reason="judge")
+
+    mock_llm.generate = mock_generate
+    dataset = _FakeGoldDataset(
+        [{"response": "a", "m": 1.0}, {"response": "b", "m": 2.0}]
+    )
+
+    with pytest.raises(ValueError, match="at least 2 rows"):
+        metric.validate_alignment(llm=mock_llm, test_dataset=dataset)
