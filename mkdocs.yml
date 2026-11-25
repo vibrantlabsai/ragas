@@ -32,7 +32,7 @@ nav:
                   - Context Recall: concepts/metrics/available_metrics/context_recall.md
                   - Context Entities Recall: concepts/metrics/available_metrics/context_entities_recall.md
                   - Noise Sensitivity: concepts/metrics/available_metrics/noise_sensitivity.md
-                  - Response Relevancy: concepts/metrics/available_metrics/answer_relevance.md
+                  - Answer Relevancy: concepts/metrics/available_metrics/answer_relevance.md
                   - Faithfulness: concepts/metrics/available_metrics/faithfulness.md
               - Nvidia Metrics:
                   - Answer Accuracy: concepts/metrics/available_metrics/nvidia_metrics/#answer-accuracy
