@@ -338,3 +338,21 @@ def test_metric_prompt_conversion():
 
     # After __post_init__, prompt should be converted to Prompt object
     assert hasattr(metric.prompt, "format")
+
+
+def test_metric_result_copy_and_pickle():
+    """copy/deepcopy/pickle must not recurse through __getattr__ (#3128)."""
+    import copy
+    import pickle
+
+    from ragas.metrics.result import MetricResult
+
+    original = MetricResult(value=0.5, reason="ok", traces={"input": "i"})
+    for clone in (
+        copy.copy(original),
+        copy.deepcopy(original),
+        pickle.loads(pickle.dumps(original)),
+    ):
+        assert clone.value == 0.5
+        assert clone.reason == "ok"
+        assert clone.traces == {"input": "i"}
