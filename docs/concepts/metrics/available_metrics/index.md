@@ -9,7 +9,7 @@ Each metric are essentially paradigms that are designed to evaluate a particular
 - [Context Recall](context_recall.md)
 - [Context Entities Recall](context_entities_recall.md)
 - [Noise Sensitivity](noise_sensitivity.md)
-- [Response Relevancy](answer_relevance.md)
+- [Answer Relevancy](answer_relevance.md)
 - [Faithfulness](faithfulness.md)
 - [Multimodal Faithfulness](multi_modal_faithfulness.md)
 - [Multimodal Relevance](multi_modal_relevance.md)
