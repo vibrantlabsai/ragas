@@ -50,6 +50,33 @@ class TestQuotedSpansUtilities:
         assert spans == ["this is a longer quoted span"]
         assert "short" not in spans
 
+    def test_extract_quoted_spans_ignores_apostrophes(self):
+        """A contraction or possessive must not swallow the real quotation."""
+        context_quote = "a major step forward"
+        samples = [
+            f'The paper calls it "{context_quote}" for QA.',
+            f'It\'s what the paper calls "{context_quote}" for QA.',
+            f'The paper\'s authors call it "{context_quote}" for QA.',
+            "The paper\u2019s authors call it \u201ca major step forward\u201d for QA.",
+        ]
+        for text in samples:
+            assert extract_quoted_spans(text) == [context_quote]
+
+    def test_extract_quoted_spans_keeps_quotes_without_spaces(self):
+        """Double quotes may touch the surrounding word. Chinese has no spaces,
+        so the span is one token and min_len must not hide it."""
+        samples = {
+            "他说“这是一个重大进步”然后离开了。": "这是一个重大进步",
+            "Sie sagte „es ist gut“und ging.": "es ist gut",
+        }
+        for text, expected in samples.items():
+            assert extract_quoted_spans(text, min_len=1) == [expected]
+
+    def test_extract_quoted_spans_keeps_apostrophe_inside_quotes(self):
+        """An apostrophe that belongs to the quoted words stays in the span."""
+        text = 'He said "the paper\'s results are significant" yesterday.'
+        assert extract_quoted_spans(text) == ["the paper's results are significant"]
+
     def test_extract_quoted_spans_empty(self):
         """Test extraction with no quotes."""
         text = "No quotes in this text at all."

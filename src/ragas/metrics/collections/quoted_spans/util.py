@@ -5,8 +5,15 @@ from __future__ import annotations
 import re
 import typing as t
 
+# Word boundaries apply only to marks that can be apostrophes. Double quotes
+# in Chinese, Japanese, Korean and German often sit against a word character,
+# so the same check there drops the quotation (#3117).
+_DOUBLE_QUOTE = '["\u201c\u201d\u201e\u201f]'
+_SINGLE_QUOTE = "['\u2018\u2019`\u00b4]"
 QUOTE_RE = re.compile(
-    r'["\u201c\u201d\u201e\u201f\'\u2018\u2019`\u00b4](.*?)["\u201c\u201d\u201e\u201f\'\u2018\u2019`\u00b4]'
+    rf"(?:{_DOUBLE_QUOTE}|(?<!\w){_SINGLE_QUOTE})"
+    rf"(.*?)"
+    rf"(?:{_DOUBLE_QUOTE}|{_SINGLE_QUOTE}(?!\w))"
 )
 
 
