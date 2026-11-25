@@ -5,11 +5,16 @@ from __future__ import annotations
 import re
 import typing as t
 
-# An opening mark must not follow a word character, and a closing mark must
-# not precede one. Otherwise an apostrophe in "it's" or "paper's" is paired
-# with a real quote and the verbatim span is lost (#3117).
-_QUOTE_MARK = r'["\u201c\u201d\u201e\u201f\'\u2018\u2019`\u00b4]'
-QUOTE_RE = re.compile(rf"(?<!\w){_QUOTE_MARK}(.*?){_QUOTE_MARK}(?!\w)")
+# Word boundaries apply only to marks that can be apostrophes. Double quotes
+# in Chinese, Japanese, Korean and German often sit against a word character,
+# so the same check there drops the quotation (#3117).
+_DOUBLE_QUOTE = '["\u201c\u201d\u201e\u201f]'
+_SINGLE_QUOTE = "['\u2018\u2019`\u00b4]"
+QUOTE_RE = re.compile(
+    rf"(?:{_DOUBLE_QUOTE}|(?<!\w){_SINGLE_QUOTE})"
+    rf"(.*?)"
+    rf"(?:{_DOUBLE_QUOTE}|{_SINGLE_QUOTE}(?!\w))"
+)
 
 
 def normalize_text(text: str) -> str:

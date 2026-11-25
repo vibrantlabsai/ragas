@@ -62,6 +62,16 @@ class TestQuotedSpansUtilities:
         for text in samples:
             assert extract_quoted_spans(text) == [context_quote]
 
+    def test_extract_quoted_spans_keeps_quotes_without_spaces(self):
+        """Double quotes may touch the surrounding word. Chinese has no spaces,
+        so the span is one token and min_len must not hide it."""
+        samples = {
+            "他说“这是一个重大进步”然后离开了。": "这是一个重大进步",
+            "Sie sagte „es ist gut“und ging.": "es ist gut",
+        }
+        for text, expected in samples.items():
+            assert extract_quoted_spans(text, min_len=1) == [expected]
+
     def test_extract_quoted_spans_keeps_apostrophe_inside_quotes(self):
         """An apostrophe that belongs to the quoted words stays in the span."""
         text = 'He said "the paper\'s results are significant" yesterday.'

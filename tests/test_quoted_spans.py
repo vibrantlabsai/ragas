@@ -41,6 +41,15 @@ def test_mixed_case_and_whitespace():
     assert result["citation_alignment_quoted_spans"] == 1.0
 
 
+def test_double_quote_touching_a_word_is_kept():
+    """A double quote glued to the next word is still a quote."""
+    answers = ['He said"the capital of France"and left.']
+    sources = [["The capital of France is Paris."]]
+    result = quoted_spans_alignment(answers, sources)
+    assert result["citation_alignment_quoted_spans"] == 1.0
+    assert result["total"] == 1.0
+
+
 def test_apostrophe_does_not_hide_a_verbatim_quote():
     """A contraction before a real quote must not replace that quote."""
     answers = ['It\'s what the paper calls "the capital of France".']

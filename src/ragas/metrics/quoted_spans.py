@@ -19,9 +19,15 @@ from __future__ import annotations
 import re
 from typing import Dict, Sequence
 
-# An opening mark must not follow a word character, and a closing mark must
-# not precede one, so an apostrophe inside a word is not a quote (#3117).
-_QUOTE_RE = re.compile(r"""(?<!\w)["'`\u00b4](.*?)["'`\u00b4](?!\w)""")
+# Same rule as the collections extractor: the word-boundary check is only for
+# apostrophe-like marks. A double quote may sit against the next word (#3117).
+_DOUBLE_QUOTE = '["]'
+_SINGLE_QUOTE = "['`\u00b4]"
+_QUOTE_RE = re.compile(
+    rf"(?:{_DOUBLE_QUOTE}|(?<!\w){_SINGLE_QUOTE})"
+    rf"(.*?)"
+    rf"(?:{_DOUBLE_QUOTE}|{_SINGLE_QUOTE}(?!\w))"
+)
 
 
 def _normalize(text: str) -> str:
