@@ -6,20 +6,10 @@ from dataclasses import dataclass, field
 from ragas.dataset_schema import MultiTurnSample
 from ragas.messages import AIMessage
 from ragas.metrics.base import MetricType, MultiTurnMetric
+from ragas.metrics.utils import make_hashable_tool_arg
 
 if t.TYPE_CHECKING:
     from langchain_core.callbacks.base import Callbacks
-
-
-def _make_hashable(obj: t.Any) -> t.Any:
-    """Recursively convert an object to a hashable representation."""
-    if isinstance(obj, dict):
-        return frozenset((k, _make_hashable(v)) for k, v in obj.items())
-    elif isinstance(obj, (list, tuple)):
-        return tuple(_make_hashable(item) for item in obj)
-    elif isinstance(obj, set):
-        return frozenset(_make_hashable(item) for item in obj)
-    return obj
 
 
 @dataclass
@@ -45,13 +35,13 @@ class ToolCallF1(MultiTurnMetric):
         expected: set[tuple[str, frozenset]] = set()
         if sample.reference_tool_calls:
             for call in sample.reference_tool_calls:
-                expected.add((call.name, _make_hashable(call.args)))
+                expected.add((call.name, make_hashable_tool_arg(call.args)))
 
         actual: set[tuple[str, frozenset]] = set()
         for msg in sample.user_input:
             if isinstance(msg, AIMessage) and msg.tool_calls is not None:
                 for call in msg.tool_calls:
-                    actual.add((call.name, _make_hashable(call.args)))
+                    actual.add((call.name, make_hashable_tool_arg(call.args)))
 
         tp = len(actual & expected)
         fp = len(actual - expected)

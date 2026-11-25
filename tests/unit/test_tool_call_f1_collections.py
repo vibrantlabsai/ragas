@@ -2,7 +2,9 @@
 
 import pytest
 
+from ragas import MultiTurnSample
 from ragas.messages import AIMessage, HumanMessage, ToolCall
+from ragas.metrics import ToolCallF1 as LegacyToolCallF1
 from ragas.metrics.collections.tool_call_f1 import ToolCallF1
 
 
@@ -10,6 +12,40 @@ from ragas.metrics.collections.tool_call_f1 import ToolCallF1
 def tool_call_f1():
     """Fixture providing ToolCallF1 instance."""
     return ToolCallF1()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "reference_args,predicted_args,expected",
+    [
+        ({"enabled": True}, {"enabled": 1}, 0.0),
+        ({"settings": [False]}, {"settings": [0]}, 0.0),
+        ({"settings": [True]}, {"settings": [True]}, 1.0),
+        ({"count": 1}, {"count": 1.0}, 1.0),
+    ],
+)
+async def test_tool_call_f1_distinguishes_booleans_from_numbers(
+    tool_call_f1, reference_args, predicted_args, expected
+):
+    reference_tool_calls = [ToolCall(name="configure", args=reference_args)]
+    user_input = [
+        HumanMessage(content="Configure the setting"),
+        AIMessage(
+            content="",
+            tool_calls=[ToolCall(name="configure", args=predicted_args)],
+        ),
+    ]
+
+    result = await tool_call_f1.ascore(
+        user_input=user_input, reference_tool_calls=reference_tool_calls
+    )
+    legacy_score = await LegacyToolCallF1().multi_turn_ascore(
+        MultiTurnSample(
+            user_input=user_input, reference_tool_calls=reference_tool_calls
+        )
+    )
+
+    assert result.value == legacy_score == expected
 
 
 class TestToolCallF1Collections:
