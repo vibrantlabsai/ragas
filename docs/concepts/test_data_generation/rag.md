@@ -217,10 +217,10 @@ apply_transforms(kg, transforms)
 To apply few of the components in parallel, you can wrap them in `Parallel` class.
 
 ```python
-from ragas.testset.transforms import KeyphraseExtractor, NERExtractor
+from ragas.testset.transforms.extractors import KeyphrasesExtractor, NERExtractor
 from ragas.testset.transforms import apply_transforms, Parallel
 
-tranforms = [Parallel(KeyphraseExtractor(), NERExtractor()), rel_builder]
+transforms = [Parallel(KeyphrasesExtractor(), NERExtractor()), rel_builder]
 
 apply_transforms(kg, transforms)
 ```
@@ -247,7 +247,7 @@ Each `Scenario` in Test set Generation is a combination of following parameters.
 
 ### Query Synthesizer
 
-The `QuerySynthesizer` is responsible for generating different scenarios for a single query type. The `generate_scenarios` method is used to generate the scenarios for a single query type. The `generate_sample` method is used to generate the query and reference answer for a single scenario. Let's understand this with an example.
+The synthesizer (a subclass of `BaseSynthesizer`) is responsible for generating different scenarios for a single query type. The `generate_scenarios` method is used to generate the scenarios for a single query type. The `generate_sample` method is used to generate the query and reference answer for a single scenario. Let's understand this with an example.
 
 #### Example
 
@@ -258,12 +258,12 @@ Imagine your goal is to create 50 different queries where each query is about so
 
 ```python
 from dataclasses import dataclass
-from ragas.testset.synthesizers.base_query import QuerySynthesizer
+from ragas.testset.synthesizers.base import BaseSynthesizer
 
 
 @dataclass
-class EntityQuerySynthesizer(QuerySynthesizer):
-    async def _generate_scenarios(self, n, knowledge_graph, callbacks):
+class EntityQuerySynthesizer(BaseSynthesizer):
+    async def _generate_scenarios(self, n, knowledge_graph, persona_list, callbacks):
         """
         logic to query nodes with entity
         logic describing how to combine nodes,styles,length,persona to form n scenarios
@@ -278,6 +278,6 @@ class EntityQuerySynthesizer(QuerySynthesizer):
         """
 
         return SingleTurnSample(
-            user_input=query, reference_contexs=contexts, reference=reference
+            user_input=query, reference_contexts=contexts, reference=reference
         )
 ```
