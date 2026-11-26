@@ -12,6 +12,7 @@ import typing as t
 import pytest
 
 from ragas.metrics import MetricResult, discrete_metric, numeric_metric, ranking_metric
+from ragas.metrics.collections import ExactMatch
 
 
 class TestDiscreteMetric:
@@ -882,3 +883,29 @@ class TestIDESupport:
         score_result = test_metric.score(input_val="hello")
         assert isinstance(score_result, MetricResult)
         assert score_result.value == "yes"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (0.0, False),
+        (0.5, True),
+        ("", False),
+        ("relevant", True),
+        ([], False),
+        ([1], True),
+    ],
+)
+def test_truthiness_uses_the_result_value(value, expected):
+    assert bool(MetricResult(value=value, reason="fixture")) is expected
+
+
+@pytest.mark.asyncio
+async def test_exact_match_results_can_be_filtered_by_truthiness():
+    metric = ExactMatch()
+    results = [
+        await metric.ascore(reference="match", response=response)
+        for response in ["match", "different"]
+    ]
+
+    assert [result.value for result in results if result] == [1.0]

@@ -51,6 +51,9 @@ class MetricResult:
         """Get the raw result value."""
         return self._value
 
+    def __bool__(self) -> bool:
+        return bool(self._value)
+
     # Container-like behaviors for list results (RankingMetric)
     def __getitem__(self, key):
         if not hasattr(self._value, "__getitem__"):
