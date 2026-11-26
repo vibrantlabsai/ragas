@@ -141,7 +141,7 @@ Find the complete [Quickstart Guide](https://docs.ragas.io/en/latest/getstarted/
 
 In the past 2 years, we have seen and helped improve many AI applications using evals. If you want help with improving and scaling up your AI application using evals.
 
-🔗 Book a [slot](https://cal.com/team/vibrantlabs/app) or drop us a line: [founders@vibrantlabs.com](mailto:founders@vibrantlabs.com).
+🔗 Book a [slot](https://cal.com/team/vibrantlabs) or drop us a line: [founders@vibrantlabs.com](mailto:founders@vibrantlabs.com).
 
 ## 🫂 Community
 
