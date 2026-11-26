@@ -103,7 +103,10 @@ def generate_personas_from_kg(
     for node in nodes:
         embeddings.append(node.properties.get("summary_embedding"))
 
-    embeddings = np.array(embeddings)
+    embeddings = np.array(embeddings, dtype=float)
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    embeddings = embeddings / norms
     cosine_similarities = np.dot(embeddings, embeddings.T)
 
     groups = []
