@@ -17,7 +17,7 @@ We'll use discount calculation as our test case: given a customer profile, calcu
 
 *Note: You can adapt this approach to any use case that matters for your application.*
 
-> **📁 Full Code**: The complete source code for this example is available on [Github](https://github.com/vibrantlabsai/ragas/tree/main/examples/benchmark_llm)
+> **📁 Full Code**: The complete source code for this example is available on [Github](https://github.com/vibrantlabsai/ragas/tree/main/examples/ragas_examples/benchmark_llm)
 
 ## Set up your environment and API access
 
@@ -331,7 +331,7 @@ In this example:
 
 ## Adapting to your use case
 
-To evaluate models for your specific application, you can use the [GitHub code](https://github.com/vibrantlabsai/ragas/tree/main/examples/benchmark_llm) as a template and adapt it to your use case.
+To evaluate models for your specific application, you can use the [GitHub code](https://github.com/vibrantlabsai/ragas/tree/main/examples/ragas_examples/benchmark_llm) as a template and adapt it to your use case.
 
 The Ragas framework handles the orchestration, parallel execution, and result aggregation automatically for you, helping you evaluate and focus on your use case!
 
