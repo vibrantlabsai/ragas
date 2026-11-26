@@ -46,7 +46,7 @@ class StatementFaithfulnessAnswer(BaseModel):
 
     statement: str
     reason: str
-    verdict: int
+    verdict: int = Field(..., ge=0, le=1, description="Binary entailment verdict")
 
 
 class StatementFaithfulnessOutput(BaseModel):
