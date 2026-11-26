@@ -48,7 +48,7 @@ def download_and_save_dataset() -> Path:
         return dataset_path
 
     logger.info("Downloading HuggingFace doc Q&A evaluation dataset from GitHub...")
-    github_url = "https://raw.githubusercontent.com/explodinggradients/ragas/main/examples/ragas_examples/improve_rag/datasets/hf_doc_qa_eval.csv"
+    github_url = "https://raw.githubusercontent.com/explodinggradients/ragas/main/examples/ragas_examples/improve_rag/evals/datasets/hf_doc_qa_eval.csv"
 
     import urllib.request
 

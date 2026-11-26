@@ -336,4 +336,4 @@ if result.returncode != 0:
 - [AG-UI Documentation](https://docs.ag-ui.com)
 - [AG-UI Quickstart](https://docs.ag-ui.com/quickstart/applications)
 - [Ragas Documentation](https://docs.ragas.io)
-- [Ragas AG-UI Integration Guide](https://docs.ragas.io/integrations/ag-ui)
+- [Ragas AG-UI Integration Guide](https://docs.ragas.io/en/stable/howtos/integrations/ag_ui/)
