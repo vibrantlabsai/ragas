@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import typing as t
 from unittest.mock import MagicMock, patch
 
@@ -235,3 +237,66 @@ class TestLangchainLLMWrapperBypassN:
             assert mock_llm._n_passed is None
             # Result should still have 3 generations
             assert len(result.generations[0]) == 3
+
+
+@pytest.mark.asyncio
+async def test_concurrent_agenerate_text_sends_each_calls_own_n():
+    """Each concurrent call's request must carry the n that call asked for.
+
+    evaluate() runs many calls at once on one LangchainLLMWrapper. Setting n
+    on the shared LangChain model let one call's n end up in another call's
+    request (e.g. answer_relevancy asking for 3 questions but getting 1).
+    """
+    httpx = pytest.importorskip("httpx")
+    from langchain_core.prompt_values import StringPromptValue
+    from langchain_openai import ChatOpenAI
+
+    sent = {}
+
+    def fake_openai(request):
+        body = json.loads(request.content)
+        n = body.get("n") or 1
+        sent[body["messages"][0]["content"]] = n
+        choices = [
+            {
+                "index": i,
+                "message": {"role": "assistant", "content": "ok"},
+                "finish_reason": "stop",
+            }
+            for i in range(n)
+        ]
+        return httpx.Response(
+            200,
+            json={
+                "id": "x",
+                "object": "chat.completion",
+                "created": 0,
+                "model": body["model"],
+                "choices": choices,
+                "usage": {
+                    "prompt_tokens": 1,
+                    "completion_tokens": 1,
+                    "total_tokens": 2,
+                },
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(fake_openai)) as http:
+        chat = ChatOpenAI(
+            model="gpt-4o-mini",
+            api_key="sk-test",
+            n=2,
+            max_retries=0,
+            http_async_client=http,
+        )
+        wrapper = LangchainLLMWrapper(chat)
+        many, one = await asyncio.gather(
+            wrapper.agenerate_text(StringPromptValue(text="many"), n=3),
+            wrapper.agenerate_text(StringPromptValue(text="one"), n=1),
+        )
+
+    assert sent == {"many": 3, "one": 1}
+    assert len(many.generations[0]) == 3
+    assert len(one.generations[0]) == 1
+    # the user's own model object keeps the n it was created with
+    assert chat.n == 2

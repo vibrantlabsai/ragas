@@ -56,6 +56,9 @@ MULTIPLE_COMPLETION_SUPPORTED: t.List[t.Type[BaseLanguageModel]] = [
 if ChatVertexAI is not None and VertexAI is not None:
     MULTIPLE_COMPLETION_SUPPORTED.extend([ChatVertexAI, VertexAI])
 
+# LLMs whose agenerate_prompt reads n from a per-call keyword argument.
+N_PER_CALL_SUPPORTED = (OpenAI, ChatOpenAI, AzureOpenAI, AzureChatOpenAI)
+
 
 def is_multiple_completion_supported(llm: BaseLanguageModel) -> bool:
     """Return whether the given LLM supports n-completion."""
@@ -306,12 +309,25 @@ class LangchainLLMWrapper(BaseRagasLLM):
 
         # handle n
         if hasattr(self.langchain_llm, "n") and not self.bypass_n:
-            self.langchain_llm.n = n  # type: ignore
-            result = await self.langchain_llm.agenerate_prompt(
-                prompts=[prompt],
-                stop=stop,
-                callbacks=callbacks,
-            )
+            if isinstance(self.langchain_llm, N_PER_CALL_SUPPORTED):
+                # Pass n per call instead of setting it on the shared LLM:
+                # concurrent calls (e.g. inside evaluate()) would otherwise
+                # overwrite each other's n before the request is built.
+                result = await self.langchain_llm.agenerate_prompt(
+                    prompts=[prompt],
+                    n=n,
+                    stop=stop,
+                    callbacks=callbacks,
+                )
+            else:
+                # Other integrations read n from the model itself and may
+                # ignore or reject an n keyword.
+                self.langchain_llm.n = n  # type: ignore
+                result = await self.langchain_llm.agenerate_prompt(
+                    prompts=[prompt],
+                    stop=stop,
+                    callbacks=callbacks,
+                )
         else:
             result = await self.langchain_llm.agenerate_prompt(
                 prompts=[prompt] * n,
