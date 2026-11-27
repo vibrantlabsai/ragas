@@ -30,8 +30,40 @@ links_extractor = RegexBasedExtractor(
 )
 
 # This regex pattern matches emails, which typically follow the format "username@domain.extension".
-emails_extractor_pattern = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
-emails_extractor = RegexBasedExtractor(
+# The alternation pairs the email match with a fallback that consumes a whole run of local-part
+# characters. A long run that contains no "@" is therefore skipped in a single step instead of
+# being re-scanned from every start position, which is what made a plain ``re.findall`` quadratic
+# on such inputs. Only the captured email group (group 1) is kept; see ``EmailsExtractor`` below.
+emails_extractor_pattern = (
+    r"([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)|[a-zA-Z0-9_.+-]+"
+)
+
+
+@dataclass
+class EmailsExtractor(RegexBasedExtractor):
+    """Extract emails from a node's ``page_content`` in linear time.
+
+    ``pattern`` must expose the email as its first capturing group. Matches from
+    the fallback alternative (runs of local-part characters skipped while
+    scanning) have no group 1 and are dropped.
+    """
+
+    async def extract(self, node: Node) -> t.Tuple[str, t.Any]:
+        text = node.get_property("page_content")
+        if not isinstance(text, str):
+            raise ValueError(
+                f"node.property('page_content') must be a string, found '{type(text)}'"
+            )
+
+        matches = [
+            match.group(1)
+            for match in re.finditer(self.pattern, text, re.MULTILINE)
+            if match.group(1)
+        ]
+        return self.property_name, matches
+
+
+emails_extractor = EmailsExtractor(
     pattern=emails_extractor_pattern, is_multiline=False, property_name="emails"
 )
 
