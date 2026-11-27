@@ -8,6 +8,7 @@ from ragas.metrics.collections.quoted_spans.util import (
     extract_quoted_spans,
     normalize_text,
 )
+from ragas.metrics.quoted_spans import quoted_spans_alignment
 
 
 class TestQuotedSpansUtilities:
@@ -147,6 +148,28 @@ class TestQuotedSpansAlignmentCollections:
         result = await metric.ascore(response=response, retrieved_contexts=sources)
         assert result.value == 0.0
         assert "0/1" in result.reason
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("casefold", [True, False])
+    @pytest.mark.parametrize(
+        ("passages", "expected"),
+        [
+            (["The blue crate ships", "on Friday the office closes."], 0.0),
+            (["on Friday the office closes.", "The blue crate ships"], 0.0),
+            (["The blue crate ships on Friday.", "The office closes."], 1.0),
+        ],
+    )
+    async def test_a_quote_must_be_in_one_passage(self, casefold, passages, expected):
+        response = 'The note says "ships on Friday".'
+        metric = QuotedSpansAlignment(casefold=casefold)
+
+        result = await metric.ascore(response=response, retrieved_contexts=passages)
+        legacy = quoted_spans_alignment([response], [passages], casefold=casefold)
+
+        assert (result.value, legacy["citation_alignment_quoted_spans"]) == (
+            expected,
+            expected,
+        )
 
     @pytest.mark.asyncio
     async def test_partial_alignment(self):

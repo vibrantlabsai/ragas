@@ -91,7 +91,7 @@ def quoted_spans_alignment(
     -----
     If no quoted spans are found across the dataset, the score is defined as
     0.0, with matched=0 and total=0.  Matching is substring matching on
-    normalized text.
+    the normalized text of each source passage.
     """
     if len(answers) != len(sources):
         raise ValueError("answers and sources must have the same length")
@@ -102,18 +102,14 @@ def quoted_spans_alignment(
         spans = _extract_quoted_spans(answer, min_len=min_len)
         if not spans:
             continue
-        # join all sources for this answer into one string
-        joined_sources = " ".join(src_list)
-        if casefold:
-            normalized_sources = _normalize(joined_sources)
-        else:
-            normalized_sources = joined_sources
+        normalized_sources = (
+            [_normalize(source) for source in src_list] if casefold else src_list
+        )
 
         for span in spans:
             total += 1
             span_norm = _normalize(span) if casefold else span
-            # check if the normalized span appears in the normalized sources
-            if span_norm and span_norm in normalized_sources:
+            if span_norm and any(span_norm in source for source in normalized_sources):
                 matched += 1
 
     score = (matched / total) if total else 0.0
