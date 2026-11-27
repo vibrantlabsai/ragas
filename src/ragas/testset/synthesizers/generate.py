@@ -5,6 +5,7 @@ import random
 import typing as t
 from dataclasses import dataclass, field
 
+import numpy as np
 from langchain_core.callbacks import BaseCallbackManager
 from langchain_core.documents import Document as LCDocument
 
@@ -44,7 +45,6 @@ if t.TYPE_CHECKING:
     from ragas.embeddings.base import BaseRagasEmbeddings
     from ragas.llms.base import BaseRagasLLM
     from ragas.testset.synthesizers import QueryDistribution
-    from ragas.testset.synthesizers.base import BaseScenario
 
 
 RAGAS_TESTSET_GENERATION_GROUP_NAME = "ragas testset generation"
@@ -449,7 +449,9 @@ class TestsetGenerator:
         with_debugging_logs : bool, default False
             If True, enable debug logging for various components.
         raise_exceptions : bool, default True
-            If True, raise exceptions during the generation process.
+            If True, raise exceptions during the generation process. If False,
+            failed scenario and sample jobs are logged and skipped when returning
+            a testset, which can contain fewer than `testset_size` samples.
         return_executor : bool, default False
             If True, returns the Executor instance instead of running generation.
             The returned executor can be used to cancel execution by calling executor.cancel().
@@ -555,7 +557,7 @@ class TestsetGenerator:
             )
 
         try:
-            scenario_sample_list: t.List[t.List[BaseScenario]] = exec.results()
+            scenario_sample_list = exec.results()
         except Exception as e:
             scenario_generation_rm.on_chain_error(e)
             raise e
@@ -579,7 +581,11 @@ class TestsetGenerator:
         )
         additional_testset_info: t.List[t.Dict] = []
         for i, (synthesizer, _) in enumerate(query_distribution):
-            for sample in scenario_sample_list[i]:
+            scenarios = scenario_sample_list[i]
+            # The executor marks each suppressed job failure with np.nan.
+            if not raise_exceptions and scenarios is np.nan:
+                continue
+            for sample in scenarios:
                 exec.submit(
                     synthesizer.generate_sample,
                     scenario=sample,
@@ -607,6 +613,8 @@ class TestsetGenerator:
         # build the testset
         testsets = []
         for sample, additional_info in zip(eval_samples, additional_testset_info):
+            if not raise_exceptions and sample is np.nan:
+                continue
             testsets.append(TestsetSample(eval_sample=sample, **additional_info))
         testset = Testset(samples=testsets, cost_cb=cost_cb)
         testset_generation_rm.on_chain_end({"testset": testset})
