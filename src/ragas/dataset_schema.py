@@ -790,12 +790,12 @@ class SingleMetricAnnotation(BaseModel):
         # Determine the number of batches required
         total_samples = len(self.samples)
         num_batches = (
-            np.ceil(total_samples / batch_size).astype(int)
+            np.floor(total_samples / batch_size).astype(int)
             if drop_last_batch
-            else np.floor(total_samples / batch_size).astype(int)
+            else np.ceil(total_samples / batch_size).astype(int)
         )
         samples_per_class_per_batch = {
-            cls: max(1, len(samples) // num_batches)
+            cls: max(1, len(samples) // max(1, num_batches))
             for cls, samples in class_groups.items()
         }
 
@@ -817,6 +817,10 @@ class SingleMetricAnnotation(BaseModel):
                 elif replace and len(batch) < batch_size:
                     # Reuse samples if `replace` is True
                     batch.extend(random.choices(samples, k=batch_size - len(batch)))
+
+            # Stop if no samples could be added, to guarantee termination
+            if not batch:
+                break
 
             # Shuffle the batch to mix classes
             random.shuffle(batch)
