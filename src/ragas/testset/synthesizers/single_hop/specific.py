@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import random
 import typing as t
 from collections import defaultdict
 from dataclasses import dataclass
@@ -134,6 +135,10 @@ class SingleHopSpecificQuerySynthesizer(SingleHopQuerySynthesizer):
         if len(nodes) == 0:
             raise ValueError("No nodes found with the `entities` property.")
         samples_per_node = int(np.ceil(n / len(nodes)))
+        # The loop below stops once it has n scenarios, and kg nodes are stored
+        # document by document, so visit them in random order. Otherwise every
+        # sample would come from the first document(s).
+        random.shuffle(nodes)
 
         scenarios = []
         for node in nodes:
