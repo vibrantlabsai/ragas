@@ -1,3 +1,4 @@
+import random
 import typing as t
 
 import pytest
@@ -187,3 +188,43 @@ async def test_generate_scenarios_with_string_entities(fake_llm):
 
     # Should generate scenarios successfully
     assert len(scenarios) > 0
+
+
+@pytest.mark.asyncio
+async def test_generate_scenarios_visits_nodes_in_shuffled_order(fake_llm, monkeypatch):
+    """Scenarios must not be limited to the first nodes of the graph.
+
+    Nodes are stored document by document. When there are more nodes than
+    requested scenarios, _generate_scenarios used to stop after the first n
+    nodes, so every single-hop sample came from the first document.
+    """
+    nodes = []
+    for doc in range(5):
+        for chunk in range(10):
+            node = Node(type=NodeType.CHUNK)
+            node.add_property("page_content", f"doc{doc} chunk{chunk}")
+            node.add_property("entities", [f"entity_{doc}_{chunk}"])
+            nodes.append(node)
+    kg = KnowledgeGraph(nodes=nodes)
+    original_order = list(kg.nodes)
+
+    # Deterministic stand-in for random.shuffle: reverse the list in place.
+    monkeypatch.setattr(random, "shuffle", lambda items: items.reverse())
+
+    personas = [
+        Persona(name="Researcher", role_description="Reads every document."),
+    ]
+    synthesizer = SingleHopSpecificQuerySynthesizer(llm=fake_llm)
+    synthesizer.theme_persona_matching_prompt = MockThemePersonaMatchingPrompt()
+
+    scenarios = await synthesizer._generate_scenarios(
+        n=8,
+        knowledge_graph=kg,
+        persona_list=personas,
+        callbacks=None,
+    )
+
+    picked = [s.nodes[0].properties["page_content"] for s in scenarios]
+    assert picked == [f"doc4 chunk{c}" for c in range(9, 1, -1)]
+    # the knowledge graph itself is not reordered
+    assert kg.nodes == original_order
