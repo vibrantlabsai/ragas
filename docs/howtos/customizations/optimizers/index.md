@@ -331,5 +331,5 @@ results = production_metric.batch_score(production_samples)
 ## See Also
 
 - [Optimizers API Reference](../../../references/optimizers.md) - Full API documentation
-- [Metric Customization](../../metrics/custom-metrics.md) - Creating custom metrics
+- [Metric Customization](../../../concepts/metrics/overview/index.md#output-types) - Creating custom metrics
 - [DSPy Documentation](https://dspy-docs.vercel.app/) - Learn more about DSPy

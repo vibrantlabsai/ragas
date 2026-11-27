@@ -95,8 +95,7 @@ nav:
           - LLM Adapters: howtos/llm-adapters.md
           - Metrics:
               - Modify Prompts: howtos/customizations/metrics/modifying-prompts-metrics.md
-              - Adapt Metrics to Languages: howtos/customizations/metrics/_metrics_language_adaptation.md
-              - Train and Align Metrics: howtos/customizations/metrics/train_your_own_metric.md
+              - Adapt Metrics to Languages: howtos/customizations/metrics/metrics_language_adaptation.md
           - Testset Generation:
               - Non-English Testset Generation: howtos/customizations/testgenerator/_language_adaptation.md
               - Persona Generation: howtos/customizations/testgenerator/_persona_generator.md

@@ -25,8 +25,7 @@ This tutorial notebook provides a step-by-step guide on how to compare and choos
 Ragas offers a unique test generation paradigm that enables the creation of evaluation datasets specifically tailored to your retrieval and generation tasks. Unlike traditional QA generators, Ragas can generate a wide variety of challenging test cases from your document corpus.
 
 !!! tip
-    Refer to [testset generation](./../../concepts/testset_generation/index.md) to know more on how it works.
-
+    Refer to [testset generation](./../../concepts/test_data_generation/index.md) to know more on how it works.
 For this tutorial notebook, I am using papers from Arxiv that is related to large language models to build RAG.
 
 !!! note
