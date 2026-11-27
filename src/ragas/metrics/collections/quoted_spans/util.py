@@ -41,7 +41,7 @@ def count_matched_spans(
     casefold: bool = True,
 ) -> t.Tuple[int, int]:
     """
-    Count how many spans appear in the sources.
+    Count how many spans appear within an individual source passage.
 
     Args:
         spans: List of quoted spans to check.
@@ -54,13 +54,14 @@ def count_matched_spans(
     if not spans:
         return 0, 0
 
-    joined_sources = " ".join(sources)
-    normalized_sources = normalize_text(joined_sources) if casefold else joined_sources
+    normalized_sources = (
+        [normalize_text(source) for source in sources] if casefold else sources
+    )
 
     matched = 0
     for span in spans:
         span_norm = normalize_text(span) if casefold else span
-        if span_norm and span_norm in normalized_sources:
+        if span_norm and any(span_norm in source for source in normalized_sources):
             matched += 1
 
     return matched, len(spans)
