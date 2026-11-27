@@ -114,10 +114,20 @@ Context Utilization Score: 0.49999999995
 
 ## Legacy Metrics API
 
-The following examples use the legacy metrics API pattern. For new projects, we recommend using the collections-based API shown above.
+The following examples use the legacy metrics API pattern. To migrate an
+LLM-based evaluation, choose the collection metric that accepts the same
+comparison input:
+
+| Legacy metric | Collection metric | Comparison input |
+| --- | --- | --- |
+| `LLMContextPrecisionWithReference` | `ContextPrecision` | `reference` |
+| `LLMContextPrecisionWithoutReference` | `ContextUtilization` | `response` |
 
 !!! warning "Deprecation Timeline"
-    This API will be deprecated in version 0.4 and removed in version 1.0. Please migrate to the collections-based API shown above.
+    The legacy metrics API was deprecated in version 0.4 and is scheduled for
+    removal in version 1.0. The table above covers the two LLM-based metrics.
+    See the sections below for evaluations that use reference contexts or
+    context IDs.
 
 ### Example with SingleTurnSample
 
@@ -197,6 +207,10 @@ Output:
 
 This metric uses non-LLM-based methods (such as [Levenshtein distance measure](https://en.wikipedia.org/wiki/Levenshtein_distance)) to determine whether a retrieved context is relevant.
 
+Use the legacy import below for this metric. The collection metrics above
+require an LLM and compare a reference answer or generated response with the
+retrieved contexts. They do not provide the same text-similarity score.
+
 ### Context Precision with reference contexts
 
 The `NonLLMContextPrecisionWithReference` metric is designed for scenarios where both retrieved contexts and reference contexts are available for a `user_input`. To determine if a retrieved context is relevant, this method compares each retrieved context or chunk in `retrieved_contexts` with every context in `reference_contexts` using a non-LLM-based similarity measure.
@@ -230,6 +244,9 @@ Output:
 ## ID Based Context Precision
 
 IDBasedContextPrecision provides a direct and efficient way to measure precision by comparing the IDs of retrieved contexts with reference context IDs. This metric is particularly useful when you have a unique ID system for your documents and want to evaluate retrieval performance without comparing the actual content.
+
+Use the legacy import below for ID-based evaluation. Neither collection
+metric above accepts context IDs.
 
 The metric computes precision using retrieved_context_ids and reference_context_ids, with values ranging between 0 and 1. Higher values indicate better performance. It works with both string and integer IDs.
 
