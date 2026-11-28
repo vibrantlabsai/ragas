@@ -9,7 +9,7 @@ import string
 import typing as t
 import uuid
 import warnings
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 
@@ -393,7 +393,7 @@ class _ContextualFormatter(logging.Formatter):
 
     @staticmethod
     def utc_converter(timestamp):
-        return datetime.utcfromtimestamp(timestamp)  # UTC time conversion
+        return datetime.fromtimestamp(timestamp, tz=timezone.utc).replace(tzinfo=None)
 
 
 base_logger = set_logging_level()
