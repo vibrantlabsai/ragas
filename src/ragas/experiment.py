@@ -3,6 +3,7 @@
 __all__ = ["Experiment", "experiment", "version_experiment"]
 
 import asyncio
+import inspect
 import typing as t
 from pathlib import Path
 
@@ -133,7 +134,7 @@ class ExperimentWrapper:
 
     async def __call__(self, *args, **kwargs) -> t.Any:
         """Call the original function."""
-        if asyncio.iscoroutinefunction(self.func):
+        if inspect.iscoroutinefunction(self.func):
             return await self.func(*args, **kwargs)
         else:
             return self.func(*args, **kwargs)
