@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 import typing as t
+
+import numpy as np
 from dataclasses import dataclass, field
 from typing import Dict
 
@@ -193,6 +195,8 @@ class SummarizationScore(MetricWithLLM, SingleTurnMetric):
         )
 
     def _compute_qa_score(self, answers: t.List[str]) -> float:
+        if not answers:
+            return np.nan
         correct = sum([1 for a in answers if a.lower() == "1"])
         return correct / len(answers)
 
